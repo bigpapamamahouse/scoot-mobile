@@ -24,25 +24,44 @@ async function bufferToHex(buffer: ArrayBuffer): Promise<string> {
 export async function directCognitoAuth(username: string, password: string) {
   try {
     console.log('=== Direct Cognito Auth Attempt ===');
-    console.log('Username:', username);
+    console.log('Username received:', username);
+    console.log('Username length:', username?.length);
+    console.log('Password length:', password?.length);
     console.log('Client ID:', ENV.USER_POOL_CLIENT_ID);
 
+    // Validate inputs
+    if (!username || username.trim().length === 0) {
+      console.error('❌ Username is empty!');
+      return { success: false, error: 'Username is required' };
+    }
+
+    if (!password || password.length === 0) {
+      console.error('❌ Password is empty!');
+      return { success: false, error: 'Password is required' };
+    }
+
     const url = `https://cognito-idp.${ENV.REGION}.amazonaws.com/`;
+
+    // Ensure USERNAME and PASSWORD are strings
+    const trimmedUsername = String(username).trim();
+    const authParams = {
+      USERNAME: trimmedUsername,
+      PASSWORD: String(password),
+    };
 
     const payload = {
       ClientId: ENV.USER_POOL_CLIENT_ID,
       AuthFlow: 'USER_PASSWORD_AUTH',
-      AuthParameters: {
-        USERNAME: username,
-        PASSWORD: password,
-      },
+      AuthParameters: authParams,
     };
 
     console.log('Request URL:', url);
     console.log('Request payload (password hidden):', {
-      ...payload,
-      AuthParameters: { ...payload.AuthParameters, PASSWORD: '***' }
+      ClientId: payload.ClientId,
+      AuthFlow: payload.AuthFlow,
+      AuthParameters: { USERNAME: trimmedUsername, PASSWORD: '***' }
     });
+    console.log('Actual AuthParameters keys:', Object.keys(authParams));
 
     const response = await fetch(url, {
       method: 'POST',
