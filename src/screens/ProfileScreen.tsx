@@ -58,6 +58,79 @@ export default function ProfileScreen({ navigation }: any) {
     return [];
   }, []);
 
+  const filterPostsForUser = React.useCallback(
+    (items: Post[], identity: { id?: string | null; handle?: string | null }) => {
+      const normalizedId = typeof identity.id === 'string' ? identity.id.trim() : null;
+      const normalizedHandle =
+        typeof identity.handle === 'string'
+          ? identity.handle.replace(/^@/, '').trim().toLowerCase()
+          : null;
+
+      if (!normalizedId && !normalizedHandle) {
+        return items;
+      }
+
+      const normalizeIdCandidate = (value: unknown) => {
+        if (typeof value === 'string') {
+          const trimmed = value.trim();
+          if (trimmed) {
+            return trimmed;
+          }
+        }
+        return null;
+      };
+
+      const normalizeHandleCandidate = (value: unknown) => {
+        if (typeof value === 'string') {
+          const trimmed = value.trim();
+          if (trimmed) {
+            return trimmed.replace(/^@/, '').toLowerCase();
+          }
+        }
+        return null;
+      };
+
+      return items.filter((raw) => {
+        const candidate: any = raw;
+
+        const idCandidates = [
+          candidate?.userId,
+          candidate?.user?.id,
+          candidate?.authorId,
+          candidate?.author?.id,
+          candidate?.ownerId,
+          candidate?.profileId,
+          candidate?.createdById,
+        ]
+          .map(normalizeIdCandidate)
+          .filter(Boolean);
+
+        if (normalizedId && idCandidates.includes(normalizedId)) {
+          return true;
+        }
+
+        const handleCandidates = [
+          candidate?.handle,
+          candidate?.user?.handle,
+          candidate?.user?.username,
+          candidate?.author?.handle,
+          candidate?.authorHandle,
+          candidate?.username,
+          candidate?.profile?.handle,
+        ]
+          .map(normalizeHandleCandidate)
+          .filter(Boolean);
+
+        if (normalizedHandle && handleCandidates.includes(normalizedHandle)) {
+          return true;
+        }
+
+        return false;
+      });
+    },
+    []
+  );
+
   const load = React.useCallback(async () => {
     try {
       // Load current user info
@@ -70,16 +143,27 @@ export default function ProfileScreen({ navigation }: any) {
         userId: userData?.id,
       });
       const normalizedPosts = resolvePosts(postsData);
-      if (!normalizedPosts.length && postsData && !Array.isArray(postsData)) {
+      const filteredPosts = filterPostsForUser(normalizedPosts, {
+        id: userData?.id,
+        handle: userData?.handle,
+      });
+      if (filteredPosts.length !== normalizedPosts.length) {
+        console.debug(
+          'Filtered profile posts to current user',
+          normalizedPosts.length - filteredPosts.length,
+          'items removed'
+        );
+      }
+      if (!filteredPosts.length && postsData && !Array.isArray(postsData)) {
         console.warn('Unrecognized user posts response shape', postsData);
       }
-      setPosts(normalizedPosts);
+      setPosts(filteredPosts);
     } catch (e: any) {
       console.warn('Failed to load profile:', e?.message || String(e));
     } finally {
       setLoading(false);
     }
-  }, [resolvePosts]);
+  }, [filterPostsForUser, resolvePosts]);
 
   React.useEffect(() => {
     load();
