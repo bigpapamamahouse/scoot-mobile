@@ -65,7 +65,10 @@ export default function ProfileScreen({ navigation }: any) {
       setUser(userData);
 
       // Load user's posts
-      const postsData = await PostsAPI.getUserPosts(userData?.handle || userData?.id);
+      const postsData = await PostsAPI.getUserPosts({
+        handle: userData?.handle,
+        userId: userData?.id,
+      });
       const normalizedPosts = resolvePosts(postsData);
       if (!normalizedPosts.length && postsData && !Array.isArray(postsData)) {
         console.warn('Unrecognized user posts response shape', postsData);
