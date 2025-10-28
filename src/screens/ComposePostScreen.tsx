@@ -34,7 +34,7 @@ export default function ComposePostScreen({ navigation }: any) {
           return;
         }
         result = await ImagePicker.launchCameraAsync({
-          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          mediaTypes: 'images',
           allowsEditing: true,
           aspect: [4, 3],
           quality: 0.8,
@@ -46,7 +46,7 @@ export default function ComposePostScreen({ navigation }: any) {
           return;
         }
         result = await ImagePicker.launchImageLibraryAsync({
-          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          mediaTypes: 'images',
           allowsEditing: true,
           aspect: [4, 3],
           quality: 0.8,
@@ -83,9 +83,6 @@ export default function ComposePostScreen({ navigation }: any) {
       const response = await fetch(`${ENV.API_URL}/upload`, {
         method: 'POST',
         body: formData,
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
       });
 
       if (!response.ok) {
