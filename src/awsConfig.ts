@@ -22,6 +22,9 @@ const config = {
         email: true,
         phone: false,
       },
+      // Explicitly set authentication flow to USER_PASSWORD_AUTH
+      // This is required for username/password authentication
+      userPoolEndpoint: `https://cognito-idp.${ENV.REGION}.amazonaws.com`,
     },
   },
 };
