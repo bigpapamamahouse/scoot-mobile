@@ -5,7 +5,15 @@ import { mediaUrlFromKey } from '../lib/media';
 import { Avatar } from './Avatar';
 import { ReactionsAPI, CommentsAPI } from '../api';
 
-export default function PostCard({ post, onPress }: { post: Post; onPress?: () => void }) {
+export default function PostCard({
+  post,
+  onPress,
+  onPressAuthor,
+}: {
+  post: Post;
+  onPress?: () => void;
+  onPressAuthor?: () => void;
+}) {
   const [reactions, setReactions] = React.useState<Reaction[]>([]);
   const [commentCount, setCommentCount] = React.useState(post.commentCount || 0);
 
@@ -47,8 +55,15 @@ export default function PostCard({ post, onPress }: { post: Post; onPress?: () =
     >
       {/* Header */}
       <View style={styles.header}>
-        <Avatar avatarKey={post.avatarKey} size={32} />
-        <Text style={styles.handle}>@{post.handle || post.userId.slice(0, 8)}</Text>
+        <TouchableOpacity
+          disabled={!onPressAuthor}
+          onPress={onPressAuthor}
+          style={styles.author}
+          activeOpacity={onPressAuthor ? 0.7 : 1}
+        >
+          <Avatar avatarKey={post.avatarKey} size={32} />
+          <Text style={styles.handle}>@{post.handle || post.userId.slice(0, 8)}</Text>
+        </TouchableOpacity>
         <Text style={styles.timestamp}>
           {new Date(post.createdAt).toLocaleString()}
         </Text>
@@ -122,12 +137,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 8,
+    justifyContent: 'space-between',
+  },
+  author: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexShrink: 1,
+    marginRight: 12,
   },
   handle: {
     fontWeight: '600',
     fontSize: 15,
     marginLeft: 8,
-    flex: 1,
+    flexShrink: 1,
   },
   timestamp: {
     color: '#888',

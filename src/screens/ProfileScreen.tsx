@@ -14,11 +14,12 @@ import { User, Post } from '../types';
 import PostCard from '../components/PostCard';
 import { Avatar } from '../components/Avatar';
 
-export default function ProfileScreen({ navigation }: any) {
+export default function ProfileScreen({ navigation, route }: any) {
   const [user, setUser] = React.useState<User | null>(null);
   const [posts, setPosts] = React.useState<Post[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [refreshing, setRefreshing] = React.useState(false);
+  const [viewer, setViewer] = React.useState<User | null>(null);
 
   const resolvePosts = React.useCallback((payload: unknown): Post[] => {
     if (!payload) return [];
@@ -131,39 +132,149 @@ export default function ProfileScreen({ navigation }: any) {
     []
   );
 
-  const load = React.useCallback(async () => {
-    try {
-      // Load current user info
-      const userData = await UsersAPI.me();
-      setUser(userData);
+  const load = React.useCallback(
+    async (options?: { skipSpinner?: boolean }) => {
+      if (!options?.skipSpinner) {
+        setLoading(true);
+      }
 
-      // Load user's posts
-      const postsData = await PostsAPI.getUserPosts({
-        handle: userData?.handle,
-        userId: userData?.id,
-      });
-      const normalizedPosts = resolvePosts(postsData);
-      const filteredPosts = filterPostsForUser(normalizedPosts, {
-        id: userData?.id,
-        handle: userData?.handle,
-      });
-      if (filteredPosts.length !== normalizedPosts.length) {
-        console.debug(
-          'Filtered profile posts to current user',
-          normalizedPosts.length - filteredPosts.length,
-          'items removed'
-        );
+      const params = (route?.params ?? {}) as Record<string, unknown>;
+      const paramHandleCandidates = [
+        params.userHandle,
+        params.handle,
+        params.username,
+      ];
+      const paramUserIdCandidates = [params.userId, params.id, params.profileId];
+
+      const normalizeHandle = (value: unknown): string | null => {
+        if (typeof value !== 'string') return null;
+        const trimmed = value.replace(/^@/, '').trim();
+        return trimmed || null;
+      };
+
+      const normalizeId = (value: unknown): string | null => {
+        if (typeof value !== 'string') return null;
+        const trimmed = value.trim();
+        return trimmed || null;
+      };
+
+      let requestedHandle: string | null = null;
+      for (const candidate of paramHandleCandidates) {
+        requestedHandle = normalizeHandle(candidate);
+        if (requestedHandle) break;
       }
-      if (!filteredPosts.length && postsData && !Array.isArray(postsData)) {
-        console.warn('Unrecognized user posts response shape', postsData);
+
+      let requestedUserId: string | null = null;
+      for (const candidate of paramUserIdCandidates) {
+        requestedUserId = normalizeId(candidate);
+        if (requestedUserId) break;
       }
-      setPosts(filteredPosts);
-    } catch (e: any) {
-      console.warn('Failed to load profile:', e?.message || String(e));
-    } finally {
-      setLoading(false);
-    }
-  }, [filterPostsForUser, resolvePosts]);
+
+      try {
+        let currentUser: User | null = null;
+        try {
+          currentUser = await UsersAPI.me();
+        } catch (viewerError: any) {
+          console.warn(
+            'Failed to load signed-in user profile:',
+            viewerError?.message || String(viewerError)
+          );
+        }
+        setViewer(currentUser);
+
+        let targetHandle = requestedHandle;
+        let targetUserId = requestedUserId;
+        const viewerHandle =
+          currentUser?.handle?.replace(/^@/, '').trim().toLowerCase() || null;
+
+        if (!targetHandle && currentUser?.handle) {
+          targetHandle = currentUser.handle.replace(/^@/, '').trim() || null;
+        }
+
+        if (!targetUserId && currentUser?.id) {
+          targetUserId = currentUser.id.trim();
+        }
+
+        const normalizedTargetHandle =
+          targetHandle?.toLowerCase() || null;
+
+        let targetUser: User | null = null;
+
+        if (
+          currentUser &&
+          ((normalizedTargetHandle &&
+            viewerHandle &&
+            normalizedTargetHandle === viewerHandle) ||
+            (targetUserId && currentUser.id === targetUserId))
+        ) {
+          targetUser = currentUser;
+        }
+
+        if (!targetUser && (targetHandle || targetUserId)) {
+          try {
+            const fetched = await UsersAPI.getUserByIdentity({
+              handle: targetHandle,
+              userId: targetUserId,
+            });
+            if (fetched) {
+              targetUser = fetched;
+              if (fetched.handle) {
+                targetHandle = fetched.handle.replace(/^@/, '').trim() || targetHandle;
+              }
+              if (fetched.id) {
+                targetUserId = fetched.id;
+              }
+            }
+          } catch (err: any) {
+            console.warn(
+              'Failed to load requested profile:',
+              err?.message || String(err)
+            );
+          }
+        }
+
+        if (!targetUser && currentUser) {
+          targetUser = currentUser;
+        }
+
+        if (!targetUser) {
+          throw new Error('Unable to resolve profile user');
+        }
+
+        setUser(targetUser);
+
+        const postsData = await PostsAPI.getUserPosts({
+          handle: targetHandle,
+          userId: targetUserId,
+        });
+        const normalizedPosts = resolvePosts(postsData);
+        const filteredPosts = filterPostsForUser(normalizedPosts, {
+          id: targetUserId,
+          handle: targetHandle,
+        });
+        if (filteredPosts.length !== normalizedPosts.length) {
+          console.debug(
+            'Filtered profile posts to target user',
+            normalizedPosts.length - filteredPosts.length,
+            'items removed'
+          );
+        }
+        if (!filteredPosts.length && postsData && !Array.isArray(postsData)) {
+          console.warn('Unrecognized user posts response shape', postsData);
+        }
+        setPosts(filteredPosts);
+      } catch (e: any) {
+        console.warn('Failed to load profile:', e?.message || String(e));
+        if (!options?.skipSpinner) {
+          setUser(null);
+          setPosts([]);
+        }
+      } finally {
+        setLoading(false);
+      }
+    },
+    [filterPostsForUser, resolvePosts, route?.params]
+  );
 
   React.useEffect(() => {
     load();
@@ -178,8 +289,40 @@ export default function ProfileScreen({ navigation }: any) {
 
   const onRefresh = React.useCallback(() => {
     setRefreshing(true);
-    load().finally(() => setRefreshing(false));
+    load({ skipSpinner: true }).finally(() => setRefreshing(false));
   }, [load]);
+
+  const isViewingSelf = React.useMemo(() => {
+    if (!viewer || !user) return false;
+    return viewer.id === user.id;
+  }, [user, viewer]);
+
+  React.useEffect(() => {
+    if (!navigation?.setOptions) return;
+    if (isViewingSelf) {
+      navigation.setOptions({ title: 'Profile' });
+    } else if (user?.handle) {
+      navigation.setOptions({ title: `@${user.handle}` });
+    } else if (user?.fullName) {
+      navigation.setOptions({ title: user.fullName });
+    } else if (user?.id) {
+      navigation.setOptions({ title: user.id.slice(0, 8) });
+    }
+  }, [isViewingSelf, navigation, user?.fullName, user?.handle, user?.id]);
+
+  const displayHandle = React.useMemo(() => {
+    if (user?.handle) return `@${user.handle}`;
+    if (user?.id) return `@${user.id.slice(0, 8)}`;
+    return '@Unknown';
+  }, [user]);
+
+  const postsSectionTitle = React.useMemo(() => {
+    if (isViewingSelf) return 'Your Posts';
+    const base = user?.handle || user?.fullName || user?.id?.slice(0, 8) || 'User';
+    if (!base) return 'Posts';
+    const needsApostrophe = /s$/i.test(base);
+    return `${base}${needsApostrophe ? "'" : "'s"} Posts`;
+  }, [isViewingSelf, user?.fullName, user?.handle, user?.id]);
 
   if (loading) {
     return (
@@ -200,9 +343,7 @@ export default function ProfileScreen({ navigation }: any) {
         ListHeaderComponent={
           <View style={styles.header}>
             <Avatar avatarKey={user?.avatarKey} size={80} />
-            <Text style={styles.handle}>
-              @{user?.handle || user?.id?.slice(0, 8) || 'Unknown'}
-            </Text>
+            <Text style={styles.handle}>{displayHandle}</Text>
             {user?.fullName && (
               <Text style={styles.fullName}>{user.fullName}</Text>
             )}
@@ -217,15 +358,17 @@ export default function ProfileScreen({ navigation }: any) {
               </View>
             </View>
 
-            <TouchableOpacity
-              style={styles.editButton}
-              onPress={() => navigation.navigate('Settings')}
-            >
-              <Text style={styles.editButtonText}>Edit Profile</Text>
-            </TouchableOpacity>
+            {isViewingSelf && (
+              <TouchableOpacity
+                style={styles.editButton}
+                onPress={() => navigation.navigate('Settings')}
+              >
+                <Text style={styles.editButtonText}>Edit Profile</Text>
+              </TouchableOpacity>
+            )}
 
             {posts.length > 0 && (
-              <Text style={styles.sectionTitle}>Your Posts</Text>
+              <Text style={styles.sectionTitle}>{postsSectionTitle}</Text>
             )}
           </View>
         }
@@ -234,13 +377,19 @@ export default function ProfileScreen({ navigation }: any) {
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>No posts yet</Text>
-            <TouchableOpacity
-              style={styles.createPostButton}
-              onPress={() => navigation.navigate('ComposePost')}
-            >
-              <Text style={styles.createPostButtonText}>Create your first post</Text>
-            </TouchableOpacity>
+            <Text style={styles.emptyText}>
+              {isViewingSelf
+                ? 'No posts yet'
+                : 'This user has not posted yet'}
+            </Text>
+            {isViewingSelf && (
+              <TouchableOpacity
+                style={styles.createPostButton}
+                onPress={() => navigation.navigate('ComposePost')}
+              >
+                <Text style={styles.createPostButtonText}>Create your first post</Text>
+              </TouchableOpacity>
+            )}
           </View>
         }
       />
@@ -329,6 +478,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#999',
     marginBottom: 16,
+    textAlign: 'center',
   },
   createPostButton: {
     backgroundColor: '#2196f3',

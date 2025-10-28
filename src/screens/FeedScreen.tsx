@@ -9,6 +9,41 @@ export default function FeedScreen({ navigation }: any){
   const [items, setItems] = React.useState<Post[]>([]);
   const [refreshing, setRefreshing] = React.useState(false);
 
+  const openProfile = React.useCallback(
+    (post: Post) => {
+      const anyPost: any = post;
+      const handleCandidate: unknown =
+        anyPost?.handle ||
+        anyPost?.user?.handle ||
+        anyPost?.author?.handle ||
+        anyPost?.username ||
+        anyPost?.user?.username ||
+        anyPost?.profile?.handle;
+      const userIdCandidate: unknown =
+        anyPost?.userId ||
+        anyPost?.user?.id ||
+        anyPost?.authorId ||
+        anyPost?.author?.id ||
+        anyPost?.createdById ||
+        anyPost?.profileId;
+
+      const handle =
+        typeof handleCandidate === 'string' && handleCandidate.trim()
+          ? handleCandidate.trim()
+          : undefined;
+      const userId =
+        typeof userIdCandidate === 'string' && userIdCandidate.trim()
+          ? userIdCandidate.trim()
+          : undefined;
+
+      navigation.push('Profile', {
+        userHandle: handle,
+        userId: userId,
+      });
+    },
+    [navigation]
+  );
+
   const load = React.useCallback(async ()=>{
     try {
       const f = await PostsAPI.getFeed();
@@ -34,7 +69,9 @@ export default function FeedScreen({ navigation }: any){
         style={{ padding: 12 }}
         data={items}
         keyExtractor={(it)=>it.id}
-        renderItem={({ item }) => <PostCard post={item} />}
+        renderItem={({ item }) => (
+          <PostCard post={item} onPressAuthor={() => openProfile(item)} />
+        )}
         ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>{ setRefreshing(true); load().finally(()=>setRefreshing(false)); }} />}
         ListEmptyComponent={<Text style={{ textAlign: 'center', color: '#666', marginTop: 40 }}>No posts yet.</Text>}
