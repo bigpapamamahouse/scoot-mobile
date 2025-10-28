@@ -1,12 +1,36 @@
 import React from 'react';
-import { View, Text, TextInput, Button, Alert, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { View, Text, TextInput, Button, Alert, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { signInFn } from '../../api/auth';
+import { signInFn, checkAuthStatus } from '../../api/auth';
 import { directCognitoAuth } from '../../api/directCognitoAuth';
 
 export default function LoginScreen({ navigation }: any) {
   const [user, setUser] = React.useState('');
   const [pass, setPass] = React.useState('');
+  const [checking, setChecking] = React.useState(true);
+
+  // Check if user is already authenticated when component mounts
+  React.useEffect(() => {
+    checkAuthStatus().then(isAuthenticated => {
+      if (isAuthenticated) {
+        console.log('User already authenticated, navigating to Feed');
+        navigation.reset({ index: 0, routes: [{ name: 'Feed' }] });
+      } else {
+        setChecking(false);
+      }
+    }).catch(() => {
+      setChecking(false);
+    });
+  }, [navigation]);
+
+  if (checking) {
+    return (
+      <SafeAreaView style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color="#2196f3" />
+        <Text style={{ marginTop: 16, color: '#666' }}>Checking authentication...</Text>
+      </SafeAreaView>
+    );
+  }
 
   const onDirectLogin = async () => {
     if (!user || user.trim().length === 0) {

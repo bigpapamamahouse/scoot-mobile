@@ -4,6 +4,7 @@ import {
   signUp,
   confirmSignUp,
   fetchAuthSession,
+  getCurrentUser,
   type SignInOutput,
 } from 'aws-amplify/auth';
 import { writeIdToken, clearAuth } from '../lib/storage';
@@ -15,11 +16,29 @@ export type SignInResult =
   | { status: 'MFA_REQUIRED'; type: string }
   | { status: 'ERROR'; name: string; message: string };
 
+// Check if user is already authenticated
+export async function checkAuthStatus(): Promise<boolean> {
+  try {
+    await getCurrentUser();
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
 export async function signInFn(username: string, password: string): Promise<SignInResult> {
   try {
     console.log('=== signIn attempt ===');
     console.log('Username:', username);
     console.log('Password length:', password?.length || 0);
+
+    // Check if user is already signed in
+    const isSignedIn = await checkAuthStatus();
+    if (isSignedIn) {
+      console.log('User already signed in, signing out first...');
+      await signOut();
+      await clearAuth();
+    }
 
     // Explicitly use username (not email) for sign in
     // Amplify v6 may be sensitive to parameter names
