@@ -184,29 +184,40 @@ export default function ProfileScreen({ navigation, route }: any) {
 
         let targetHandle = requestedHandle;
         let targetUserId = requestedUserId;
+
         const viewerHandle =
           currentUser?.handle?.replace(/^@/, '').trim().toLowerCase() || null;
+        const viewerId = currentUser?.id?.trim() || null;
 
-        if (!targetHandle && currentUser?.handle) {
-          targetHandle = currentUser.handle.replace(/^@/, '').trim() || null;
+        const isSelfRequest = (() => {
+          if (!targetHandle && !targetUserId) {
+            return true;
+          }
+          if (targetHandle && viewerHandle) {
+            if (targetHandle.toLowerCase() === viewerHandle) {
+              return true;
+            }
+          }
+          if (targetUserId && viewerId) {
+            if (targetUserId === viewerId) {
+              return true;
+            }
+          }
+          return false;
+        })();
+
+        if (isSelfRequest) {
+          if (!targetHandle && viewerHandle) {
+            targetHandle = viewerHandle;
+          }
+          if (!targetUserId && viewerId) {
+            targetUserId = viewerId;
+          }
         }
-
-        if (!targetUserId && currentUser?.id) {
-          targetUserId = currentUser.id.trim();
-        }
-
-        const normalizedTargetHandle =
-          targetHandle?.toLowerCase() || null;
 
         let targetUser: User | null = null;
 
-        if (
-          currentUser &&
-          ((normalizedTargetHandle &&
-            viewerHandle &&
-            normalizedTargetHandle === viewerHandle) ||
-            (targetUserId && currentUser.id === targetUserId))
-        ) {
+        if (isSelfRequest && currentUser) {
           targetUser = currentUser;
         }
 
@@ -233,15 +244,22 @@ export default function ProfileScreen({ navigation, route }: any) {
           }
         }
 
-        if (!targetUser && currentUser) {
-          targetUser = currentUser;
-        }
-
         if (!targetUser) {
-          throw new Error('Unable to resolve profile user');
+          if (isSelfRequest && currentUser) {
+            targetUser = currentUser;
+          } else {
+            throw new Error('Unable to resolve profile user');
+          }
         }
 
         setUser(targetUser);
+
+        if (targetUser?.handle) {
+          targetHandle = targetUser.handle.replace(/^@/, '').trim() || targetHandle;
+        }
+        if (targetUser?.id) {
+          targetUserId = targetUser.id.trim();
+        }
 
         const postsData = await PostsAPI.getUserPosts({
           handle: targetHandle,
@@ -311,14 +329,18 @@ export default function ProfileScreen({ navigation, route }: any) {
   }, [isViewingSelf, navigation, user?.fullName, user?.handle, user?.id]);
 
   const displayHandle = React.useMemo(() => {
-    if (user?.handle) return `@${user.handle}`;
+    if (user?.handle) {
+      const normalizedHandle = user.handle.replace(/^@+/, '');
+      return `@${normalizedHandle || user.handle}`;
+    }
     if (user?.id) return `@${user.id.slice(0, 8)}`;
     return '@Unknown';
   }, [user]);
 
   const postsSectionTitle = React.useMemo(() => {
     if (isViewingSelf) return 'Your Posts';
-    const base = user?.handle || user?.fullName || user?.id?.slice(0, 8) || 'User';
+    const baseHandle = user?.handle?.replace(/^@+/, '');
+    const base = baseHandle || user?.fullName || user?.id?.slice(0, 8) || 'User';
     if (!base) return 'Posts';
     const needsApostrophe = /s$/i.test(base);
     return `${base}${needsApostrophe ? "'" : "'s"} Posts`;
