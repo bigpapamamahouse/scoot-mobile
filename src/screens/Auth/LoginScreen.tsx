@@ -9,13 +9,23 @@ export default function LoginScreen({ navigation }: any) {
   const [pass, setPass] = React.useState('');
 
   const onDirectLogin = async () => {
+    if (!user || user.trim().length === 0) {
+      Alert.alert('Error', 'Please enter a username');
+      return;
+    }
+
+    if (!pass || pass.length === 0) {
+      Alert.alert('Error', 'Please enter a password');
+      return;
+    }
+
     console.log('=== Using Direct Cognito Auth (Bypass Amplify) ===');
     const result = await directCognitoAuth(user.trim(), pass);
 
     if (result.success) {
       Alert.alert('Direct Auth Success!', 'Check console for details. Amplify may have a configuration issue.');
     } else {
-      Alert.alert('Direct Auth Failed', `Check console for details. Error: ${result.error?.__type || 'Unknown'}`);
+      Alert.alert('Direct Auth Failed', `Check console for details. Error: ${result.error?.__type || result.error || 'Unknown'}`);
     }
   };
 
