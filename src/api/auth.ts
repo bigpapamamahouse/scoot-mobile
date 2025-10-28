@@ -21,7 +21,19 @@ export async function signInFn(username: string, password: string): Promise<Sign
     console.log('Username:', username);
     console.log('Password length:', password?.length || 0);
 
-    const out: SignInOutput = await signIn({ username, password });
+    // Explicitly use username (not email) for sign in
+    // Amplify v6 may be sensitive to parameter names
+    const signInInput = {
+      username: username,
+      password: password,
+      options: {
+        authFlowType: 'USER_PASSWORD_AUTH' as const,
+      },
+    };
+
+    console.log('SignIn input:', { ...signInInput, password: '***', options: signInInput.options });
+
+    const out: SignInOutput = await signIn(signInInput);
 
     // Debug the full output
     console.log('signIn output:', JSON.stringify(out, null, 2));

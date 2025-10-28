@@ -55,17 +55,28 @@ setTimeout(() => {
   testCognitoConnection();
 }, 1000);
 
+// Try the exact configuration format that works with direct auth
 const config = {
   Auth: {
     Cognito: {
       userPoolId: ENV.USER_POOL_ID,
       userPoolClientId: ENV.USER_POOL_CLIENT_ID,
-      // Region is automatically derived from userPoolId
-      // Removing userPoolEndpoint as it may cause issues
+      // Don't specify region or endpoint - let Amplify derive from userPoolId
+      // But ensure signInOptions are configured properly
+      signUpVerificationMethod: 'code',
+      loginWith: {
+        username: true,
+        email: true,
+      },
     },
   },
 };
 
 console.log('Amplify config:', JSON.stringify(config, null, 2));
-Amplify.configure(config);
-console.log('=== Amplify configured successfully ===');
+
+try {
+  Amplify.configure(config, { ssr: false });
+  console.log('=== Amplify configured successfully ===');
+} catch (e: any) {
+  console.error('❌ Amplify.configure failed:', e);
+}
