@@ -17,6 +17,14 @@ import { PostsAPI } from '../api';
 import { ENV } from '../lib/env';
 import { readIdToken } from '../lib/storage';
 
+type UploadDescriptor = {
+  uploadUrl: string;
+  method?: string;
+  fields?: Record<string, string>;
+  key?: string;
+  headers?: Record<string, string>;
+};
+
 export default function ComposePostScreen({ navigation }: any) {
   const [text, setText] = React.useState('');
   const [imageUri, setImageUri] = React.useState<string | null>(null);
@@ -68,37 +76,219 @@ export default function ComposePostScreen({ navigation }: any) {
   const uploadImage = async (uri: string) => {
     setUploading(true);
     try {
-      // Create form data
+      const filename = uri.split('/').pop() || 'photo.jpg';
+      const match = /\.(\w+)$/.exec(filename);
+      const type = match ? `image/${match[1]}` : 'image/jpeg';
+      const token = await readIdToken();
+      const authHeader: Record<string, string> = token
+        ? { Authorization: `Bearer ${token}` }
+        : {};
+
+      const parseDescriptor = (data: any): UploadDescriptor | null => {
+        if (!data || typeof data !== 'object') return null;
+        const candidateUrl =
+          data.uploadUrl ||
+          data.url ||
+          data.signedUrl ||
+          data.putUrl ||
+          data.presignedUrl;
+        if (!candidateUrl || typeof candidateUrl !== 'string') return null;
+        const fields =
+          data.fields && typeof data.fields === 'object'
+            ? (data.fields as Record<string, string>)
+            : undefined;
+        const key =
+          data.key ||
+          data.imageKey ||
+          data.fileKey ||
+          data.storageKey ||
+          data.objectKey ||
+          (fields && fields.key);
+        const headers =
+          data.headers && typeof data.headers === 'object'
+            ? (data.headers as Record<string, string>)
+            : data.uploadHeaders && typeof data.uploadHeaders === 'object'
+            ? (data.uploadHeaders as Record<string, string>)
+            : undefined;
+        return {
+          uploadUrl: candidateUrl,
+          method:
+            typeof data.method === 'string'
+              ? data.method
+              : typeof data.httpMethod === 'string'
+              ? data.httpMethod
+              : typeof data.verb === 'string'
+              ? data.verb
+              : undefined,
+          fields,
+          key,
+          headers,
+        };
+      };
+
+      const descriptorCandidates = [
+        '/media/upload-url',
+        '/media/presign',
+        '/uploads/presign',
+        '/upload-url',
+        '/media/uploads',
+      ];
+
+      const jsonHeaders: Record<string, string> = {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        'X-Ignore-Auth-Redirect': '1',
+        ...authHeader,
+      };
+
+      let descriptor: UploadDescriptor | null = null;
+      let lastDescriptorError: string | null = null;
+
+      for (const path of descriptorCandidates) {
+        try {
+          const response = await fetch(`${ENV.API_URL}${path}`, {
+            method: 'POST',
+            headers: jsonHeaders,
+            body: JSON.stringify({ contentType: type, fileName: filename, intent: 'post-image' }),
+          });
+
+          if (response.status === 404) {
+            const text = await response.text().catch(() => '');
+            lastDescriptorError = `Upload descriptor endpoint ${path} returned 404${
+              text ? `: ${text}` : ''
+            }`;
+            console.warn(lastDescriptorError);
+            continue;
+          }
+
+          if (!response.ok) {
+            const text = await response.text().catch(() => '');
+            lastDescriptorError = `Descriptor request to ${path} failed: ${
+              text || `HTTP ${response.status}`
+            }`;
+            console.warn(lastDescriptorError);
+            continue;
+          }
+
+          let data: any = null;
+          try {
+            data = await response.json();
+          } catch (parseError) {
+            lastDescriptorError = `Descriptor response from ${path} was not valid JSON`;
+            console.warn(lastDescriptorError);
+            continue;
+          }
+
+          const parsed = parseDescriptor(data);
+          if (parsed) {
+            descriptor = parsed;
+            console.log(`Received upload descriptor from ${path}:`, data);
+            break;
+          }
+
+          if (data && (data.key || data.imageKey || data.fileKey)) {
+            const directKey = data.key || data.imageKey || data.fileKey;
+            if (typeof directKey === 'string') {
+              setImageKey(directKey);
+              console.log(`Upload descriptor ${path} returned final key without storage upload.`);
+              return;
+            }
+          }
+
+          lastDescriptorError = `Descriptor response from ${path} did not include an upload URL`;
+          console.warn(lastDescriptorError);
+        } catch (error: any) {
+          lastDescriptorError = `Descriptor request to ${path} threw: ${error?.message || error}`;
+          console.warn(lastDescriptorError);
+        }
+      }
+
+      if (descriptor) {
+        let finalKey: string | undefined = descriptor.key;
+
+        if (descriptor.fields) {
+          const formData = new FormData();
+          Object.entries(descriptor.fields).forEach(([key, value]) => {
+            formData.append(key, value);
+          });
+          formData.append('file', {
+            uri,
+            name: filename,
+            type,
+          } as any);
+
+          const uploadResponse = await fetch(descriptor.uploadUrl, {
+            method: descriptor.method || 'POST',
+            body: formData,
+          });
+
+          if (!uploadResponse.ok) {
+            const text = await uploadResponse.text().catch(() => '');
+            throw new Error(
+              text ? `Storage upload failed: ${text}` : `Storage upload failed: HTTP ${uploadResponse.status}`
+            );
+          }
+
+          finalKey = finalKey || descriptor.fields?.key;
+        } else {
+          const fileResponse = await fetch(uri);
+          if (!fileResponse.ok) {
+            throw new Error('Failed to read image data for upload');
+          }
+          const blob = await fileResponse.blob();
+          const uploadHeaders: Record<string, string> = {
+            ...(descriptor.headers || {}),
+          };
+
+          if (!uploadHeaders['Content-Type'] && !uploadHeaders['content-type']) {
+            uploadHeaders['Content-Type'] = type;
+          }
+
+          const uploadResponse = await fetch(descriptor.uploadUrl, {
+            method: descriptor.method || 'PUT',
+            headers: uploadHeaders,
+            body: blob,
+          });
+
+          if (!uploadResponse.ok) {
+            const text = await uploadResponse.text().catch(() => '');
+            throw new Error(
+              text ? `Storage upload failed: ${text}` : `Storage upload failed: HTTP ${uploadResponse.status}`
+            );
+          }
+        }
+
+        if (!finalKey) {
+          throw new Error('Upload failed: storage key missing from descriptor response');
+        }
+
+        setImageKey(finalKey);
+        return;
+      }
+
+      // Fall back to direct multipart upload endpoints if no descriptor worked
       const createFormData = () => {
         const formData = new FormData();
-        const filename = uri.split('/').pop() || 'photo.jpg';
-        const match = /\.(\w+)$/.exec(filename);
-        const type = match ? `image/${match[1]}` : 'image/jpeg';
-
         formData.append('file', {
           uri,
           name: filename,
           type,
         } as any);
-
         return formData;
       };
 
-      // Upload to API
-      const headers: Record<string, string> = {
+      const directHeadersBase: Record<string, string> = {
         Accept: 'application/json',
         'X-Ignore-Auth-Redirect': '1',
+        ...authHeader,
       };
-      const token = await readIdToken();
-      if (token) {
-        headers.Authorization = `Bearer ${token}`;
-      }
 
       const uploadEndpoints = ['/media/upload', '/media', '/upload', '/uploads'];
-      let lastNotFoundMessage: string | null = null;
+      let lastNotFoundMessage: string | null = lastDescriptorError;
       let uploadedKey: string | null = null;
 
       for (const path of uploadEndpoints) {
+        const headers = { ...directHeadersBase };
         const response = await fetch(`${ENV.API_URL}${path}`, {
           method: 'POST',
           body: createFormData(),
@@ -146,6 +336,7 @@ export default function ComposePostScreen({ navigation }: any) {
       console.error('Error uploading image:', error);
       Alert.alert('Error', error?.message ? `Failed to upload image: ${error.message}` : 'Failed to upload image');
       setImageUri(null);
+      setImageKey(null);
     } finally {
       setUploading(false);
     }
