@@ -173,17 +173,21 @@ export async function searchUsers(query: string): Promise<User[]> {
       return response;
     }
     if (response && typeof response === 'object') {
-      if ('users' in response) {
-        console.log(`[Search] Success! Found ${response.users?.length || 0} users in 'users' field`);
-        return response.users || [];
+      if ('items' in response && Array.isArray(response.items)) {
+        console.log(`[Search] Success! Found ${response.items.length} users in 'items' field`);
+        return response.items;
       }
-      if ('results' in response) {
-        console.log(`[Search] Success! Found ${response.results?.length || 0} users in 'results' field`);
-        return response.results || [];
+      if ('users' in response && Array.isArray(response.users)) {
+        console.log(`[Search] Success! Found ${response.users.length} users in 'users' field`);
+        return response.users;
       }
-      if ('Items' in response) {
-        console.log(`[Search] Success! Found ${response.Items?.length || 0} users in 'Items' field`);
-        return response.Items || [];
+      if ('results' in response && Array.isArray(response.results)) {
+        console.log(`[Search] Success! Found ${response.results.length} users in 'results' field`);
+        return response.results;
+      }
+      if ('Items' in response && Array.isArray(response.Items)) {
+        console.log(`[Search] Success! Found ${response.Items.length} users in 'Items' field`);
+        return response.Items;
       }
     }
 

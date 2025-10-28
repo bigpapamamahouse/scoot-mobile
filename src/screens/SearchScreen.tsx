@@ -59,7 +59,7 @@ export function SearchScreen({ navigation }: Props) {
   const handleUserPress = useCallback((user: User) => {
     navigation.push('Profile', {
       userHandle: user.handle,
-      userId: user.id,
+      userId: user.id || undefined,
     });
   }, [navigation]);
 
@@ -136,7 +136,7 @@ export function SearchScreen({ navigation }: Props) {
       <FlatList
         data={results}
         renderItem={renderUserItem}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => item.id || item.handle || Math.random().toString()}
         contentContainerStyle={styles.listContainer}
         ListEmptyComponent={renderEmptyState}
       />
