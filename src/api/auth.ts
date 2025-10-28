@@ -19,9 +19,12 @@ export async function signInFn(username: string, password: string): Promise<Sign
   try {
     console.log('=== signIn attempt ===');
     console.log('Username:', username);
+    console.log('Password length:', password?.length || 0);
 
     const out: SignInOutput = await signIn({ username, password });
-    // Debug next step (shows exactly why it didn't complete)
+
+    // Debug the full output
+    console.log('signIn output:', JSON.stringify(out, null, 2));
     console.log('signIn nextStep:', JSON.stringify(out?.nextStep, null, 2));
 
     switch (out?.nextStep?.signInStep) {
@@ -35,7 +38,12 @@ export async function signInFn(username: string, password: string): Promise<Sign
       case 'DONE':
       default: {
         // We're signed in, fetch tokens
+        console.log('Fetching auth session...');
         const session = await fetchAuthSession();
+        console.log('Session obtained:', {
+          hasTokens: !!session.tokens,
+          hasIdToken: !!session.tokens?.idToken
+        });
         const idToken = session.tokens?.idToken?.toString() || '';
         if (!idToken) throw new Error('No ID token in session');
         await writeIdToken(idToken);
@@ -48,7 +56,16 @@ export async function signInFn(username: string, password: string): Promise<Sign
     console.error('Error name:', e?.name);
     console.error('Error message:', e?.message);
     console.error('Error stack:', e?.stack);
+    console.error('Error code:', e?.code);
+    console.error('Error underlyingError:', e?.underlyingError);
     console.error('Error stringified:', JSON.stringify(e, null, 2));
+    console.error('Full error keys:', Object.keys(e || {}));
+
+    // Try to extract more info from underlyingError
+    if (e?.underlyingError) {
+      console.error('Underlying error details:', JSON.stringify(e.underlyingError, null, 2));
+      console.error('Underlying error keys:', Object.keys(e.underlyingError || {}));
+    }
 
     // Common Cognito errors include UserNotConfirmedException, NotAuthorizedException, UserNotFoundException, etc.
     const errorName = e?.name || 'UnknownError';
