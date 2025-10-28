@@ -26,12 +26,9 @@ export default function ProfileScreen({ navigation }: any) {
       const userData = await UsersAPI.me();
       setUser(userData);
 
-      // Load user's posts from feed (filtered by user)
-      const feedData = await PostsAPI.getFeed();
-      const userPosts = feedData.items?.filter(
-        (post: Post) => post.userId === userData.id
-      ) || [];
-      setPosts(userPosts);
+      // Load user's posts
+      const postsData = await PostsAPI.getUserPosts();
+      setPosts(postsData.items || postsData || []);
     } catch (e: any) {
       console.warn('Failed to load profile:', e?.message || String(e));
     } finally {

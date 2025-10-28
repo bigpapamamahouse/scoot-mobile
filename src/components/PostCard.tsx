@@ -13,23 +13,29 @@ export default function PostCard({ post, onPress }: { post: Post; onPress?: () =
   React.useEffect(() => {
     ReactionsAPI.getReactions(post.id)
       .then((data) => {
-        if (data.reactions) {
-          setReactions(data.reactions);
-        }
+        console.log('Reactions data for post', post.id, ':', data);
+        // Handle both array directly or nested in object
+        const reactionsData = Array.isArray(data) ? data : (data.reactions || data.items || []);
+        setReactions(reactionsData);
       })
-      .catch((e) => console.warn('Failed to load reactions:', e));
+      .catch((e) => {
+        console.warn('Failed to load reactions for post', post.id, ':', e);
+      });
   }, [post.id]);
 
   const handleReaction = async (emoji: string) => {
     try {
-      await ReactionsAPI.toggleReaction(post.id, emoji);
+      console.log('Toggling reaction', emoji, 'for post', post.id);
+      const response = await ReactionsAPI.toggleReaction(post.id, emoji);
+      console.log('Toggle reaction response:', response);
+
       // Reload reactions
       const data = await ReactionsAPI.getReactions(post.id);
-      if (data.reactions) {
-        setReactions(data.reactions);
-      }
-    } catch (e) {
-      console.warn('Failed to toggle reaction:', e);
+      const reactionsData = Array.isArray(data) ? data : (data.reactions || data.items || []);
+      setReactions(reactionsData);
+    } catch (e: any) {
+      console.error('Failed to toggle reaction:', e);
+      console.error('Error details:', e?.message, e?.response);
     }
   };
 

@@ -5,6 +5,10 @@ export async function getFeed(){
   return api('/feed');
 }
 
+export async function getUserPosts(){
+  return api('/me/posts');
+}
+
 export async function createPost(text: string, imageKey?: string){
   return api('/posts', { method: 'POST', body: JSON.stringify({ text, imageKey }) });
 }
