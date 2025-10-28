@@ -7,6 +7,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { UsersAPI, PostsAPI } from '../api';
@@ -31,7 +32,7 @@ export default function ProfileScreen({ navigation, route }: any) {
   const [viewer, setViewer] = React.useState<User | null>(null);
   const [followerCount, setFollowerCount] = React.useState(0);
   const [followingCount, setFollowingCount] = React.useState(0);
-  const [isFollowing, setIsFollowing] = React.useState(false);
+  const [followStatus, setFollowStatus] = React.useState<'none' | 'pending' | 'following'>('none');
   const [followLoading, setFollowLoading] = React.useState(false);
 
   const resolvePosts = React.useCallback((payload: unknown): Post[] => {
@@ -418,7 +419,7 @@ export default function ProfileScreen({ navigation, route }: any) {
             const viewerId = viewer?.id?.trim() || null;
             if (!isSelfRequest && viewerId) {
               const isUserFollowing = followers.some((f: any) => f.id === viewerId);
-              setIsFollowing(isUserFollowing);
+              setFollowStatus(isUserFollowing ? 'following' : 'none');
             }
           } catch (err) {
             console.warn('Failed to load follower/following counts:', err);
@@ -492,24 +493,66 @@ export default function ProfileScreen({ navigation, route }: any) {
   const handleFollowPress = React.useCallback(async () => {
     if (!user?.id || followLoading) return;
 
+    // If already following, show confirmation dialog
+    if (followStatus === 'following') {
+      const userHandle = user?.handle?.replace(/^@/, '') || 'this user';
+      Alert.alert(
+        'Unfollow',
+        `Are you sure you want to unfollow @${userHandle}?`,
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel',
+          },
+          {
+            text: 'Unfollow',
+            style: 'destructive',
+            onPress: async () => {
+              setFollowLoading(true);
+              try {
+                await UsersAPI.unfollowUser(user.id!);
+                setFollowStatus('none');
+                setFollowerCount(prev => Math.max(0, prev - 1));
+              } catch (err: any) {
+                console.error('Failed to unfollow user:', err);
+                Alert.alert('Error', err?.message || 'Failed to unfollow user');
+              } finally {
+                setFollowLoading(false);
+              }
+            },
+          },
+        ]
+      );
+      return;
+    }
+
+    // Send follow request
     setFollowLoading(true);
     try {
-      if (isFollowing) {
-        await UsersAPI.unfollowUser(user.id);
-        setIsFollowing(false);
-        setFollowerCount(prev => Math.max(0, prev - 1));
+      const response = await UsersAPI.followUser(user.id);
+
+      // Check if response indicates a pending request
+      // The API might return { status: 'pending' } or similar
+      if (response && typeof response === 'object') {
+        if ('status' in response && response.status === 'pending') {
+          setFollowStatus('pending');
+          // Don't increment follower count yet since it's pending
+        } else {
+          // Immediate follow (no approval required)
+          setFollowStatus('following');
+          setFollowerCount(prev => prev + 1);
+        }
       } else {
-        await UsersAPI.followUser(user.id);
-        setIsFollowing(true);
-        setFollowerCount(prev => prev + 1);
+        // Default to pending for safety
+        setFollowStatus('pending');
       }
     } catch (err: any) {
-      console.error('Failed to follow/unfollow user:', err);
-      alert(err?.message || 'Failed to update follow status');
+      console.error('Failed to follow user:', err);
+      Alert.alert('Error', err?.message || 'Failed to send follow request');
     } finally {
       setFollowLoading(false);
     }
-  }, [user?.id, isFollowing, followLoading]);
+  }, [user?.id, user?.handle, followStatus, followLoading]);
 
   const handleFollowersPress = React.useCallback(() => {
     if (user?.handle) {
@@ -582,12 +625,23 @@ export default function ProfileScreen({ navigation, route }: any) {
 
             {!isViewingSelf && (
               <TouchableOpacity
-                style={[styles.followButton, isFollowing && styles.followingButton]}
+                style={[
+                  styles.followButton,
+                  followStatus === 'following' && styles.followingButton,
+                  followStatus === 'pending' && styles.pendingButton,
+                ]}
                 onPress={handleFollowPress}
                 disabled={followLoading}
               >
-                <Text style={[styles.followButtonText, isFollowing && styles.followingButtonText]}>
-                  {followLoading ? 'Loading...' : isFollowing ? 'Following' : 'Follow'}
+                <Text style={[
+                  styles.followButtonText,
+                  followStatus === 'following' && styles.followingButtonText,
+                  followStatus === 'pending' && styles.pendingButtonText,
+                ]}>
+                  {followLoading ? 'Loading...' :
+                   followStatus === 'following' ? 'Following' :
+                   followStatus === 'pending' ? 'Pending' :
+                   'Follow'}
                 </Text>
               </TouchableOpacity>
             )}
@@ -707,6 +761,14 @@ const styles = StyleSheet.create({
   },
   followingButtonText: {
     color: '#2196f3',
+  },
+  pendingButton: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#ff9800',
+  },
+  pendingButtonText: {
+    color: '#ff9800',
   },
   sectionTitle: {
     fontSize: 18,
