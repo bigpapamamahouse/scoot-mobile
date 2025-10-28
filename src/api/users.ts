@@ -154,3 +154,15 @@ export async function listFollowers(handle: string){
 export async function listFollowing(handle: string){
   return api(`/u/${encodeURIComponent(handle)}/following`);
 }
+
+export async function searchUsers(query: string): Promise<User[]> {
+  const response = await api(`/users/search?q=${encodeURIComponent(query)}`);
+  // Handle both array responses and wrapped responses
+  if (Array.isArray(response)) {
+    return response;
+  }
+  if (response && typeof response === 'object' && 'users' in response) {
+    return response.users || [];
+  }
+  return [];
+}
