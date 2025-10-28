@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { PostsAPI } from '../api';
 import { ENV } from '../lib/env';
+import { readIdToken } from '../lib/storage';
 
 export default function ComposePostScreen({ navigation }: any) {
   const [text, setText] = React.useState('');
@@ -80,21 +81,34 @@ export default function ComposePostScreen({ navigation }: any) {
       } as any);
 
       // Upload to API
+      const headers: Record<string, string> = {};
+      const token = await readIdToken();
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
+
       const response = await fetch(`${ENV.API_URL}/upload`, {
         method: 'POST',
         body: formData,
+        headers,
       });
 
       if (!response.ok) {
-        throw new Error('Upload failed');
+        const errorText = await response.text().catch(() => '');
+        const message = errorText || `HTTP ${response.status}`;
+        throw new Error(message);
       }
 
       const data = await response.json();
-      setImageKey(data.key || data.imageKey);
+      const key = data.key || data.imageKey || data.fileKey;
+      if (!key) {
+        throw new Error('Upload failed: missing image key');
+      }
+      setImageKey(key);
       console.log('Image uploaded:', data);
     } catch (error: any) {
       console.error('Error uploading image:', error);
-      Alert.alert('Error', 'Failed to upload image');
+      Alert.alert('Error', error?.message ? `Failed to upload image: ${error.message}` : 'Failed to upload image');
       setImageUri(null);
     } finally {
       setUploading(false);
