@@ -17,8 +17,11 @@ export type SignInResult =
 
 export async function signInFn(username: string, password: string): Promise<SignInResult> {
   try {
+    console.log('=== signIn attempt ===');
+    console.log('Username:', username);
+
     const out: SignInOutput = await signIn({ username, password });
-    // Debug next step (shows exactly why it didn’t complete)
+    // Debug next step (shows exactly why it didn't complete)
     console.log('signIn nextStep:', JSON.stringify(out?.nextStep, null, 2));
 
     switch (out?.nextStep?.signInStep) {
@@ -31,7 +34,7 @@ export async function signInFn(username: string, password: string): Promise<Sign
         return { status: 'MFA_REQUIRED', type: out.nextStep.signInStep };
       case 'DONE':
       default: {
-        // We’re signed in, fetch tokens
+        // We're signed in, fetch tokens
         const session = await fetchAuthSession();
         const idToken = session.tokens?.idToken?.toString() || '';
         if (!idToken) throw new Error('No ID token in session');
@@ -40,9 +43,18 @@ export async function signInFn(username: string, password: string): Promise<Sign
       }
     }
   } catch (e: any) {
-    console.log('signIn error:', e);
+    console.error('=== signIn ERROR ===');
+    console.error('Error object:', e);
+    console.error('Error name:', e?.name);
+    console.error('Error message:', e?.message);
+    console.error('Error stack:', e?.stack);
+    console.error('Error stringified:', JSON.stringify(e, null, 2));
+
     // Common Cognito errors include UserNotConfirmedException, NotAuthorizedException, UserNotFoundException, etc.
-    return { status: 'ERROR', name: e?.name || 'AuthError', message: e?.message || String(e) };
+    const errorName = e?.name || 'UnknownError';
+    const errorMessage = e?.message || e?.toString() || 'An unknown error occurred';
+
+    return { status: 'ERROR', name: errorName, message: errorMessage };
   }
 }
 

@@ -6,7 +6,12 @@ import { ENV } from './lib/env';
 
 loadGetRandomValues();
 
-Amplify.configure({
+console.log('=== AWS Amplify Configuration ===');
+console.log('User Pool ID:', ENV.USER_POOL_ID);
+console.log('User Pool Client ID:', ENV.USER_POOL_CLIENT_ID);
+console.log('Region:', ENV.REGION);
+
+const config = {
   Auth: {
     Cognito: {
       userPoolId: ENV.USER_POOL_ID,
@@ -19,4 +24,8 @@ Amplify.configure({
       },
     },
   },
-});
+};
+
+console.log('Amplify config:', JSON.stringify(config, null, 2));
+Amplify.configure(config);
+console.log('=== Amplify configured successfully ===');
