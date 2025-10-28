@@ -9,6 +9,8 @@ export interface Post {
   imageKey?: string;
   createdAt: string;
   updatedAt?: string;
+  reactionCount?: number;
+  commentCount?: number;
 }
 
 export interface User {
@@ -17,6 +19,7 @@ export interface User {
   avatarKey?: string;
   email?: string;
   createdAt: string;
+  fullName?: string;
 }
 
 export interface Notification {
@@ -38,4 +41,10 @@ export interface Comment {
   handle?: string;
   text: string;
   createdAt: string;
+}
+
+export interface Reaction {
+  emoji: string;
+  count: number;
+  userReacted?: boolean;
 }
