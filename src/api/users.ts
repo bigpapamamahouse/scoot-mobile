@@ -156,13 +156,49 @@ export async function listFollowing(handle: string){
 }
 
 export async function searchUsers(query: string): Promise<User[]> {
-  const response = await api(`/users/search?q=${encodeURIComponent(query)}`);
-  // Handle both array responses and wrapped responses
-  if (Array.isArray(response)) {
-    return response;
+  // Try different possible endpoint paths
+  const possiblePaths = [
+    `/users/search?q=${encodeURIComponent(query)}`,
+    `/search?q=${encodeURIComponent(query)}`,
+    `/u/search?q=${encodeURIComponent(query)}`,
+    `/search/users?q=${encodeURIComponent(query)}`,
+  ];
+
+  let lastError: any;
+
+  for (const path of possiblePaths) {
+    try {
+      console.log(`Trying search endpoint: ${path}`);
+      const response = await api(path);
+
+      // Handle both array responses and wrapped responses
+      if (Array.isArray(response)) {
+        console.log(`Success with ${path}, found ${response.length} results`);
+        return response;
+      }
+      if (response && typeof response === 'object' && 'users' in response) {
+        console.log(`Success with ${path}, found ${response.users?.length || 0} results`);
+        return response.users || [];
+      }
+      if (response && typeof response === 'object' && 'results' in response) {
+        console.log(`Success with ${path}, found ${response.results?.length || 0} results`);
+        return response.results || [];
+      }
+
+      console.log(`${path} returned unexpected format:`, response);
+    } catch (err: any) {
+      lastError = err;
+      const message = String(err?.message || '');
+      if (message.includes('404')) {
+        console.log(`${path} not found, trying next...`);
+        continue;
+      }
+      // If it's not a 404, throw immediately (auth error, server error, etc.)
+      throw err;
+    }
   }
-  if (response && typeof response === 'object' && 'users' in response) {
-    return response.users || [];
-  }
-  return [];
+
+  // If we got here, all paths returned 404
+  console.error('All search endpoint paths failed:', lastError);
+  throw new Error('Search endpoint not found. Please check backend API configuration.');
 }
