@@ -156,49 +156,42 @@ export async function listFollowing(handle: string){
 }
 
 export async function searchUsers(query: string): Promise<User[]> {
-  // Try different possible endpoint paths
-  const possiblePaths = [
-    `/users/search?q=${encodeURIComponent(query)}`,
-    `/search?q=${encodeURIComponent(query)}`,
-    `/u/search?q=${encodeURIComponent(query)}`,
-    `/search/users?q=${encodeURIComponent(query)}`,
-  ];
+  const path = `/search?q=${encodeURIComponent(query)}`;
 
-  let lastError: any;
+  try {
+    console.log(`[Search] Calling: ${path}`);
+    console.log(`[Search] Query: "${query}"`);
 
-  for (const path of possiblePaths) {
-    try {
-      console.log(`Trying search endpoint: ${path}`);
-      const response = await api(path);
+    const response = await api(path);
 
-      // Handle both array responses and wrapped responses
-      if (Array.isArray(response)) {
-        console.log(`Success with ${path}, found ${response.length} results`);
-        return response;
-      }
-      if (response && typeof response === 'object' && 'users' in response) {
-        console.log(`Success with ${path}, found ${response.users?.length || 0} results`);
+    console.log(`[Search] Response type:`, typeof response);
+    console.log(`[Search] Response:`, JSON.stringify(response, null, 2));
+
+    // Handle both array responses and wrapped responses
+    if (Array.isArray(response)) {
+      console.log(`[Search] Success! Found ${response.length} users`);
+      return response;
+    }
+    if (response && typeof response === 'object') {
+      if ('users' in response) {
+        console.log(`[Search] Success! Found ${response.users?.length || 0} users in 'users' field`);
         return response.users || [];
       }
-      if (response && typeof response === 'object' && 'results' in response) {
-        console.log(`Success with ${path}, found ${response.results?.length || 0} results`);
+      if ('results' in response) {
+        console.log(`[Search] Success! Found ${response.results?.length || 0} users in 'results' field`);
         return response.results || [];
       }
-
-      console.log(`${path} returned unexpected format:`, response);
-    } catch (err: any) {
-      lastError = err;
-      const message = String(err?.message || '');
-      if (message.includes('404')) {
-        console.log(`${path} not found, trying next...`);
-        continue;
+      if ('Items' in response) {
+        console.log(`[Search] Success! Found ${response.Items?.length || 0} users in 'Items' field`);
+        return response.Items || [];
       }
-      // If it's not a 404, throw immediately (auth error, server error, etc.)
-      throw err;
     }
-  }
 
-  // If we got here, all paths returned 404
-  console.error('All search endpoint paths failed:', lastError);
-  throw new Error('Search endpoint not found. Please check backend API configuration.');
+    console.warn(`[Search] Unexpected response format:`, response);
+    return [];
+  } catch (err: any) {
+    console.error('[Search] Error:', err);
+    console.error('[Search] Error message:', err?.message);
+    throw err;
+  }
 }
