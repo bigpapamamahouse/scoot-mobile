@@ -69,43 +69,79 @@ export default function ComposePostScreen({ navigation }: any) {
     setUploading(true);
     try {
       // Create form data
-      const formData = new FormData();
-      const filename = uri.split('/').pop() || 'photo.jpg';
-      const match = /\.(\w+)$/.exec(filename);
-      const type = match ? `image/${match[1]}` : 'image/jpeg';
+      const createFormData = () => {
+        const formData = new FormData();
+        const filename = uri.split('/').pop() || 'photo.jpg';
+        const match = /\.(\w+)$/.exec(filename);
+        const type = match ? `image/${match[1]}` : 'image/jpeg';
 
-      formData.append('file', {
-        uri,
-        name: filename,
-        type,
-      } as any);
+        formData.append('file', {
+          uri,
+          name: filename,
+          type,
+        } as any);
+
+        return formData;
+      };
 
       // Upload to API
-      const headers: Record<string, string> = {};
+      const headers: Record<string, string> = {
+        Accept: 'application/json',
+        'X-Ignore-Auth-Redirect': '1',
+      };
       const token = await readIdToken();
       if (token) {
         headers.Authorization = `Bearer ${token}`;
       }
 
-      const response = await fetch(`${ENV.API_URL}/upload`, {
-        method: 'POST',
-        body: formData,
-        headers,
-      });
+      const uploadEndpoints = ['/media/upload', '/media', '/upload', '/uploads'];
+      let lastNotFoundMessage: string | null = null;
+      let uploadedKey: string | null = null;
 
-      if (!response.ok) {
-        const errorText = await response.text().catch(() => '');
-        const message = errorText || `HTTP ${response.status}`;
-        throw new Error(message);
+      for (const path of uploadEndpoints) {
+        const response = await fetch(`${ENV.API_URL}${path}`, {
+          method: 'POST',
+          body: createFormData(),
+          headers,
+        });
+
+        if (response.status === 404) {
+          const notFoundText = await response.text().catch(() => '');
+          lastNotFoundMessage = `Upload endpoint ${path} returned 404${
+            notFoundText ? `: ${notFoundText}` : ''
+          }`;
+          console.warn(lastNotFoundMessage);
+          continue;
+        }
+
+        if (!response.ok) {
+          const errorText = await response.text().catch(() => '');
+          const message = errorText || `HTTP ${response.status}`;
+          throw new Error(message);
+        }
+
+        let data: any;
+        try {
+          data = await response.json();
+        } catch (parseError) {
+          throw new Error('Upload failed: invalid JSON response');
+        }
+
+        const key = data.key || data.imageKey || data.fileKey;
+        if (!key) {
+          throw new Error('Upload failed: missing image key');
+        }
+
+        uploadedKey = key;
+        console.log(`Image uploaded via ${path}:`, data);
+        break;
       }
 
-      const data = await response.json();
-      const key = data.key || data.imageKey || data.fileKey;
-      if (!key) {
-        throw new Error('Upload failed: missing image key');
+      if (!uploadedKey) {
+        throw new Error(lastNotFoundMessage || 'Upload failed: endpoint not found');
       }
-      setImageKey(key);
-      console.log('Image uploaded:', data);
+
+      setImageKey(uploadedKey);
     } catch (error: any) {
       console.error('Error uploading image:', error);
       Alert.alert('Error', error?.message ? `Failed to upload image: ${error.message}` : 'Failed to upload image');
