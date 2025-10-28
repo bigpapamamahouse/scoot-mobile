@@ -11,6 +11,7 @@ import SignupScreen from '../screens/Auth/SignupScreen';
 import ConfirmCodeScreen from '../screens/Auth/ConfirmCodeScreen';
 import ClaimUsernameScreen from '../screens/Auth/ClaimUsernameScreen';
 import ComposePostScreen from '../screens/ComposePostScreen';
+import { SearchScreen } from '../screens/SearchScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -28,16 +29,22 @@ export default function RootNavigator(){
           options={({ navigation }) => ({
             title: 'Feed',
             headerRight: () => {
-              const { TouchableOpacity, Text } = require('react-native');
+              const { TouchableOpacity, Text, View } = require('react-native');
               return (
-                <TouchableOpacity onPress={() => navigation.navigate('Profile')} style={{ paddingHorizontal: 16 }}>
-                  <Text style={{ fontSize: 24 }}>👤</Text>
-                </TouchableOpacity>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <TouchableOpacity onPress={() => navigation.navigate('Search')} style={{ paddingHorizontal: 12 }}>
+                    <Text style={{ fontSize: 24 }}>🔍</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => navigation.navigate('Profile')} style={{ paddingHorizontal: 12 }}>
+                    <Text style={{ fontSize: 24 }}>👤</Text>
+                  </TouchableOpacity>
+                </View>
               );
             },
           })}
         />
         <Stack.Screen name="ComposePost" component={ComposePostScreen} options={{ headerShown: false, presentation: 'modal' }} />
+        <Stack.Screen name="Search" component={SearchScreen} options={{ title: 'Search Users' }} />
         <Stack.Screen name="Profile" component={ProfileScreen} options={{ title: 'Profile' }} />
         <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Notifications' }} />
         <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: 'Settings' }} />
