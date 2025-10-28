@@ -14,8 +14,17 @@ import { User, Post } from '../types';
 import PostCard from '../components/PostCard';
 import { Avatar } from '../components/Avatar';
 
+type ProfileIdentity = {
+  id?: string | null;
+  handle?: string | null;
+  avatarKey?: string | null;
+  email?: string | null;
+  fullName?: string | null;
+  createdAt?: string | null;
+};
+
 export default function ProfileScreen({ navigation, route }: any) {
-  const [user, setUser] = React.useState<User | null>(null);
+  const [user, setUser] = React.useState<ProfileIdentity | null>(null);
   const [posts, setPosts] = React.useState<Post[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [refreshing, setRefreshing] = React.useState(false);
@@ -59,6 +68,26 @@ export default function ProfileScreen({ navigation, route }: any) {
     return [];
   }, []);
 
+  const normalizeIdCandidate = React.useCallback((value: unknown): string | null => {
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (trimmed) {
+        return trimmed;
+      }
+    }
+    return null;
+  }, []);
+
+  const normalizeHandleCandidate = React.useCallback((value: unknown): string | null => {
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (trimmed) {
+        return trimmed.replace(/^@/, '').toLowerCase();
+      }
+    }
+    return null;
+  }, []);
+
   const filterPostsForUser = React.useCallback(
     (items: Post[], identity: { id?: string | null; handle?: string | null }) => {
       const normalizedId = typeof identity.id === 'string' ? identity.id.trim() : null;
@@ -70,26 +99,6 @@ export default function ProfileScreen({ navigation, route }: any) {
       if (!normalizedId && !normalizedHandle) {
         return items;
       }
-
-      const normalizeIdCandidate = (value: unknown) => {
-        if (typeof value === 'string') {
-          const trimmed = value.trim();
-          if (trimmed) {
-            return trimmed;
-          }
-        }
-        return null;
-      };
-
-      const normalizeHandleCandidate = (value: unknown) => {
-        if (typeof value === 'string') {
-          const trimmed = value.trim();
-          if (trimmed) {
-            return trimmed.replace(/^@/, '').toLowerCase();
-          }
-        }
-        return null;
-      };
 
       return items.filter((raw) => {
         const candidate: any = raw;
@@ -129,7 +138,73 @@ export default function ProfileScreen({ navigation, route }: any) {
         return false;
       });
     },
-    []
+    [normalizeHandleCandidate, normalizeIdCandidate]
+  );
+
+  const deriveIdentityFromPosts = React.useCallback(
+    (items: Post[]): ProfileIdentity | null => {
+      for (const raw of items) {
+        if (!raw) continue;
+        const candidate: any = raw;
+
+        const derivedId =
+          normalizeIdCandidate(candidate?.userId) ||
+          normalizeIdCandidate(candidate?.authorId) ||
+          normalizeIdCandidate(candidate?.ownerId) ||
+          normalizeIdCandidate(candidate?.profileId) ||
+          normalizeIdCandidate(candidate?.createdById) ||
+          normalizeIdCandidate(candidate?.user?.id) ||
+          normalizeIdCandidate(candidate?.author?.id) ||
+          normalizeIdCandidate(candidate?.profile?.id);
+
+        const derivedHandle =
+          normalizeHandleCandidate(candidate?.handle) ||
+          normalizeHandleCandidate(candidate?.user?.handle) ||
+          normalizeHandleCandidate(candidate?.user?.username) ||
+          normalizeHandleCandidate(candidate?.author?.handle) ||
+          normalizeHandleCandidate(candidate?.authorHandle) ||
+          normalizeHandleCandidate(candidate?.username) ||
+          normalizeHandleCandidate(candidate?.profile?.handle);
+
+        const avatarKey =
+          candidate?.avatarKey ||
+          candidate?.user?.avatarKey ||
+          candidate?.author?.avatarKey ||
+          candidate?.profile?.avatarKey;
+
+        const fullName =
+          candidate?.user?.fullName ||
+          candidate?.author?.fullName ||
+          candidate?.profile?.fullName;
+
+        const email =
+          candidate?.user?.email ||
+          candidate?.author?.email ||
+          candidate?.profile?.email;
+
+        if (derivedId || derivedHandle || avatarKey || fullName || email) {
+          const identity: ProfileIdentity = {};
+          if (derivedId) {
+            identity.id = derivedId;
+          }
+          if (derivedHandle) {
+            identity.handle = derivedHandle;
+          }
+          if (avatarKey !== undefined) {
+            identity.avatarKey = avatarKey ?? null;
+          }
+          if (fullName !== undefined) {
+            identity.fullName = fullName ?? null;
+          }
+          if (email !== undefined) {
+            identity.email = email ?? null;
+          }
+          return identity;
+        }
+      }
+      return null;
+    },
+    [normalizeHandleCandidate, normalizeIdCandidate]
   );
 
   const load = React.useCallback(
@@ -169,6 +244,8 @@ export default function ProfileScreen({ navigation, route }: any) {
         requestedUserId = normalizeId(candidate);
         if (requestedUserId) break;
       }
+
+      let targetIdentity: ProfileIdentity | null = null;
 
       try {
         let currentUser: User | null = null;
@@ -215,20 +292,32 @@ export default function ProfileScreen({ navigation, route }: any) {
           }
         }
 
-        let targetUser: User | null = null;
-
         if (isSelfRequest && currentUser) {
-          targetUser = currentUser;
+          targetIdentity = {
+            id: currentUser.id ?? null,
+            handle: currentUser.handle ?? null,
+            avatarKey: currentUser.avatarKey ?? null,
+            email: currentUser.email ?? null,
+            fullName: currentUser.fullName ?? null,
+            createdAt: currentUser.createdAt ?? null,
+          };
         }
 
-        if (!targetUser && (targetHandle || targetUserId)) {
+        if (!targetIdentity && (targetHandle || targetUserId)) {
           try {
             const fetched = await UsersAPI.getUserByIdentity({
               handle: targetHandle,
               userId: targetUserId,
             });
             if (fetched) {
-              targetUser = fetched;
+              targetIdentity = {
+                id: fetched.id ?? null,
+                handle: fetched.handle ?? null,
+                avatarKey: fetched.avatarKey ?? null,
+                email: fetched.email ?? null,
+                fullName: fetched.fullName ?? null,
+                createdAt: fetched.createdAt ?? null,
+              };
               if (fetched.handle) {
                 targetHandle = fetched.handle.replace(/^@/, '').trim() || targetHandle;
               }
@@ -244,21 +333,18 @@ export default function ProfileScreen({ navigation, route }: any) {
           }
         }
 
-        if (!targetUser) {
-          if (isSelfRequest && currentUser) {
-            targetUser = currentUser;
-          } else {
-            throw new Error('Unable to resolve profile user');
-          }
+        if (!targetIdentity && (targetHandle || targetUserId)) {
+          targetIdentity = {
+            id: targetUserId ?? null,
+            handle: targetHandle ?? null,
+          };
         }
 
-        setUser(targetUser);
-
-        if (targetUser?.handle) {
-          targetHandle = targetUser.handle.replace(/^@/, '').trim() || targetHandle;
+        if (targetIdentity?.handle) {
+          targetHandle = targetIdentity.handle.replace(/^@/, '').trim() || targetHandle;
         }
-        if (targetUser?.id) {
-          targetUserId = targetUser.id.trim();
+        if (targetIdentity?.id) {
+          targetUserId = targetIdentity.id.trim();
         }
 
         const postsData = await PostsAPI.getUserPosts({
@@ -281,17 +367,44 @@ export default function ProfileScreen({ navigation, route }: any) {
           console.warn('Unrecognized user posts response shape', postsData);
         }
         setPosts(filteredPosts);
+
+        let resolvedIdentity = targetIdentity;
+        const derivedIdentity = deriveIdentityFromPosts(filteredPosts);
+        if (derivedIdentity) {
+          resolvedIdentity = {
+            ...(resolvedIdentity ?? {}),
+            ...derivedIdentity,
+            id: derivedIdentity.id ?? resolvedIdentity?.id ?? null,
+            handle: derivedIdentity.handle ?? resolvedIdentity?.handle ?? null,
+            avatarKey: derivedIdentity.avatarKey ?? resolvedIdentity?.avatarKey,
+            fullName: derivedIdentity.fullName ?? resolvedIdentity?.fullName,
+            email: derivedIdentity.email ?? resolvedIdentity?.email ?? null,
+          };
+        }
+
+        if (!resolvedIdentity && (targetHandle || targetUserId)) {
+          resolvedIdentity = {
+            id: targetUserId ?? null,
+            handle: targetHandle ?? null,
+          };
+        }
+
+        if (!resolvedIdentity && filteredPosts.length) {
+          resolvedIdentity = deriveIdentityFromPosts(filteredPosts);
+        }
+
+        setUser(resolvedIdentity ?? targetIdentity ?? null);
       } catch (e: any) {
         console.warn('Failed to load profile:', e?.message || String(e));
         if (!options?.skipSpinner) {
-          setUser(null);
+          setUser(targetIdentity ?? null);
           setPosts([]);
         }
       } finally {
         setLoading(false);
       }
     },
-    [filterPostsForUser, resolvePosts, route?.params]
+    [deriveIdentityFromPosts, filterPostsForUser, resolvePosts, route?.params]
   );
 
   React.useEffect(() => {
