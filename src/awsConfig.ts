@@ -11,7 +11,6 @@ Amplify.configure({
     Cognito: {
       userPoolId: ENV.USER_POOL_ID,
       userPoolClientId: ENV.USER_POOL_CLIENT_ID,
-      region: ENV.REGION,
       // tell Amplify which credential types are allowed for sign in
       loginWith: {
         username: true,
