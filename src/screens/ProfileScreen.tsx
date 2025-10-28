@@ -20,6 +20,44 @@ export default function ProfileScreen({ navigation }: any) {
   const [loading, setLoading] = React.useState(true);
   const [refreshing, setRefreshing] = React.useState(false);
 
+  const resolvePosts = React.useCallback((payload: unknown): Post[] => {
+    if (!payload) return [];
+
+    const tryArray = (value: unknown): Post[] | null => {
+      if (Array.isArray(value)) return value as Post[];
+      return null;
+    };
+
+    const direct = tryArray(payload);
+    if (direct) return direct;
+
+    if (typeof payload === 'object' && payload !== null) {
+      const candidates: unknown[] = [];
+      const maybeRecord = payload as Record<string, unknown>;
+      candidates.push(maybeRecord.items);
+      candidates.push(maybeRecord.posts);
+      candidates.push(maybeRecord.data);
+      candidates.push(maybeRecord.results);
+
+      if (maybeRecord.data && typeof maybeRecord.data === 'object') {
+        const dataRecord = maybeRecord.data as Record<string, unknown>;
+        candidates.push(dataRecord.items);
+      }
+
+      if (maybeRecord.posts && typeof maybeRecord.posts === 'object') {
+        const postsRecord = maybeRecord.posts as Record<string, unknown>;
+        candidates.push(postsRecord.items);
+      }
+
+      for (const candidate of candidates) {
+        const arr = tryArray(candidate);
+        if (arr) return arr;
+      }
+    }
+
+    return [];
+  }, []);
+
   const load = React.useCallback(async () => {
     try {
       // Load current user info
@@ -27,18 +65,29 @@ export default function ProfileScreen({ navigation }: any) {
       setUser(userData);
 
       // Load user's posts
-      const postsData = await PostsAPI.getUserPosts();
-      setPosts(postsData.items || postsData || []);
+      const postsData = await PostsAPI.getUserPosts(userData?.handle || userData?.id);
+      const normalizedPosts = resolvePosts(postsData);
+      if (!normalizedPosts.length && postsData && !Array.isArray(postsData)) {
+        console.warn('Unrecognized user posts response shape', postsData);
+      }
+      setPosts(normalizedPosts);
     } catch (e: any) {
       console.warn('Failed to load profile:', e?.message || String(e));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [resolvePosts]);
 
   React.useEffect(() => {
     load();
   }, [load]);
+
+  React.useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      load();
+    });
+    return unsubscribe;
+  }, [navigation, load]);
 
   const onRefresh = React.useCallback(() => {
     setRefreshing(true);

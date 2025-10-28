@@ -5,8 +5,28 @@ export async function getFeed(){
   return api('/feed');
 }
 
-export async function getUserPosts(){
-  return api('/me/posts');
+export async function getUserPosts(handle?: string){
+  const attempts: string[] = ['/me/posts'];
+  if (handle) {
+    const encoded = encodeURIComponent(handle);
+    attempts.push(`/u/${encoded}/posts`);
+    attempts.push(`/u/${encoded}/feed`);
+  }
+
+  let lastError: unknown;
+  for (const path of attempts) {
+    try {
+      return await api(path);
+    } catch (err: any) {
+      lastError = err;
+      const message = String(err?.message || '');
+      if (!message.includes('404')) {
+        break;
+      }
+    }
+  }
+
+  throw lastError;
 }
 
 export async function createPost(text: string, imageKey?: string){
