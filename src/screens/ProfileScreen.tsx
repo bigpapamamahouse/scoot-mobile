@@ -29,6 +29,10 @@ export default function ProfileScreen({ navigation, route }: any) {
   const [loading, setLoading] = React.useState(true);
   const [refreshing, setRefreshing] = React.useState(false);
   const [viewer, setViewer] = React.useState<User | null>(null);
+  const [followerCount, setFollowerCount] = React.useState(0);
+  const [followingCount, setFollowingCount] = React.useState(0);
+  const [isFollowing, setIsFollowing] = React.useState(false);
+  const [followLoading, setFollowLoading] = React.useState(false);
 
   const resolvePosts = React.useCallback((payload: unknown): Post[] => {
     if (!payload) return [];
@@ -394,6 +398,32 @@ export default function ProfileScreen({ navigation, route }: any) {
         }
 
         setUser(resolvedIdentity ?? targetIdentity ?? null);
+
+        // Load follower/following counts
+        const finalIdentity = resolvedIdentity ?? targetIdentity;
+        const userHandle = finalIdentity?.handle?.replace(/^@/, '').trim();
+        if (userHandle) {
+          try {
+            const followersData = await UsersAPI.listFollowers(userHandle);
+            const followers = Array.isArray(followersData) ? followersData :
+              (followersData?.items || followersData?.followers || []);
+            setFollowerCount(followers.length);
+
+            const followingData = await UsersAPI.listFollowing(userHandle);
+            const following = Array.isArray(followingData) ? followingData :
+              (followingData?.items || followingData?.following || []);
+            setFollowingCount(following.length);
+
+            // Check if current user is following this profile
+            const viewerId = viewer?.id?.trim() || null;
+            if (!isSelfRequest && viewerId) {
+              const isUserFollowing = followers.some((f: any) => f.id === viewerId);
+              setIsFollowing(isUserFollowing);
+            }
+          } catch (err) {
+            console.warn('Failed to load follower/following counts:', err);
+          }
+        }
       } catch (e: any) {
         console.warn('Failed to load profile:', e?.message || String(e));
         if (!options?.skipSpinner) {
@@ -459,6 +489,46 @@ export default function ProfileScreen({ navigation, route }: any) {
     return `${base}${needsApostrophe ? "'" : "'s"} Posts`;
   }, [isViewingSelf, user?.fullName, user?.handle, user?.id]);
 
+  const handleFollowPress = React.useCallback(async () => {
+    if (!user?.id || followLoading) return;
+
+    setFollowLoading(true);
+    try {
+      if (isFollowing) {
+        await UsersAPI.unfollowUser(user.id);
+        setIsFollowing(false);
+        setFollowerCount(prev => Math.max(0, prev - 1));
+      } else {
+        await UsersAPI.followUser(user.id);
+        setIsFollowing(true);
+        setFollowerCount(prev => prev + 1);
+      }
+    } catch (err: any) {
+      console.error('Failed to follow/unfollow user:', err);
+      alert(err?.message || 'Failed to update follow status');
+    } finally {
+      setFollowLoading(false);
+    }
+  }, [user?.id, isFollowing, followLoading]);
+
+  const handleFollowersPress = React.useCallback(() => {
+    if (user?.handle) {
+      navigation.navigate('UserList', {
+        handle: user.handle.replace(/^@/, ''),
+        type: 'followers'
+      });
+    }
+  }, [navigation, user?.handle]);
+
+  const handleFollowingPress = React.useCallback(() => {
+    if (user?.handle) {
+      navigation.navigate('UserList', {
+        handle: user.handle.replace(/^@/, ''),
+        type: 'following'
+      });
+    }
+  }, [navigation, user?.handle]);
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -491,6 +561,14 @@ export default function ProfileScreen({ navigation, route }: any) {
                 <Text style={styles.statValue}>{posts.length}</Text>
                 <Text style={styles.statLabel}>Posts</Text>
               </View>
+              <TouchableOpacity style={styles.stat} onPress={handleFollowersPress}>
+                <Text style={styles.statValue}>{followerCount}</Text>
+                <Text style={styles.statLabel}>Followers</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.stat} onPress={handleFollowingPress}>
+                <Text style={styles.statValue}>{followingCount}</Text>
+                <Text style={styles.statLabel}>Following</Text>
+              </TouchableOpacity>
             </View>
 
             {isViewingSelf && (
@@ -499,6 +577,18 @@ export default function ProfileScreen({ navigation, route }: any) {
                 onPress={() => navigation.navigate('Settings')}
               >
                 <Text style={styles.editButtonText}>Edit Profile</Text>
+              </TouchableOpacity>
+            )}
+
+            {!isViewingSelf && (
+              <TouchableOpacity
+                style={[styles.followButton, isFollowing && styles.followingButton]}
+                onPress={handleFollowPress}
+                disabled={followLoading}
+              >
+                <Text style={[styles.followButtonText, isFollowing && styles.followingButtonText]}>
+                  {followLoading ? 'Loading...' : isFollowing ? 'Following' : 'Follow'}
+                </Text>
               </TouchableOpacity>
             )}
 
@@ -597,6 +687,26 @@ const styles = StyleSheet.create({
     color: '#2196f3',
     fontWeight: '600',
     fontSize: 15,
+  },
+  followButton: {
+    marginTop: 16,
+    paddingHorizontal: 24,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#2196f3',
+  },
+  followButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 15,
+  },
+  followingButton: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#2196f3',
+  },
+  followingButtonText: {
+    color: '#2196f3',
   },
   sectionTitle: {
     fontSize: 18,

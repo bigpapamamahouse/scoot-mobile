@@ -156,46 +156,34 @@ export async function listFollowing(handle: string){
 }
 
 export async function searchUsers(query: string): Promise<User[]> {
-  const path = `/search?q=${encodeURIComponent(query)}`;
+  const response = await api(`/search?q=${encodeURIComponent(query)}`);
 
-  try {
-    console.log(`[Search] Calling: ${path}`);
-    console.log(`[Search] Query: "${query}"`);
-
-    const response = await api(path);
-
-    console.log(`[Search] Response type:`, typeof response);
-    console.log(`[Search] Response:`, JSON.stringify(response, null, 2));
-
-    // Handle both array responses and wrapped responses
-    if (Array.isArray(response)) {
-      console.log(`[Search] Success! Found ${response.length} users`);
-      return response;
-    }
-    if (response && typeof response === 'object') {
-      if ('items' in response && Array.isArray(response.items)) {
-        console.log(`[Search] Success! Found ${response.items.length} users in 'items' field`);
-        return response.items;
-      }
-      if ('users' in response && Array.isArray(response.users)) {
-        console.log(`[Search] Success! Found ${response.users.length} users in 'users' field`);
-        return response.users;
-      }
-      if ('results' in response && Array.isArray(response.results)) {
-        console.log(`[Search] Success! Found ${response.results.length} users in 'results' field`);
-        return response.results;
-      }
-      if ('Items' in response && Array.isArray(response.Items)) {
-        console.log(`[Search] Success! Found ${response.Items.length} users in 'Items' field`);
-        return response.Items;
-      }
-    }
-
-    console.warn(`[Search] Unexpected response format:`, response);
-    return [];
-  } catch (err: any) {
-    console.error('[Search] Error:', err);
-    console.error('[Search] Error message:', err?.message);
-    throw err;
+  // Handle both array responses and wrapped responses
+  if (Array.isArray(response)) {
+    return response;
   }
+  if (response && typeof response === 'object') {
+    if ('items' in response && Array.isArray(response.items)) {
+      return response.items;
+    }
+    if ('users' in response && Array.isArray(response.users)) {
+      return response.users;
+    }
+    if ('results' in response && Array.isArray(response.results)) {
+      return response.results;
+    }
+    if ('Items' in response && Array.isArray(response.Items)) {
+      return response.Items;
+    }
+  }
+
+  return [];
+}
+
+export async function followUser(userId: string) {
+  return api('/follow', { method: 'POST', body: JSON.stringify({ userId }) });
+}
+
+export async function unfollowUser(userId: string) {
+  return api('/follow', { method: 'DELETE', body: JSON.stringify({ userId }) });
 }
