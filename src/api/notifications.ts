@@ -10,3 +10,6 @@ export async function acceptFollow(fromUserId: string){
 export async function declineFollow(fromUserId: string){
   return api('/follow-decline', { method: 'POST', body: JSON.stringify({ fromUserId }) });
 }
+export async function registerPushToken(token: string, platform?: string){
+  return api('/push/register', { method: 'POST', body: JSON.stringify({ token, platform }) });
+}

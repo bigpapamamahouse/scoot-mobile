@@ -63,7 +63,7 @@ const config = {
       userPoolClientId: ENV.USER_POOL_CLIENT_ID,
       // Don't specify region or endpoint - let Amplify derive from userPoolId
       // But ensure signInOptions are configured properly
-      signUpVerificationMethod: 'code',
+      signUpVerificationMethod: 'code' as const,
       loginWith: {
         username: true,
         email: true,

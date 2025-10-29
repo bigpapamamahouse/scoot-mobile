@@ -18,6 +18,8 @@
     "aws-amplify": "^6.3.2",
     "babel-preset-expo": "~54.0.0",
     "expo": "^54.0.0",
+    "expo-device": "~6.0.2",
+    "expo-notifications": "~0.28.8",
     "expo-constants": "~18.0.10",
     "expo-image-picker": "~17.0.8",
     "expo-linking": "~8.0.8",
