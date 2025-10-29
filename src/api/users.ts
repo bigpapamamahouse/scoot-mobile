@@ -215,6 +215,33 @@ const ensureFullName = (value: Record<string, unknown>): void => {
   }
 };
 
+const ensureHandle = (value: Record<string, unknown>): void => {
+  if (trimString(value.handle)) {
+    return;
+  }
+  const candidates = [
+    trimString(value.username),
+    trimString((value as any)?.userHandle),
+    trimString((value as any)?.user_handle),
+    trimString((value as any)?.userName),
+    trimString((value as any)?.profileHandle),
+    trimString((value as any)?.profile_handle),
+    trimString((value as any)?.profileName),
+    trimString((value.user as any)?.handle),
+    trimString((value.user as any)?.username),
+    trimString((value.user as any)?.userName),
+    trimString((value.profile as any)?.handle),
+    trimString((value.profile as any)?.username),
+    trimString((value.profile as any)?.userName),
+    trimString((value.account as any)?.handle),
+    trimString((value.account as any)?.username),
+    trimString((value.account as any)?.userName),
+  ].filter(Boolean);
+  if (candidates.length > 0) {
+    value.handle = candidates[0] as string;
+  }
+};
+
 const collectAvatarCandidates = (source: unknown): string[] => {
   if (!isRecord(source)) {
     return [];
@@ -292,6 +319,7 @@ export async function me(){
   ensureId(normalized);
   ensureCreatedAt(normalized);
   ensureFullName(normalized);
+  ensureHandle(normalized);
 
   const inviteCode = findInviteCode(result);
   if (inviteCode) {
@@ -301,24 +329,53 @@ export async function me(){
   return normalized;
 }
 
-export async function updateMe(payload: { fullName?: string | null; avatarKey?: string | null }){
+type UpdateMePayload = {
+  fullName?: string | null;
+  avatarKey?: string | null;
+  handle?: string | null;
+  email?: string | null;
+};
+
+const assignWithAliases = (
+  body: Record<string, unknown>,
+  value: string | null | undefined,
+  aliases: string[]
+) => {
+  if (value === undefined) {
+    return;
+  }
+
+  for (const field of aliases) {
+    if (!(field in body)) {
+      body[field] = value;
+    }
+  }
+};
+
+export async function updateMe(payload: UpdateMePayload) {
   const body: Record<string, unknown> = {};
 
   if ('fullName' in payload) {
-    body.fullName = payload.fullName === undefined ? undefined : payload.fullName;
-    if (!('full_name' in body)) {
-      body.full_name = payload.fullName === undefined ? undefined : payload.fullName;
-    }
+    assignWithAliases(body, payload.fullName, ['fullName', 'full_name', 'name', 'displayName', 'display_name']);
   }
 
-  // Don't include avatarKey in PATCH /me - use updateAvatar() instead
-  if ('avatarKey' in payload && !('fullName' in payload)) {
-    // If only updating avatar, use the dedicated endpoint
-    console.warn('[updateMe] avatarKey should be updated via updateAvatar() instead');
+  if ('handle' in payload) {
+    assignWithAliases(body, payload.handle, [
+      'handle',
+      'userHandle',
+      'user_handle',
+      'username',
+      'userName',
+      'profileHandle',
+      'profile_handle',
+    ]);
   }
 
-  if ('avatarKey' in payload && 'fullName' in payload) {
-    // Legacy support: If updating both, include avatar in PATCH /me
+  if ('email' in payload) {
+    assignWithAliases(body, payload.email, ['email', 'emailAddress', 'email_address']);
+  }
+
+  if ('avatarKey' in payload) {
     const details = resolveAvatarDetails(payload.avatarKey);
     const keyValue =
       details.key !== undefined

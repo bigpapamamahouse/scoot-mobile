@@ -23,6 +23,9 @@ type ViewerProfile = {
   fullName?: string | null;
   avatarKey?: string | null;
   inviteCode?: string | null;
+  handle?: string | null;
+  email?: string | null;
+  id?: string | null;
 };
 
 type LoadViewerOptions = {
@@ -39,8 +42,15 @@ export default function SettingsScreen({ navigation }: any) {
   const [avatarKey, setAvatarKey] = React.useState<string | null>(null);
   const [inviteCode, setInviteCode] = React.useState<string | null>(null);
   const [initialFullName, setInitialFullName] = React.useState('');
+  const [initialHandle, setInitialHandle] = React.useState('');
+  const [initialEmail, setInitialEmail] = React.useState('');
   const [initialAvatarKey, setInitialAvatarKey] = React.useState<string | null>(null);
   const [avatarPreviewUri, setAvatarPreviewUri] = React.useState<string | null>(null);
+  const lastKnownHandleRef = React.useRef('');
+  const updateHandle = React.useCallback((value: string) => {
+    lastKnownHandleRef.current = value;
+    setHandle(value);
+  }, []);
 
   const ensureInviteCode = React.useCallback(
     async (viewerId?: string | null): Promise<string | null> => {
@@ -93,21 +103,39 @@ export default function SettingsScreen({ navigation }: any) {
     }
     try {
       const data: ViewerProfile | null = await UsersAPI.me();
-      const normalizedFullName =
-        data && typeof data.fullName === 'string' ? data.fullName : '';
+      const normalizedFullName = typeof data?.fullName === 'string' ? data.fullName : '';
       const normalizedAvatarKey = data?.avatarKey ?? null;
-      const normalizedHandle =
-        data && typeof (data as any).handle === 'string' ? (data as any).handle : '';
-      const normalizedEmail =
-        data && typeof (data as any).email === 'string' ? (data as any).email : '';
+      let normalizedHandle = typeof data?.handle === 'string' ? data.handle : '';
+      const normalizedEmail = typeof data?.email === 'string' ? data.email : '';
       const normalizedId =
-        data && typeof (data as any).id === 'string' && (data as any).id.trim().length
-          ? (data as any).id.trim()
-          : null;
+        typeof data?.id === 'string' && data.id.trim().length ? data.id.trim() : null;
       let normalizedInviteCode =
         data && typeof data.inviteCode === 'string' && data.inviteCode.trim().length
           ? data.inviteCode.trim()
           : null;
+
+      if (!normalizedHandle.trim().length && normalizedId) {
+        try {
+          const fallbackUser = await UsersAPI.getUserByIdentity?.({ userId: normalizedId });
+          const fallbackHandle =
+            typeof fallbackUser?.handle === 'string'
+              ? fallbackUser.handle
+              : typeof (fallbackUser as any)?.username === 'string'
+              ? (fallbackUser as any).username
+              : typeof (fallbackUser as any)?.userHandle === 'string'
+              ? (fallbackUser as any).userHandle
+              : null;
+          if (fallbackHandle && fallbackHandle.trim().length) {
+            normalizedHandle = fallbackHandle.trim();
+          }
+        } catch (error) {
+          console.warn('Failed to resolve handle fallback:', error);
+        }
+      }
+
+      if (!normalizedHandle.trim().length && lastKnownHandleRef.current.trim().length) {
+        normalizedHandle = lastKnownHandleRef.current.trim();
+      }
 
       if (!normalizedInviteCode && normalizedId) {
         normalizedInviteCode = await readStoredInviteCode(normalizedId);
@@ -120,8 +148,10 @@ export default function SettingsScreen({ navigation }: any) {
       console.log('[SettingsScreen loadViewer] Setting state - avatarKey:', normalizedAvatarKey);
       setFullName(normalizedFullName);
       setInitialFullName(normalizedFullName);
-      setHandle(normalizedHandle);
+      updateHandle(normalizedHandle);
+      setInitialHandle(normalizedHandle);
       setEmail(normalizedEmail);
+      setInitialEmail(normalizedEmail);
       setAvatarKey(normalizedAvatarKey);
       setInitialAvatarKey(normalizedAvatarKey);
       setInviteCode(normalizedInviteCode);
@@ -137,11 +167,15 @@ export default function SettingsScreen({ navigation }: any) {
     } finally {
       setLoading(false);
     }
-  }, [ensureInviteCode]);
+  }, [ensureInviteCode, updateHandle]);
 
   React.useEffect(() => {
     loadViewer();
   }, [loadViewer]);
+
+  React.useEffect(() => {
+    lastKnownHandleRef.current = handle;
+  }, [handle]);
 
   const handleLogout = async () => {
     try {
@@ -244,32 +278,71 @@ export default function SettingsScreen({ navigation }: any) {
 
   const handleSave = async () => {
     const trimmedName = fullName.trim();
-    const normalizedName = trimmedName.length ? trimmedName : '';
+    const normalizedName = trimmedName.length ? trimmedName : null;
+    const initialNameTrimmed = initialFullName.trim();
+    const normalizedInitialName = initialNameTrimmed.length ? initialNameTrimmed : null;
 
-    const hasNameChange = normalizedName !== initialFullName.trim();
+    const trimmedHandle = handle.trim();
+    const normalizedHandle = trimmedHandle.length ? trimmedHandle : null;
+    const initialHandleTrimmed = initialHandle.trim();
+    const normalizedInitialHandle = initialHandleTrimmed.length ? initialHandleTrimmed : null;
+    const rememberedHandle =
+      lastKnownHandleRef.current.trim().length ? lastKnownHandleRef.current.trim() : null;
+
+    const trimmedEmail = email.trim();
+    const normalizedEmail = trimmedEmail.length ? trimmedEmail : null;
+    const initialEmailTrimmed = initialEmail.trim();
+    const normalizedInitialEmail = initialEmailTrimmed.length ? initialEmailTrimmed : null;
+
+    const hasNameChange = normalizedName !== normalizedInitialName;
+    const hasHandleChange = normalizedHandle !== normalizedInitialHandle;
+    const hasEmailChange = normalizedEmail !== normalizedInitialEmail;
     const hasAvatarChange = (avatarKey ?? null) !== (initialAvatarKey ?? null);
 
-    if (!hasNameChange && !hasAvatarChange) {
+    if (!hasNameChange && !hasHandleChange && !hasEmailChange && !hasAvatarChange) {
       Alert.alert('No changes', 'Update your profile before saving.');
       return;
     }
 
     setSaving(true);
     try {
-      // ONLY send fields that actually changed
-      // Don't try to "preserve" other fields - let backend keep what it has
-      const payload: any = {};
-
-      if (hasNameChange) {
-        payload.fullName = trimmedName.length ? trimmedName : null;
-      }
-
       if (hasAvatarChange) {
-        payload.avatarKey = avatarKey;
+        console.log('[SettingsScreen] Saving avatar via POST /me/avatar:', avatarKey ?? null);
+        await UsersAPI.updateAvatar(avatarKey ?? null);
       }
 
-      console.log('[SettingsScreen] Saving changes via PATCH /me:', payload);
-      await UsersAPI.updateMe(payload);
+      if (hasNameChange || hasHandleChange || hasEmailChange || hasAvatarChange) {
+        const payload: {
+          fullName?: string | null;
+          handle?: string | null;
+          email?: string | null;
+          avatarKey?: string | null;
+        } = {};
+
+        if (hasNameChange || normalizedInitialName !== null) {
+          payload.fullName = normalizedName ?? normalizedInitialName ?? null;
+        }
+
+        if (
+          hasHandleChange ||
+          normalizedInitialHandle !== null ||
+          normalizedHandle !== null ||
+          rememberedHandle !== null
+        ) {
+          payload.handle = normalizedHandle ?? normalizedInitialHandle ?? rememberedHandle ?? null;
+        }
+
+        if (hasEmailChange || normalizedInitialEmail !== null) {
+          payload.email = normalizedEmail ?? normalizedInitialEmail ?? null;
+        }
+
+        if (hasAvatarChange || (initialAvatarKey ?? null) !== null || (avatarKey ?? null) !== null) {
+          payload.avatarKey = (avatarKey ?? initialAvatarKey) ?? null;
+        }
+
+        console.log('[SettingsScreen] Saving profile via PATCH /me:', payload);
+        await UsersAPI.updateMe(payload);
+      }
 
       await loadViewer({ silent: true });
 
