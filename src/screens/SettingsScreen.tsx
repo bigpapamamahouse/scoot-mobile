@@ -39,6 +39,8 @@ export default function SettingsScreen({ navigation }: any) {
   const [avatarKey, setAvatarKey] = React.useState<string | null>(null);
   const [inviteCode, setInviteCode] = React.useState<string | null>(null);
   const [initialFullName, setInitialFullName] = React.useState('');
+  const [initialHandle, setInitialHandle] = React.useState('');
+  const [initialEmail, setInitialEmail] = React.useState('');
   const [initialAvatarKey, setInitialAvatarKey] = React.useState<string | null>(null);
   const [avatarPreviewUri, setAvatarPreviewUri] = React.useState<string | null>(null);
 
@@ -121,7 +123,9 @@ export default function SettingsScreen({ navigation }: any) {
       setFullName(normalizedFullName);
       setInitialFullName(normalizedFullName);
       setHandle(normalizedHandle);
+      setInitialHandle(normalizedHandle);
       setEmail(normalizedEmail);
+      setInitialEmail(normalizedEmail);
       setAvatarKey(normalizedAvatarKey);
       setInitialAvatarKey(normalizedAvatarKey);
       setInviteCode(normalizedInviteCode);
@@ -244,32 +248,51 @@ export default function SettingsScreen({ navigation }: any) {
 
   const handleSave = async () => {
     const trimmedName = fullName.trim();
-    const normalizedName = trimmedName.length ? trimmedName : '';
+    const normalizedName = trimmedName.length ? trimmedName : null;
+    const initialNameTrimmed = initialFullName.trim();
+    const normalizedInitialName = initialNameTrimmed.length ? initialNameTrimmed : null;
 
-    const hasNameChange = normalizedName !== initialFullName.trim();
+    const trimmedHandle = handle.trim();
+    const normalizedHandle = trimmedHandle.length ? trimmedHandle : null;
+    const initialHandleTrimmed = initialHandle.trim();
+    const normalizedInitialHandle = initialHandleTrimmed.length ? initialHandleTrimmed : null;
+
+    const trimmedEmail = email.trim();
+    const normalizedEmail = trimmedEmail.length ? trimmedEmail : null;
+    const initialEmailTrimmed = initialEmail.trim();
+    const normalizedInitialEmail = initialEmailTrimmed.length ? initialEmailTrimmed : null;
+
+    const hasNameChange = normalizedName !== normalizedInitialName;
+    const hasHandleChange = normalizedHandle !== normalizedInitialHandle;
+    const hasEmailChange = normalizedEmail !== normalizedInitialEmail;
     const hasAvatarChange = (avatarKey ?? null) !== (initialAvatarKey ?? null);
 
-    if (!hasNameChange && !hasAvatarChange) {
+    if (!hasNameChange && !hasHandleChange && !hasEmailChange && !hasAvatarChange) {
       Alert.alert('No changes', 'Update your profile before saving.');
       return;
     }
 
     setSaving(true);
     try {
-      // ONLY send fields that actually changed
-      // Don't try to "preserve" other fields - let backend keep what it has
-      const payload: any = {};
+      const updateCalls: Array<Promise<any>> = [];
 
-      if (hasNameChange) {
-        payload.fullName = trimmedName.length ? trimmedName : null;
+      if (hasNameChange || hasHandleChange || hasEmailChange) {
+        const payload = {
+          fullName: normalizedName,
+          handle: normalizedHandle,
+          email: normalizedEmail,
+        };
+
+        console.log('[SettingsScreen] Saving profile details via PATCH /me:', payload);
+        updateCalls.push(UsersAPI.updateMe(payload));
       }
 
       if (hasAvatarChange) {
-        payload.avatarKey = avatarKey;
+        console.log('[SettingsScreen] Saving avatar via POST /me/avatar:', avatarKey);
+        updateCalls.push(UsersAPI.updateAvatar(avatarKey ?? null));
       }
 
-      console.log('[SettingsScreen] Saving changes via PATCH /me:', payload);
-      await UsersAPI.updateMe(payload);
+      await Promise.all(updateCalls);
 
       await loadViewer({ silent: true });
 

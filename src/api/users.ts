@@ -301,24 +301,53 @@ export async function me(){
   return normalized;
 }
 
-export async function updateMe(payload: { fullName?: string | null; avatarKey?: string | null }){
+type UpdateMePayload = {
+  fullName?: string | null;
+  avatarKey?: string | null;
+  handle?: string | null;
+  email?: string | null;
+};
+
+const assignWithAliases = (
+  body: Record<string, unknown>,
+  value: string | null | undefined,
+  aliases: string[]
+) => {
+  if (value === undefined) {
+    return;
+  }
+
+  for (const field of aliases) {
+    if (!(field in body)) {
+      body[field] = value;
+    }
+  }
+};
+
+export async function updateMe(payload: UpdateMePayload) {
   const body: Record<string, unknown> = {};
 
   if ('fullName' in payload) {
-    body.fullName = payload.fullName === undefined ? undefined : payload.fullName;
-    if (!('full_name' in body)) {
-      body.full_name = payload.fullName === undefined ? undefined : payload.fullName;
-    }
+    assignWithAliases(body, payload.fullName, ['fullName', 'full_name', 'name', 'displayName', 'display_name']);
   }
 
-  // Don't include avatarKey in PATCH /me - use updateAvatar() instead
-  if ('avatarKey' in payload && !('fullName' in payload)) {
-    // If only updating avatar, use the dedicated endpoint
-    console.warn('[updateMe] avatarKey should be updated via updateAvatar() instead');
+  if ('handle' in payload) {
+    assignWithAliases(body, payload.handle, [
+      'handle',
+      'userHandle',
+      'user_handle',
+      'username',
+      'userName',
+      'profileHandle',
+      'profile_handle',
+    ]);
   }
 
-  if ('avatarKey' in payload && 'fullName' in payload) {
-    // Legacy support: If updating both, include avatar in PATCH /me
+  if ('email' in payload) {
+    assignWithAliases(body, payload.email, ['email', 'emailAddress', 'email_address']);
+  }
+
+  if ('avatarKey' in payload) {
     const details = resolveAvatarDetails(payload.avatarKey);
     const keyValue =
       details.key !== undefined
