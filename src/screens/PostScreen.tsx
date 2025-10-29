@@ -9,12 +9,14 @@ import {
   KeyboardAvoidingView,
   Platform,
   RefreshControl,
+  Alert,
 } from 'react-native';
 import PostCard from '../components/PostCard';
 import { CommentsAPI, PostsAPI } from '../api';
 import { Comment, Post } from '../types';
 import { Avatar } from '../components/Avatar';
 import { resolveHandle } from '../lib/resolveHandle';
+import { useCurrentUser, isOwner } from '../hooks/useCurrentUser';
 
 interface PostScreenRoute {
   params?: {
@@ -27,6 +29,7 @@ export default function PostScreen({ route, navigation }: { route: PostScreenRou
   const initialPost = route?.params?.post ?? null;
   const postId = route?.params?.postId ?? initialPost?.id;
 
+  const { currentUser } = useCurrentUser();
   const [post, setPost] = React.useState<Post | null>(initialPost);
   const [comments, setComments] = React.useState<Comment[]>([]);
   const [loading, setLoading] = React.useState(false);
@@ -164,6 +167,78 @@ export default function PostScreen({ route, navigation }: { route: PostScreenRou
     }
   }, [newComment, postId, submitting]);
 
+  const handleEditComment = (comment: Comment) => {
+    Alert.prompt(
+      'Edit Comment',
+      'Update your comment:',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Save',
+          onPress: async (text) => {
+            if (!text || !text.trim()) {
+              Alert.alert('Error', 'Comment text cannot be empty');
+              return;
+            }
+            if (!postId) return;
+            try {
+              await CommentsAPI.updateComment(postId, comment.id, text.trim());
+              setComments((prev) =>
+                prev.map((c) =>
+                  c.id === comment.id ? { ...c, text: text.trim() } : c
+                )
+              );
+              Alert.alert('Success', 'Comment updated successfully');
+            } catch (error) {
+              console.error('Failed to update comment:', error);
+              Alert.alert('Error', 'Failed to update comment. Please try again.');
+            }
+          },
+        },
+      ],
+      'plain-text',
+      comment.text
+    );
+  };
+
+  const handleDeleteComment = (comment: Comment) => {
+    Alert.alert(
+      'Delete Comment',
+      'Are you sure you want to delete this comment? This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            if (!postId) return;
+            try {
+              await CommentsAPI.deleteComment(postId, comment.id);
+              setComments((prev) => prev.filter((c) => c.id !== comment.id));
+              setPost((prev) => {
+                if (!prev) return prev;
+                const nextCount = Math.max((prev.commentCount || 0) - 1, 0);
+                return { ...prev, commentCount: nextCount };
+              });
+              Alert.alert('Success', 'Comment deleted successfully');
+            } catch (error) {
+              console.error('Failed to delete comment:', error);
+              Alert.alert('Error', 'Failed to delete comment. Please try again.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleCommentOptions = (comment: Comment) => {
+    Alert.alert('Comment Options', 'Choose an action:', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Edit', onPress: () => handleEditComment(comment) },
+      { text: 'Delete', onPress: () => handleDeleteComment(comment), style: 'destructive' },
+    ]);
+  };
+
   const renderComment = ({ item }: { item: Comment }) => {
     const anyComment: any = item;
     const handleCandidate = resolveHandle(anyComment);
@@ -173,6 +248,8 @@ export default function PostScreen({ route, navigation }: { route: PostScreenRou
         : 'Anonymous';
     const handle = handleCandidate ? `@${handleCandidate}` : fallbackId;
     const createdAt = item.createdAt ? new Date(item.createdAt).toLocaleString() : '';
+    const userOwnsComment = isOwner(item, currentUser);
+
     return (
       <View style={styles.commentRow}>
         <Avatar avatarKey={anyComment?.avatarKey} size={28} />
@@ -180,6 +257,14 @@ export default function PostScreen({ route, navigation }: { route: PostScreenRou
           <View style={styles.commentHeader}>
             <Text style={styles.commentHandle}>{handle}</Text>
             {!!createdAt && <Text style={styles.commentTimestamp}>{createdAt}</Text>}
+            {userOwnsComment && (
+              <TouchableOpacity
+                onPress={() => handleCommentOptions(item)}
+                style={styles.commentOptionsButton}
+              >
+                <Text style={styles.commentOptionsIcon}>⋯</Text>
+              </TouchableOpacity>
+            )}
           </View>
           <Text style={styles.commentText}>{item.text}</Text>
         </View>
@@ -292,8 +377,9 @@ const styles = StyleSheet.create({
   },
   commentHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 4,
+    gap: 8,
   },
   commentHandle: {
     fontWeight: '600',
@@ -302,6 +388,15 @@ const styles = StyleSheet.create({
   commentTimestamp: {
     fontSize: 12,
     color: '#999',
+    marginLeft: 'auto',
+  },
+  commentOptionsButton: {
+    padding: 4,
+  },
+  commentOptionsIcon: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#666',
   },
   commentText: {
     fontSize: 14,

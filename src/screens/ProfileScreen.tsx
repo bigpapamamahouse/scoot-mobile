@@ -528,6 +528,16 @@ export default function ProfileScreen({ navigation, route }: any) {
     load({ skipSpinner: true }).finally(() => setRefreshing(false));
   }, [load]);
 
+  const handlePostUpdated = React.useCallback((updatedPost: Post) => {
+    setPosts((prev) =>
+      prev.map((p) => (p.id === updatedPost.id ? updatedPost : p))
+    );
+  }, []);
+
+  const handlePostDeleted = React.useCallback((postId: string) => {
+    setPosts((prev) => prev.filter((p) => p.id !== postId));
+  }, []);
+
   const isViewingSelf = React.useMemo(() => {
     if (!viewer || !user) return false;
 
@@ -801,7 +811,13 @@ export default function ProfileScreen({ navigation, route }: any) {
             )}
           </View>
         }
-        renderItem={({ item }) => <PostCard post={item} />}
+        renderItem={({ item }) => (
+          <PostCard
+            post={item}
+            onPostUpdated={handlePostUpdated}
+            onPostDeleted={handlePostDeleted}
+          />
+        )}
         ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={
