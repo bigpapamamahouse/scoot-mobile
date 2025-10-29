@@ -310,10 +310,12 @@ export default function ProfileScreen({ navigation, route }: any) {
 
         if (!targetIdentity && (targetHandle || targetUserId)) {
           try {
+            console.log('[Profile] Fetching user by identity:', { handle: targetHandle, userId: targetUserId });
             const fetched = await UsersAPI.getUserByIdentity({
               handle: targetHandle,
               userId: targetUserId,
             });
+            console.log('[Profile] getUserByIdentity returned:', fetched);
             if (fetched) {
               targetIdentity = {
                 id: fetched.id ?? null,
@@ -323,12 +325,18 @@ export default function ProfileScreen({ navigation, route }: any) {
                 fullName: fetched.fullName ?? null,
                 createdAt: fetched.createdAt ?? null,
               };
+              console.log('[Profile] Created targetIdentity:', targetIdentity);
               if (fetched.handle) {
                 targetHandle = fetched.handle.replace(/^@/, '').trim() || targetHandle;
               }
               if (fetched.id) {
                 targetUserId = fetched.id;
+                console.log('[Profile] Set targetUserId:', targetUserId);
+              } else {
+                console.warn('[Profile] Fetched user has no ID!');
               }
+            } else {
+              console.warn('[Profile] getUserByIdentity returned null/undefined');
             }
           } catch (err: any) {
             console.warn(
@@ -396,9 +404,14 @@ export default function ProfileScreen({ navigation, route }: any) {
 
         if (!resolvedIdentity && filteredPosts.length) {
           resolvedIdentity = deriveIdentityFromPosts(filteredPosts);
+          console.log('[Profile] Derived identity from posts:', resolvedIdentity);
         }
 
-        setUser(resolvedIdentity ?? targetIdentity ?? null);
+        const finalUserToSet = resolvedIdentity ?? targetIdentity ?? null;
+        console.log('[Profile] Setting user state:', finalUserToSet);
+        console.log('[Profile] resolvedIdentity:', resolvedIdentity);
+        console.log('[Profile] targetIdentity:', targetIdentity);
+        setUser(finalUserToSet);
 
         // Load follower/following counts
         const finalIdentity = resolvedIdentity ?? targetIdentity;

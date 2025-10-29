@@ -120,9 +120,13 @@ export async function getUserByIdentity(options: UserIdentityOptions = {}): Prom
   let lastError: unknown;
   for (const path of attempts) {
     try {
+      console.log('[getUserByIdentity] Trying path:', path);
       const payload = await api(path);
+      console.log('[getUserByIdentity] Payload from', path, ':', payload);
       const user = extractUserFromPayload(payload);
+      console.log('[getUserByIdentity] Extracted user:', user);
       if (user) {
+        console.log('[getUserByIdentity] Success! Returning user with ID:', user.id);
         return user;
       }
       console.warn(`User lookup ${path} returned unrecognized shape`, payload);
