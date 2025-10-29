@@ -274,28 +274,26 @@ export default function SettingsScreen({ navigation }: any) {
 
     setSaving(true);
     try {
-      const payload: {
-        fullName: string | null;
-        handle: string | null;
-        email: string | null;
-        avatarKey: string | null;
-      } = {
-        fullName: normalizedName,
-        handle: normalizedHandle,
-        email: normalizedEmail,
-        avatarKey: avatarKey ?? null,
-      };
-
-      if (hasNameChange || hasHandleChange || hasEmailChange) {
-        console.log('[SettingsScreen] Saving profile via PATCH /me:', payload);
-        await UsersAPI.updateMe(payload);
-      } else {
-        console.log('[SettingsScreen] Skipping PATCH /me because only avatar changed');
-      }
-
       if (hasAvatarChange) {
         console.log('[SettingsScreen] Saving avatar via POST /me/avatar:', avatarKey ?? null);
         await UsersAPI.updateAvatar(avatarKey ?? null);
+      }
+
+      if (hasNameChange || hasHandleChange || hasEmailChange || hasAvatarChange) {
+        const payload: {
+          fullName: string | null;
+          handle: string | null;
+          email: string | null;
+          avatarKey: string | null;
+        } = {
+          fullName: normalizedName ?? normalizedInitialName ?? null,
+          handle: normalizedHandle ?? normalizedInitialHandle ?? null,
+          email: normalizedEmail ?? normalizedInitialEmail ?? null,
+          avatarKey: (avatarKey ?? initialAvatarKey) ?? null,
+        };
+
+        console.log('[SettingsScreen] Saving profile via PATCH /me:', payload);
+        await UsersAPI.updateMe(payload);
       }
 
       await loadViewer({ silent: true });
