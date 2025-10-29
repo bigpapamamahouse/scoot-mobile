@@ -12,6 +12,7 @@ import ConfirmCodeScreen from '../screens/Auth/ConfirmCodeScreen';
 import ClaimUsernameScreen from '../screens/Auth/ClaimUsernameScreen';
 import ComposePostScreen from '../screens/ComposePostScreen';
 import { SearchScreen } from '../screens/SearchScreen';
+import { UserListScreen } from '../screens/UserListScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -46,6 +47,13 @@ export default function RootNavigator(){
         <Stack.Screen name="ComposePost" component={ComposePostScreen} options={{ headerShown: false, presentation: 'modal' }} />
         <Stack.Screen name="Search" component={SearchScreen} options={{ title: 'Search Users' }} />
         <Stack.Screen name="Profile" component={ProfileScreen} options={{ title: 'Profile' }} />
+        <Stack.Screen
+          name="UserList"
+          component={UserListScreen}
+          options={({ route }) => ({
+            title: route.params?.type === 'followers' ? 'Followers' : 'Following'
+          })}
+        />
         <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Notifications' }} />
         <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: 'Settings' }} />
       </Stack.Navigator>

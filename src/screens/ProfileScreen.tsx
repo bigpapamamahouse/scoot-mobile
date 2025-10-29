@@ -7,6 +7,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { UsersAPI, PostsAPI } from '../api';
@@ -29,6 +30,10 @@ export default function ProfileScreen({ navigation, route }: any) {
   const [loading, setLoading] = React.useState(true);
   const [refreshing, setRefreshing] = React.useState(false);
   const [viewer, setViewer] = React.useState<User | null>(null);
+  const [followerCount, setFollowerCount] = React.useState(0);
+  const [followingCount, setFollowingCount] = React.useState(0);
+  const [followStatus, setFollowStatus] = React.useState<'none' | 'pending' | 'following'>('none');
+  const [followLoading, setFollowLoading] = React.useState(false);
 
   const resolvePosts = React.useCallback((payload: unknown): Post[] => {
     if (!payload) return [];
@@ -251,6 +256,9 @@ export default function ProfileScreen({ navigation, route }: any) {
         let currentUser: User | null = null;
         try {
           currentUser = await UsersAPI.me();
+          console.log('[Profile] currentUser from me():', currentUser);
+          console.log('[Profile] currentUser?.id:', currentUser?.id);
+          console.log('[Profile] currentUser?.userId:', (currentUser as any)?.userId);
         } catch (viewerError: any) {
           console.warn(
             'Failed to load signed-in user profile:',
@@ -265,6 +273,7 @@ export default function ProfileScreen({ navigation, route }: any) {
         const viewerHandle =
           currentUser?.handle?.replace(/^@/, '').trim().toLowerCase() || null;
         const viewerId = currentUser?.id?.trim() || null;
+        console.log('[Profile] viewerId after me():', viewerId);
 
         const isSelfRequest = (() => {
           if (!targetHandle && !targetUserId) {
@@ -305,10 +314,12 @@ export default function ProfileScreen({ navigation, route }: any) {
 
         if (!targetIdentity && (targetHandle || targetUserId)) {
           try {
+            console.log('[Profile] Fetching user by identity:', { handle: targetHandle, userId: targetUserId });
             const fetched = await UsersAPI.getUserByIdentity({
               handle: targetHandle,
               userId: targetUserId,
             });
+            console.log('[Profile] getUserByIdentity returned:', fetched);
             if (fetched) {
               targetIdentity = {
                 id: fetched.id ?? null,
@@ -318,12 +329,18 @@ export default function ProfileScreen({ navigation, route }: any) {
                 fullName: fetched.fullName ?? null,
                 createdAt: fetched.createdAt ?? null,
               };
+              console.log('[Profile] Created targetIdentity:', targetIdentity);
               if (fetched.handle) {
                 targetHandle = fetched.handle.replace(/^@/, '').trim() || targetHandle;
               }
               if (fetched.id) {
                 targetUserId = fetched.id;
+                console.log('[Profile] Set targetUserId:', targetUserId);
+              } else {
+                console.warn('[Profile] Fetched user has no ID!');
               }
+            } else {
+              console.warn('[Profile] getUserByIdentity returned null/undefined');
             }
           } catch (err: any) {
             console.warn(
@@ -391,9 +408,81 @@ export default function ProfileScreen({ navigation, route }: any) {
 
         if (!resolvedIdentity && filteredPosts.length) {
           resolvedIdentity = deriveIdentityFromPosts(filteredPosts);
+          console.log('[Profile] Derived identity from posts:', resolvedIdentity);
         }
 
-        setUser(resolvedIdentity ?? targetIdentity ?? null);
+        const finalUserToSet = resolvedIdentity ?? targetIdentity ?? null;
+        console.log('[Profile] Setting user state:', finalUserToSet);
+        console.log('[Profile] resolvedIdentity:', resolvedIdentity);
+        console.log('[Profile] targetIdentity:', targetIdentity);
+        setUser(finalUserToSet);
+
+        // Load follower/following counts and follow status
+        const finalIdentity = resolvedIdentity ?? targetIdentity;
+        const userHandle = finalIdentity?.handle?.replace(/^@/, '').trim();
+        if (userHandle) {
+          try {
+            // Fetch fresh user profile data to get follow status
+            console.log('[Profile] Fetching user profile for follow status:', userHandle);
+            const profileData = await UsersAPI.getUser(userHandle);
+            console.log('[Profile] Profile data:', profileData);
+
+            const followersData = await UsersAPI.listFollowers(userHandle);
+            const followers = Array.isArray(followersData) ? followersData :
+              (followersData?.items || followersData?.followers || []);
+            setFollowerCount(followers.length);
+
+            const followingData = await UsersAPI.listFollowing(userHandle);
+            const following = Array.isArray(followingData) ? followingData :
+              (followingData?.items || followingData?.following || []);
+            setFollowingCount(following.length);
+
+            // Check follow status from profile data
+            // Use viewerId from earlier in the function (it's in the same scope)
+            console.log('[Profile] Checking follow status - isSelfRequest:', isSelfRequest, 'viewerId:', viewerId);
+            if (!isSelfRequest && viewerId) {
+              console.log('[Profile] Entered follow status check block');
+              // Use followStatus and isFollowPending from API if available
+              if (profileData && typeof profileData === 'object') {
+                console.log('[Profile] profileData is valid object');
+                if ('isFollowPending' in profileData && profileData.isFollowPending === true) {
+                  console.log('[Profile] Follow status: pending (from API)');
+                  setFollowStatus('pending');
+                } else if ('followStatus' in profileData) {
+                  const status = profileData.followStatus;
+                  console.log('[Profile] followStatus field found:', status);
+                  if (status === 'pending' || status === 'requested') {
+                    console.log('[Profile] Follow status: pending (from followStatus)');
+                    setFollowStatus('pending');
+                  } else if (status === 'following' || status === 'accepted') {
+                    console.log('[Profile] Follow status: following (from followStatus)');
+                    setFollowStatus('following');
+                  } else {
+                    console.log('[Profile] Follow status: none (from followStatus)');
+                    setFollowStatus('none');
+                  }
+                } else if ('isFollowing' in profileData && profileData.isFollowing === true) {
+                  console.log('[Profile] Follow status: following (from isFollowing)');
+                  setFollowStatus('following');
+                } else {
+                  // Fallback: check if in followers list
+                  const isUserFollowing = followers.some((f: any) => f.id === viewerId);
+                  console.log('[Profile] Follow status: fallback check -', isUserFollowing ? 'following' : 'none');
+                  setFollowStatus(isUserFollowing ? 'following' : 'none');
+                }
+              } else {
+                console.log('[Profile] profileData is not a valid object');
+                // Fallback: check if in followers list
+                const isUserFollowing = followers.some((f: any) => f.id === viewerId);
+                setFollowStatus(isUserFollowing ? 'following' : 'none');
+              }
+            } else {
+              console.log('[Profile] Skipped follow status check - isSelfRequest:', isSelfRequest, 'viewerId:', viewerId);
+            }
+          } catch (err) {
+            console.warn('Failed to load follower/following counts:', err);
+          }
+        }
       } catch (e: any) {
         console.warn('Failed to load profile:', e?.message || String(e));
         if (!options?.skipSpinner) {
@@ -459,6 +548,128 @@ export default function ProfileScreen({ navigation, route }: any) {
     return `${base}${needsApostrophe ? "'" : "'s"} Posts`;
   }, [isViewingSelf, user?.fullName, user?.handle, user?.id]);
 
+  const handleFollowPress = React.useCallback(async () => {
+    console.log('[Follow] Button pressed');
+    console.log('[Follow] User:', user);
+    console.log('[Follow] User handle:', user?.handle);
+    console.log('[Follow] Follow status:', followStatus);
+    console.log('[Follow] Follow loading:', followLoading);
+
+    const userHandle = user?.handle?.replace(/^@/, '');
+    if (!userHandle || followLoading) {
+      console.log('[Follow] Blocked - userHandle:', userHandle, 'followLoading:', followLoading);
+      return;
+    }
+
+    // If already following, show confirmation dialog
+    if (followStatus === 'following') {
+      console.log('[Follow] Already following, showing unfollow dialog');
+      Alert.alert(
+        'Unfollow',
+        `Are you sure you want to unfollow @${userHandle}?`,
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel',
+          },
+          {
+            text: 'Unfollow',
+            style: 'destructive',
+            onPress: async () => {
+              console.log('[Follow] Unfollowing user:', userHandle);
+              setFollowLoading(true);
+              try {
+                await UsersAPI.unfollowUser(userHandle);
+                console.log('[Follow] Unfollow successful');
+                setFollowStatus('none');
+                setFollowerCount(prev => Math.max(0, prev - 1));
+              } catch (err: any) {
+                console.error('[Follow] Failed to unfollow user:', err);
+                Alert.alert('Error', err?.message || 'Failed to unfollow user');
+              } finally {
+                setFollowLoading(false);
+              }
+            },
+          },
+        ]
+      );
+      return;
+    }
+
+    // Send follow request
+    console.log('[Follow] Sending follow request to user:', userHandle);
+    setFollowLoading(true);
+    try {
+      const response = await UsersAPI.followUser(userHandle);
+      console.log('[Follow] Follow response:', response);
+      console.log('[Follow] Follow response type:', typeof response);
+      if (response && typeof response === 'object') {
+        console.log('[Follow] Follow response keys:', Object.keys(response));
+      }
+
+      // Check if response indicates a pending request or immediate follow
+      // Look for various possible response formats
+      let isPending = true; // Default to pending (requires approval)
+      let isImmediate = false;
+
+      if (response && typeof response === 'object') {
+        // Check for explicit status field
+        if ('status' in response) {
+          isPending = response.status === 'pending' || response.status === 'requested';
+          isImmediate = response.status === 'following' || response.status === 'accepted';
+        }
+        // Check for followStatus field
+        else if ('followStatus' in response) {
+          isPending = response.followStatus === 'pending' || response.followStatus === 'requested';
+          isImmediate = response.followStatus === 'following' || response.followStatus === 'accepted';
+        }
+        // Check for isFollowing field
+        else if ('isFollowing' in response) {
+          isImmediate = response.isFollowing === true;
+          isPending = !isImmediate;
+        }
+        // Check for pending field
+        else if ('pending' in response) {
+          isPending = response.pending === true;
+          isImmediate = !isPending;
+        }
+      }
+
+      if (isImmediate) {
+        console.log('[Follow] Status: following (immediate/auto-accepted)');
+        setFollowStatus('following');
+        setFollowerCount(prev => prev + 1);
+      } else {
+        console.log('[Follow] Status: pending (requires approval)');
+        setFollowStatus('pending');
+        // Don't increment follower count yet since it's pending
+      }
+    } catch (err: any) {
+      console.error('[Follow] Failed to follow user:', err);
+      Alert.alert('Error', err?.message || 'Failed to send follow request');
+    } finally {
+      setFollowLoading(false);
+    }
+  }, [user?.id, user?.handle, followStatus, followLoading]);
+
+  const handleFollowersPress = React.useCallback(() => {
+    if (user?.handle) {
+      navigation.navigate('UserList', {
+        handle: user.handle.replace(/^@/, ''),
+        type: 'followers'
+      });
+    }
+  }, [navigation, user?.handle]);
+
+  const handleFollowingPress = React.useCallback(() => {
+    if (user?.handle) {
+      navigation.navigate('UserList', {
+        handle: user.handle.replace(/^@/, ''),
+        type: 'following'
+      });
+    }
+  }, [navigation, user?.handle]);
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -491,6 +702,14 @@ export default function ProfileScreen({ navigation, route }: any) {
                 <Text style={styles.statValue}>{posts.length}</Text>
                 <Text style={styles.statLabel}>Posts</Text>
               </View>
+              <TouchableOpacity style={styles.stat} onPress={handleFollowersPress}>
+                <Text style={styles.statValue}>{followerCount}</Text>
+                <Text style={styles.statLabel}>Followers</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.stat} onPress={handleFollowingPress}>
+                <Text style={styles.statValue}>{followingCount}</Text>
+                <Text style={styles.statLabel}>Following</Text>
+              </TouchableOpacity>
             </View>
 
             {isViewingSelf && (
@@ -499,6 +718,29 @@ export default function ProfileScreen({ navigation, route }: any) {
                 onPress={() => navigation.navigate('Settings')}
               >
                 <Text style={styles.editButtonText}>Edit Profile</Text>
+              </TouchableOpacity>
+            )}
+
+            {!isViewingSelf && (
+              <TouchableOpacity
+                style={[
+                  styles.followButton,
+                  followStatus === 'following' && styles.followingButton,
+                  followStatus === 'pending' && styles.pendingButton,
+                ]}
+                onPress={handleFollowPress}
+                disabled={followLoading}
+              >
+                <Text style={[
+                  styles.followButtonText,
+                  followStatus === 'following' && styles.followingButtonText,
+                  followStatus === 'pending' && styles.pendingButtonText,
+                ]}>
+                  {followLoading ? 'Loading...' :
+                   followStatus === 'following' ? 'Following' :
+                   followStatus === 'pending' ? 'Pending' :
+                   'Follow'}
+                </Text>
               </TouchableOpacity>
             )}
 
@@ -597,6 +839,34 @@ const styles = StyleSheet.create({
     color: '#2196f3',
     fontWeight: '600',
     fontSize: 15,
+  },
+  followButton: {
+    marginTop: 16,
+    paddingHorizontal: 24,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#2196f3',
+  },
+  followButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 15,
+  },
+  followingButton: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#2196f3',
+  },
+  followingButtonText: {
+    color: '#2196f3',
+  },
+  pendingButton: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#ff9800',
+  },
+  pendingButtonText: {
+    color: '#ff9800',
   },
   sectionTitle: {
     fontSize: 18,

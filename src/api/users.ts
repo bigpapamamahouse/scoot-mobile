@@ -3,7 +3,12 @@ import { api } from './client';
 import type { User } from '../types';
 
 export async function me(){
-  return api('/me');
+  console.log('[API] me() called');
+  const result = await api('/me');
+  console.log('[API] me() response:', result);
+  console.log('[API] me() result.id:', result?.id);
+  console.log('[API] me() result.userId:', result?.userId);
+  return result;
 }
 
 export async function updateMe(payload: { fullName?: string | null }){
@@ -11,7 +16,10 @@ export async function updateMe(payload: { fullName?: string | null }){
 }
 
 export async function getUser(handle: string){
-  return api(`/u/${encodeURIComponent(handle)}`);
+  console.log('[API] getUser called with handle:', handle);
+  const result = await api(`/u/${encodeURIComponent(handle)}`);
+  console.log('[API] getUser response:', result);
+  return result;
 }
 
 export interface UserIdentityOptions {
@@ -24,11 +32,13 @@ const isRecord = (value: unknown): value is Record<string, unknown> => {
 };
 
 const isUserLike = (value: unknown): value is User => {
-  return (
-    isRecord(value) &&
-    typeof value.id === 'string' &&
-    value.id.trim().length > 0
-  );
+  if (!isRecord(value)) return false;
+
+  // Check for either 'id' or 'userId' field
+  const hasId = typeof value.id === 'string' && value.id.trim().length > 0;
+  const hasUserId = typeof value.userId === 'string' && value.userId.trim().length > 0;
+
+  return hasId || hasUserId;
 };
 
 function extractUserFromPayload(payload: unknown, visited = new Set<unknown>()): User | null {
@@ -45,7 +55,13 @@ function extractUserFromPayload(payload: unknown, visited = new Set<unknown>()):
   }
 
   if (isUserLike(payload)) {
-    return payload as User;
+    const record = payload as Record<string, unknown>;
+    // Normalize userId -> id
+    const user = { ...record } as User;
+    if (!user.id && record.userId) {
+      user.id = record.userId as string;
+    }
+    return user;
   }
 
   if (Array.isArray(payload)) {
@@ -120,9 +136,13 @@ export async function getUserByIdentity(options: UserIdentityOptions = {}): Prom
   let lastError: unknown;
   for (const path of attempts) {
     try {
+      console.log('[getUserByIdentity] Trying path:', path);
       const payload = await api(path);
+      console.log('[getUserByIdentity] Payload from', path, ':', payload);
       const user = extractUserFromPayload(payload);
+      console.log('[getUserByIdentity] Extracted user:', user);
       if (user) {
+        console.log('[getUserByIdentity] Success! Returning user with ID:', user.id);
         return user;
       }
       console.warn(`User lookup ${path} returned unrecognized shape`, payload);
@@ -156,46 +176,82 @@ export async function listFollowing(handle: string){
 }
 
 export async function searchUsers(query: string): Promise<User[]> {
-  const path = `/search?q=${encodeURIComponent(query)}`;
+  const response = await api(`/search?q=${encodeURIComponent(query)}`);
 
-  try {
-    console.log(`[Search] Calling: ${path}`);
-    console.log(`[Search] Query: "${query}"`);
-
-    const response = await api(path);
-
-    console.log(`[Search] Response type:`, typeof response);
-    console.log(`[Search] Response:`, JSON.stringify(response, null, 2));
-
-    // Handle both array responses and wrapped responses
-    if (Array.isArray(response)) {
-      console.log(`[Search] Success! Found ${response.length} users`);
-      return response;
-    }
-    if (response && typeof response === 'object') {
-      if ('items' in response && Array.isArray(response.items)) {
-        console.log(`[Search] Success! Found ${response.items.length} users in 'items' field`);
-        return response.items;
-      }
-      if ('users' in response && Array.isArray(response.users)) {
-        console.log(`[Search] Success! Found ${response.users.length} users in 'users' field`);
-        return response.users;
-      }
-      if ('results' in response && Array.isArray(response.results)) {
-        console.log(`[Search] Success! Found ${response.results.length} users in 'results' field`);
-        return response.results;
-      }
-      if ('Items' in response && Array.isArray(response.Items)) {
-        console.log(`[Search] Success! Found ${response.Items.length} users in 'Items' field`);
-        return response.Items;
-      }
-    }
-
-    console.warn(`[Search] Unexpected response format:`, response);
-    return [];
-  } catch (err: any) {
-    console.error('[Search] Error:', err);
-    console.error('[Search] Error message:', err?.message);
-    throw err;
+  // Handle both array responses and wrapped responses
+  if (Array.isArray(response)) {
+    return response;
   }
+  if (response && typeof response === 'object') {
+    if ('items' in response && Array.isArray(response.items)) {
+      return response.items;
+    }
+    if ('users' in response && Array.isArray(response.users)) {
+      return response.users;
+    }
+    if ('results' in response && Array.isArray(response.results)) {
+      return response.results;
+    }
+    if ('Items' in response && Array.isArray(response.Items)) {
+      return response.Items;
+    }
+  }
+
+  return [];
+}
+
+export async function followUser(handle: string) {
+  console.log('[API] followUser called with handle:', handle);
+  const requestBody = { handle };
+  console.log('[API] followUser request body:', JSON.stringify(requestBody));
+
+  const result = await api('/follow-request', {
+    method: 'POST',
+    body: JSON.stringify(requestBody)
+  });
+
+  console.log('[API] followUser response:', result);
+  console.log('[API] followUser response type:', typeof result);
+  console.log('[API] followUser response JSON:', JSON.stringify(result, null, 2));
+  if (result && typeof result === 'object') {
+    console.log('[API] followUser response keys:', Object.keys(result));
+  }
+  return result;
+}
+
+export async function unfollowUser(handle: string) {
+  console.log('[API] unfollowUser called with handle:', handle);
+
+  // Try different unfollow endpoint patterns
+  const attempts = [
+    { method: 'POST', path: '/unfollow', body: JSON.stringify({ handle }) },
+    { method: 'DELETE', path: `/follow/${handle}`, body: undefined },
+    { method: 'DELETE', path: '/follow', body: JSON.stringify({ handle }) },
+    { method: 'POST', path: '/follow/remove', body: JSON.stringify({ handle }) },
+  ];
+
+  let lastError: any;
+  for (const attempt of attempts) {
+    try {
+      console.log(`[API] Trying unfollow: ${attempt.method} ${attempt.path}`);
+      const result = await api(attempt.path, {
+        method: attempt.method,
+        body: attempt.body
+      });
+      console.log('[API] unfollowUser success with:', attempt.path, result);
+      return result;
+    } catch (err: any) {
+      lastError = err;
+      const message = String(err?.message || '');
+      if (message.includes('404')) {
+        console.log(`[API] ${attempt.path} returned 404, trying next...`);
+        continue;
+      }
+      // If it's not a 404, throw immediately
+      throw err;
+    }
+  }
+
+  console.error('[API] All unfollow attempts failed:', lastError);
+  throw lastError;
 }

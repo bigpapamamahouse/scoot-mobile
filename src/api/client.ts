@@ -39,8 +39,10 @@ export async function api(path: string, init: RequestInit = {}) {
   let token: string | null | undefined;
 
   const fullUrl = `${ENV.API_URL}${path}`;
-  console.log(`[API Client] Fetching: ${fullUrl}`);
-  console.log(`[API Client] Method: ${init.method || 'GET'}`);
+  console.log(`[API Client] ${init.method || 'GET'} ${fullUrl}`);
+  if (init.body) {
+    console.log('[API Client] Body:', init.body);
+  }
 
   while (attempt < 2) {
     attempt += 1;
@@ -52,12 +54,18 @@ export async function api(path: string, init: RequestInit = {}) {
 
     if (res.ok) {
       const ct = res.headers.get('content-type') || '';
-      if (ct.includes('application/json')) return res.json();
-      return res.text();
+      if (ct.includes('application/json')) {
+        const json = await res.json();
+        console.log('[API Client] Response:', json);
+        return json;
+      }
+      const text = await res.text();
+      console.log('[API Client] Response:', text);
+      return text;
     }
 
     lastText = await res.text().catch(() => '');
-    console.log(`[API Client] Error response: ${lastText}`);
+    console.log('[API Client] Error response:', lastText);
 
     if (res.status === 401 && attempt === 1) {
       const refreshed = await refreshSession(token);
