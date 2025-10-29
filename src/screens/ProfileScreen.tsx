@@ -527,21 +527,66 @@ export default function ProfileScreen({ navigation, route }: any) {
 
   const isViewingSelf = React.useMemo(() => {
     if (!viewer || !user) return false;
-    return viewer.id === user.id;
+
+    const normalizeId = (value: unknown): string | null => {
+      if (typeof value !== 'string') return null;
+      const trimmed = value.trim();
+      return trimmed.length > 0 ? trimmed : null;
+    };
+
+    const normalizeHandle = (value: unknown): string | null => {
+      if (typeof value !== 'string') return null;
+      const trimmed = value.replace(/^@+/, '').trim().toLowerCase();
+      return trimmed.length > 0 ? trimmed : null;
+    };
+
+    const viewerId = normalizeId((viewer as any)?.id) || normalizeId((viewer as any)?.userId);
+    const userId = normalizeId((user as any)?.id) || normalizeId((user as any)?.userId);
+
+    if (viewerId && userId && viewerId === userId) {
+      return true;
+    }
+
+    const viewerHandle = normalizeHandle((viewer as any)?.handle);
+    const userHandle = normalizeHandle((user as any)?.handle);
+
+    if (viewerHandle && userHandle && viewerHandle === userHandle) {
+      return true;
+    }
+
+    return false;
   }, [user, viewer]);
+
+  const openSettings = React.useCallback(() => {
+    navigation.navigate('Settings');
+  }, [navigation]);
+
+  const headerRight = React.useMemo(() => {
+    if (!isViewingSelf) {
+      return undefined;
+    }
+    return () => (
+      <TouchableOpacity onPress={openSettings} style={styles.headerSettingsButton}>
+        <Text style={styles.headerSettingsButtonText}>Settings</Text>
+      </TouchableOpacity>
+    );
+  }, [isViewingSelf, openSettings]);
 
   React.useEffect(() => {
     if (!navigation?.setOptions) return;
+    const options: Record<string, unknown> = {};
     if (isViewingSelf) {
-      navigation.setOptions({ title: 'Profile' });
+      options.title = 'Profile';
     } else if (user?.handle) {
-      navigation.setOptions({ title: `@${user.handle}` });
+      options.title = `@${user.handle}`;
     } else if (user?.fullName) {
-      navigation.setOptions({ title: user.fullName });
+      options.title = user.fullName;
     } else if (user?.id) {
-      navigation.setOptions({ title: user.id.slice(0, 8) });
+      options.title = user.id.slice(0, 8);
     }
-  }, [isViewingSelf, navigation, user?.fullName, user?.handle, user?.id]);
+    options.headerRight = headerRight;
+    navigation.setOptions(options);
+  }, [headerRight, isViewingSelf, navigation, user?.fullName, user?.handle, user?.id]);
 
   const displayHandle = React.useMemo(() => {
     if (user?.handle) {
@@ -726,11 +771,8 @@ export default function ProfileScreen({ navigation, route }: any) {
             </View>
 
             {isViewingSelf && (
-              <TouchableOpacity
-                style={styles.editButton}
-                onPress={() => navigation.navigate('Settings')}
-              >
-                <Text style={styles.editButtonText}>Edit Profile</Text>
+              <TouchableOpacity style={styles.editButton} onPress={openSettings}>
+                <Text style={styles.editButtonText}>Open Settings</Text>
               </TouchableOpacity>
             )}
 
@@ -852,6 +894,18 @@ const styles = StyleSheet.create({
     color: '#2196f3',
     fontWeight: '600',
     fontSize: 15,
+  },
+  headerSettingsButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#2196f3',
+  },
+  headerSettingsButtonText: {
+    color: '#2196f3',
+    fontWeight: '600',
+    fontSize: 14,
   },
   followButton: {
     marginTop: 16,
