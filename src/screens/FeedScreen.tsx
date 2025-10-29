@@ -44,6 +44,16 @@ export default function FeedScreen({ navigation }: any){
     }
   }, []);
 
+  const handlePostUpdated = React.useCallback((updatedPost: Post) => {
+    setItems((prev) =>
+      prev.map((p) => (p.id === updatedPost.id ? updatedPost : p))
+    );
+  }, []);
+
+  const handlePostDeleted = React.useCallback((postId: string) => {
+    setItems((prev) => prev.filter((p) => p.id !== postId));
+  }, []);
+
   React.useEffect(()=>{ load(); }, [load]);
 
   // Refresh feed when screen comes into focus
@@ -65,6 +75,8 @@ export default function FeedScreen({ navigation }: any){
             post={item}
             onPress={() => navigation.navigate('Post', { post: item })}
             onPressAuthor={() => openProfile(item)}
+            onPostUpdated={handlePostUpdated}
+            onPostDeleted={handlePostDeleted}
           />
         )}
         ItemSeparatorComponent={() => <View style={{ height: 12 }} />}

@@ -1,22 +1,28 @@
 import React from 'react';
-import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, Image, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { Post, Reaction, Comment } from '../types';
 import { mediaUrlFromKey } from '../lib/media';
 import { Avatar } from './Avatar';
-import { CommentsAPI, ReactionsAPI } from '../api';
+import { CommentsAPI, ReactionsAPI, PostsAPI } from '../api';
 import { resolveHandle } from '../lib/resolveHandle';
+import { useCurrentUser, isOwner } from '../hooks/useCurrentUser';
 
 export default function PostCard({
   post,
   onPress,
   onPressAuthor,
   showCommentPreview = true,
+  onPostUpdated,
+  onPostDeleted,
 }: {
   post: Post;
   onPress?: () => void;
   onPressAuthor?: () => void;
   showCommentPreview?: boolean;
+  onPostUpdated?: (updatedPost: Post) => void;
+  onPostDeleted?: (postId: string) => void;
 }) {
+  const { currentUser } = useCurrentUser();
   const [reactions, setReactions] = React.useState<Reaction[]>([]);
   const [commentCount, setCommentCount] = React.useState(
     post.commentCount ?? post.comments?.length ?? 0
@@ -25,8 +31,81 @@ export default function PostCard({
     () => (post.comments || []).slice(0, 3)
   );
   const [imageAspectRatio, setImageAspectRatio] = React.useState<number | null>(null);
+  const [localPost, setLocalPost] = React.useState<Post>(post);
 
-  const imageUri = React.useMemo(() => mediaUrlFromKey(post.imageKey), [post.imageKey]);
+  const imageUri = React.useMemo(() => mediaUrlFromKey(localPost.imageKey), [localPost.imageKey]);
+
+  // Update local post when prop changes
+  React.useEffect(() => {
+    setLocalPost(post);
+  }, [post]);
+
+  const userOwnsPost = React.useMemo(() => {
+    return isOwner(localPost, currentUser);
+  }, [localPost, currentUser]);
+
+  const handleEdit = () => {
+    Alert.prompt(
+      'Edit Post',
+      'Update your post text:',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Save',
+          onPress: async (text) => {
+            if (!text || !text.trim()) {
+              Alert.alert('Error', 'Post text cannot be empty');
+              return;
+            }
+            try {
+              await PostsAPI.updatePost(localPost.id, text.trim());
+              const updatedPost = { ...localPost, text: text.trim() };
+              setLocalPost(updatedPost);
+              onPostUpdated?.(updatedPost);
+              Alert.alert('Success', 'Post updated successfully');
+            } catch (error) {
+              console.error('Failed to update post:', error);
+              Alert.alert('Error', 'Failed to update post. Please try again.');
+            }
+          },
+        },
+      ],
+      'plain-text',
+      localPost.text
+    );
+  };
+
+  const handleDelete = () => {
+    Alert.alert(
+      'Delete Post',
+      'Are you sure you want to delete this post? This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await PostsAPI.deletePost(localPost.id);
+              onPostDeleted?.(localPost.id);
+              Alert.alert('Success', 'Post deleted successfully');
+            } catch (error) {
+              console.error('Failed to delete post:', error);
+              Alert.alert('Error', 'Failed to delete post. Please try again.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleOptionsPress = () => {
+    Alert.alert('Post Options', 'Choose an action:', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Edit', onPress: handleEdit },
+      { text: 'Delete', onPress: handleDelete, style: 'destructive' },
+    ]);
+  };
 
   React.useEffect(() => {
     if (!imageUri) {
@@ -155,8 +234,8 @@ export default function PostCard({
     []
   );
 
-  const postHandle = resolveHandle(post);
-  const displayHandle = postHandle ? `@${postHandle}` : `@${post.userId.slice(0, 8)}`;
+  const postHandle = resolveHandle(localPost);
+  const displayHandle = postHandle ? `@${postHandle}` : `@${localPost.userId.slice(0, 8)}`;
   const hasMoreComments = commentCount > previewComments.length;
 
   return (
@@ -173,16 +252,23 @@ export default function PostCard({
           style={styles.author}
           activeOpacity={onPressAuthor ? 0.7 : 1}
         >
-          <Avatar avatarKey={post.avatarKey} size={32} />
+          <Avatar avatarKey={localPost.avatarKey} size={32} />
           <Text style={styles.handle}>{displayHandle}</Text>
         </TouchableOpacity>
-        <Text style={styles.timestamp}>
-          {new Date(post.createdAt).toLocaleString()}
-        </Text>
+        <View style={styles.headerRight}>
+          <Text style={styles.timestamp}>
+            {new Date(localPost.createdAt).toLocaleString()}
+          </Text>
+          {userOwnsPost && (
+            <TouchableOpacity onPress={handleOptionsPress} style={styles.optionsButton}>
+              <Text style={styles.optionsIcon}>⋯</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {/* Content */}
-      <Text style={styles.text}>{post.text}</Text>
+      <Text style={styles.text}>{localPost.text}</Text>
 
       {/* Image */}
       {imageUri && (
@@ -264,6 +350,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 8,
     justifyContent: 'space-between',
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   author: {
     flexDirection: 'row',
@@ -365,6 +456,15 @@ const styles = StyleSheet.create({
   },
   commentCount: {
     fontSize: 13,
+    color: '#666',
+  },
+  optionsButton: {
+    padding: 4,
+    marginLeft: 4,
+  },
+  optionsIcon: {
+    fontSize: 20,
+    fontWeight: 'bold',
     color: '#666',
   },
 });
