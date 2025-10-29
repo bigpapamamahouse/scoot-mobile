@@ -46,6 +46,11 @@ export default function SettingsScreen({ navigation }: any) {
   const [initialEmail, setInitialEmail] = React.useState('');
   const [initialAvatarKey, setInitialAvatarKey] = React.useState<string | null>(null);
   const [avatarPreviewUri, setAvatarPreviewUri] = React.useState<string | null>(null);
+  const lastKnownHandleRef = React.useRef('');
+  const updateHandle = React.useCallback((value: string) => {
+    lastKnownHandleRef.current = value;
+    setHandle(value);
+  }, []);
 
   const ensureInviteCode = React.useCallback(
     async (viewerId?: string | null): Promise<string | null> => {
@@ -100,7 +105,7 @@ export default function SettingsScreen({ navigation }: any) {
       const data: ViewerProfile | null = await UsersAPI.me();
       const normalizedFullName = typeof data?.fullName === 'string' ? data.fullName : '';
       const normalizedAvatarKey = data?.avatarKey ?? null;
-      const normalizedHandle = typeof data?.handle === 'string' ? data.handle : '';
+      let normalizedHandle = typeof data?.handle === 'string' ? data.handle : '';
       const normalizedEmail = typeof data?.email === 'string' ? data.email : '';
       const normalizedId =
         typeof data?.id === 'string' && data.id.trim().length ? data.id.trim() : null;
@@ -108,6 +113,29 @@ export default function SettingsScreen({ navigation }: any) {
         data && typeof data.inviteCode === 'string' && data.inviteCode.trim().length
           ? data.inviteCode.trim()
           : null;
+
+      if (!normalizedHandle.trim().length && normalizedId) {
+        try {
+          const fallbackUser = await UsersAPI.getUserByIdentity?.({ userId: normalizedId });
+          const fallbackHandle =
+            typeof fallbackUser?.handle === 'string'
+              ? fallbackUser.handle
+              : typeof (fallbackUser as any)?.username === 'string'
+              ? (fallbackUser as any).username
+              : typeof (fallbackUser as any)?.userHandle === 'string'
+              ? (fallbackUser as any).userHandle
+              : null;
+          if (fallbackHandle && fallbackHandle.trim().length) {
+            normalizedHandle = fallbackHandle.trim();
+          }
+        } catch (error) {
+          console.warn('Failed to resolve handle fallback:', error);
+        }
+      }
+
+      if (!normalizedHandle.trim().length && lastKnownHandleRef.current.trim().length) {
+        normalizedHandle = lastKnownHandleRef.current.trim();
+      }
 
       if (!normalizedInviteCode && normalizedId) {
         normalizedInviteCode = await readStoredInviteCode(normalizedId);
@@ -120,7 +148,7 @@ export default function SettingsScreen({ navigation }: any) {
       console.log('[SettingsScreen loadViewer] Setting state - avatarKey:', normalizedAvatarKey);
       setFullName(normalizedFullName);
       setInitialFullName(normalizedFullName);
-      setHandle(normalizedHandle);
+      updateHandle(normalizedHandle);
       setInitialHandle(normalizedHandle);
       setEmail(normalizedEmail);
       setInitialEmail(normalizedEmail);
@@ -139,11 +167,15 @@ export default function SettingsScreen({ navigation }: any) {
     } finally {
       setLoading(false);
     }
-  }, [ensureInviteCode]);
+  }, [ensureInviteCode, updateHandle]);
 
   React.useEffect(() => {
     loadViewer();
   }, [loadViewer]);
+
+  React.useEffect(() => {
+    lastKnownHandleRef.current = handle;
+  }, [handle]);
 
   const handleLogout = async () => {
     try {
@@ -254,6 +286,8 @@ export default function SettingsScreen({ navigation }: any) {
     const normalizedHandle = trimmedHandle.length ? trimmedHandle : null;
     const initialHandleTrimmed = initialHandle.trim();
     const normalizedInitialHandle = initialHandleTrimmed.length ? initialHandleTrimmed : null;
+    const rememberedHandle =
+      lastKnownHandleRef.current.trim().length ? lastKnownHandleRef.current.trim() : null;
 
     const trimmedEmail = email.trim();
     const normalizedEmail = trimmedEmail.length ? trimmedEmail : null;
@@ -289,8 +323,13 @@ export default function SettingsScreen({ navigation }: any) {
           payload.fullName = normalizedName ?? normalizedInitialName ?? null;
         }
 
-        if (hasHandleChange || normalizedInitialHandle !== null || normalizedHandle !== null) {
-          payload.handle = normalizedHandle ?? normalizedInitialHandle ?? null;
+        if (
+          hasHandleChange ||
+          normalizedInitialHandle !== null ||
+          normalizedHandle !== null ||
+          rememberedHandle !== null
+        ) {
+          payload.handle = normalizedHandle ?? normalizedInitialHandle ?? rememberedHandle ?? null;
         }
 
         if (hasEmailChange || normalizedInitialEmail !== null) {
