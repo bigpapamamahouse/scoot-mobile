@@ -103,7 +103,11 @@ export default function PostCard({
   const renderCommentPreview = React.useCallback(
     (comment: Comment) => {
       const handle = resolveHandle(comment);
-      const displayHandle = handle ? `@${handle}` : 'Anonymous';
+      const fallbackId =
+        typeof comment.userId === 'string' && comment.userId.trim()
+          ? `@${comment.userId.trim().slice(0, 8)}`
+          : 'Anonymous';
+      const displayHandle = handle ? `@${handle}` : fallbackId;
       return (
         <View key={comment.id} style={styles.commentPreviewRow}>
           <Text style={styles.commentPreviewHandle}>{displayHandle}</Text>

@@ -167,7 +167,11 @@ export default function PostScreen({ route, navigation }: { route: PostScreenRou
   const renderComment = ({ item }: { item: Comment }) => {
     const anyComment: any = item;
     const handleCandidate = resolveHandle(anyComment);
-    const handle = handleCandidate ? `@${handleCandidate}` : 'Anonymous';
+    const fallbackId =
+      typeof anyComment?.userId === 'string' && anyComment.userId.trim()
+        ? `@${anyComment.userId.trim().slice(0, 8)}`
+        : 'Anonymous';
+    const handle = handleCandidate ? `@${handleCandidate}` : fallbackId;
     const createdAt = item.createdAt ? new Date(item.createdAt).toLocaleString() : '';
     return (
       <View style={styles.commentRow}>
