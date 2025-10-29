@@ -44,8 +44,6 @@ export default function ComposePostScreen({ navigation }: any) {
         }
         result = await ImagePicker.launchCameraAsync({
           mediaTypes: 'images',
-          allowsEditing: true,
-          aspect: [4, 3],
           quality: 0.8,
         });
       } else {
@@ -56,8 +54,6 @@ export default function ComposePostScreen({ navigation }: any) {
         }
         result = await ImagePicker.launchImageLibraryAsync({
           mediaTypes: 'images',
-          allowsEditing: true,
-          aspect: [4, 3],
           quality: 0.8,
         });
       }

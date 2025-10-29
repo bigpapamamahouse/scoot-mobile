@@ -24,6 +24,43 @@ export default function PostCard({
   const [previewComments, setPreviewComments] = React.useState<Comment[]>(
     () => (post.comments || []).slice(0, 3)
   );
+  const [imageAspectRatio, setImageAspectRatio] = React.useState<number | null>(null);
+
+  const imageUri = React.useMemo(() => mediaUrlFromKey(post.imageKey), [post.imageKey]);
+
+  React.useEffect(() => {
+    if (!imageUri) {
+      setImageAspectRatio(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    Image.getSize(
+      imageUri,
+      (width, height) => {
+        if (cancelled) {
+          return;
+        }
+        if (width > 0 && height > 0) {
+          setImageAspectRatio(width / height);
+        } else {
+          setImageAspectRatio(null);
+        }
+      },
+      (error) => {
+        if (cancelled) {
+          return;
+        }
+        console.warn('Failed to get image dimensions for', imageUri, error);
+        setImageAspectRatio(null);
+      }
+    );
+
+    return () => {
+      cancelled = true;
+    };
+  }, [imageUri]);
 
   React.useEffect(() => {
     setCommentCount(post.commentCount ?? post.comments?.length ?? 0);
@@ -148,11 +185,16 @@ export default function PostCard({
       <Text style={styles.text}>{post.text}</Text>
 
       {/* Image */}
-      {post.imageKey && (
+      {imageUri && (
         <Image
-          source={{ uri: mediaUrlFromKey(post.imageKey)! }}
-          style={styles.image}
-          resizeMode="cover"
+          source={{ uri: imageUri }}
+          style={[
+            styles.image,
+            imageAspectRatio
+              ? { aspectRatio: imageAspectRatio }
+              : styles.imageFallback,
+          ]}
+          resizeMode="contain"
         />
       )}
 
@@ -246,9 +288,12 @@ const styles = StyleSheet.create({
   },
   image: {
     width: '100%',
-    height: 200,
     borderRadius: 8,
     marginBottom: 8,
+    backgroundColor: '#f2f2f2',
+  },
+  imageFallback: {
+    aspectRatio: 1,
   },
   reactions: {
     flexDirection: 'row',
