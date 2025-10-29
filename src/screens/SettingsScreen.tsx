@@ -111,12 +111,14 @@ export default function SettingsScreen({ navigation }: any) {
         normalizedInviteCode = await ensureInviteCode(normalizedId);
       }
 
+      console.log('[SettingsScreen loadViewer] Setting state - avatarKey:', normalizedAvatarKey);
       setFullName(normalizedFullName);
       setInitialFullName(normalizedFullName);
       setAvatarKey(normalizedAvatarKey);
       setInitialAvatarKey(normalizedAvatarKey);
       setInviteCode(normalizedInviteCode);
       setAvatarPreviewUri(null);
+      console.log('[SettingsScreen loadViewer] Avatar preview URI cleared');
 
       if (normalizedInviteCode && normalizedId) {
         await writeStoredInviteCode(normalizedId, normalizedInviteCode);
@@ -146,23 +148,28 @@ export default function SettingsScreen({ navigation }: any) {
     async (uri: string) => {
       setUploading(true);
       try {
+        console.log('[SettingsScreen] Starting avatar upload...');
         const key = await uploadMedia({ uri, intent: 'avatar-image' });
+        console.log('[SettingsScreen] Upload complete, key:', key);
         setAvatarKey(key);
         const remotePreview = mediaUrlFromKey(key);
+        console.log('[SettingsScreen] Remote preview URL:', remotePreview);
         setAvatarPreviewUri(remotePreview ?? uri);
 
         // Auto-save the avatar to persist the change immediately
         try {
+          console.log('[SettingsScreen] Auto-saving avatar with key:', key);
           await UsersAPI.updateMe({ avatarKey: key });
+          console.log('[SettingsScreen] Auto-save successful, reloading viewer data...');
           // Reload viewer data to refresh the profile with the new avatar
           await loadViewer({ silent: true });
-          console.log('Avatar saved successfully');
+          console.log('[SettingsScreen] Viewer data reloaded');
         } catch (saveError: any) {
-          console.error('Failed to save avatar:', saveError);
+          console.error('[SettingsScreen] Failed to save avatar:', saveError);
           Alert.alert('Error', saveError?.message || 'Failed to save profile photo. You can try clicking "Save changes" to retry.');
         }
       } catch (error: any) {
-        console.error('Failed to upload avatar:', error);
+        console.error('[SettingsScreen] Failed to upload avatar:', error);
         Alert.alert('Error', error?.message || 'Failed to upload profile photo.');
         setAvatarPreviewUri(null);
       } finally {
