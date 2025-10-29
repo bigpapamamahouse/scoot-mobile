@@ -491,10 +491,20 @@ export default function ProfileScreen({ navigation, route }: any) {
   }, [isViewingSelf, user?.fullName, user?.handle, user?.id]);
 
   const handleFollowPress = React.useCallback(async () => {
-    if (!user?.id || followLoading) return;
+    console.log('[Follow] Button pressed');
+    console.log('[Follow] User:', user);
+    console.log('[Follow] User ID:', user?.id);
+    console.log('[Follow] Follow status:', followStatus);
+    console.log('[Follow] Follow loading:', followLoading);
+
+    if (!user?.id || followLoading) {
+      console.log('[Follow] Blocked - user.id:', user?.id, 'followLoading:', followLoading);
+      return;
+    }
 
     // If already following, show confirmation dialog
     if (followStatus === 'following') {
+      console.log('[Follow] Already following, showing unfollow dialog');
       const userHandle = user?.handle?.replace(/^@/, '') || 'this user';
       Alert.alert(
         'Unfollow',
@@ -508,13 +518,15 @@ export default function ProfileScreen({ navigation, route }: any) {
             text: 'Unfollow',
             style: 'destructive',
             onPress: async () => {
+              console.log('[Follow] Unfollowing user:', user.id);
               setFollowLoading(true);
               try {
                 await UsersAPI.unfollowUser(user.id!);
+                console.log('[Follow] Unfollow successful');
                 setFollowStatus('none');
                 setFollowerCount(prev => Math.max(0, prev - 1));
               } catch (err: any) {
-                console.error('Failed to unfollow user:', err);
+                console.error('[Follow] Failed to unfollow user:', err);
                 Alert.alert('Error', err?.message || 'Failed to unfollow user');
               } finally {
                 setFollowLoading(false);
@@ -527,27 +539,32 @@ export default function ProfileScreen({ navigation, route }: any) {
     }
 
     // Send follow request
+    console.log('[Follow] Sending follow request to user:', user.id);
     setFollowLoading(true);
     try {
       const response = await UsersAPI.followUser(user.id);
+      console.log('[Follow] Follow response:', response);
 
       // Check if response indicates a pending request
       // The API might return { status: 'pending' } or similar
       if (response && typeof response === 'object') {
         if ('status' in response && response.status === 'pending') {
+          console.log('[Follow] Status: pending');
           setFollowStatus('pending');
           // Don't increment follower count yet since it's pending
         } else {
+          console.log('[Follow] Status: following (immediate)');
           // Immediate follow (no approval required)
           setFollowStatus('following');
           setFollowerCount(prev => prev + 1);
         }
       } else {
+        console.log('[Follow] Status: pending (default)');
         // Default to pending for safety
         setFollowStatus('pending');
       }
     } catch (err: any) {
-      console.error('Failed to follow user:', err);
+      console.error('[Follow] Failed to follow user:', err);
       Alert.alert('Error', err?.message || 'Failed to send follow request');
     } finally {
       setFollowLoading(false);

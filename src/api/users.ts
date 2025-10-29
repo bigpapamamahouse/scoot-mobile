@@ -181,9 +181,15 @@ export async function searchUsers(query: string): Promise<User[]> {
 }
 
 export async function followUser(userId: string) {
-  return api('/follow', { method: 'POST', body: JSON.stringify({ userId }) });
+  console.log('[API] followUser called with userId:', userId);
+  const result = await api('/follow', { method: 'POST', body: JSON.stringify({ userId }) });
+  console.log('[API] followUser response:', result);
+  return result;
 }
 
 export async function unfollowUser(userId: string) {
-  return api('/follow', { method: 'DELETE', body: JSON.stringify({ userId }) });
+  console.log('[API] unfollowUser called with userId:', userId);
+  const result = await api('/follow', { method: 'DELETE', body: JSON.stringify({ userId }) });
+  console.log('[API] unfollowUser response:', result);
+  return result;
 }
