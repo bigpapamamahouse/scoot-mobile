@@ -16,11 +16,16 @@ import { signOutFn } from '../api/auth';
 import { UsersAPI } from '../api';
 import { Avatar } from '../components/Avatar';
 import { uploadMedia } from '../lib/upload';
+import { mediaUrlFromKey } from '../lib/media';
 
 type ViewerProfile = {
   fullName?: string | null;
   avatarKey?: string | null;
   inviteCode?: string | null;
+};
+
+type LoadViewerOptions = {
+  silent?: boolean;
 };
 
 export default function SettingsScreen({ navigation }: any) {
@@ -34,17 +39,73 @@ export default function SettingsScreen({ navigation }: any) {
   const [initialAvatarKey, setInitialAvatarKey] = React.useState<string | null>(null);
   const [avatarPreviewUri, setAvatarPreviewUri] = React.useState<string | null>(null);
 
-  const loadViewer = React.useCallback(async () => {
-    setLoading(true);
+  const inviteCodeFromPayload = React.useCallback((payload: unknown): string | null => {
+    const readString = (value: unknown): string | null => {
+      if (typeof value !== 'string') return null;
+      const trimmed = value.trim();
+      return trimmed.length > 0 ? trimmed : null;
+    };
+
+    const search = (value: unknown, isNested = false): string | null => {
+      const directString = readString(value);
+      if (directString) {
+        return directString;
+      }
+
+      if (!value || typeof value !== 'object') {
+        return null;
+      }
+
+      const record = value as Record<string, unknown>;
+      const directKeys = ['inviteCode', 'invite_code', 'invitecode'];
+      if (isNested) {
+        directKeys.push('code');
+      }
+      for (const key of directKeys) {
+        if (key in record) {
+          const result = readString(record[key]);
+          if (result) {
+            return result;
+          }
+        }
+      }
+
+      const nestedKeys = ['invite', 'invitation', 'inviteInfo', 'data'];
+      for (const key of nestedKeys) {
+        if (!(key in record)) {
+          continue;
+        }
+        const nested = search(record[key], true);
+        if (nested) {
+          return nested;
+        }
+      }
+
+      if (Array.isArray(record.invites)) {
+        for (const entry of record.invites) {
+          const nested = search(entry, true);
+          if (nested) {
+            return nested;
+          }
+        }
+      }
+
+      return null;
+    };
+
+    return search(payload);
+  }, []);
+
+  const loadViewer = React.useCallback(async (options?: LoadViewerOptions) => {
+    if (!options?.silent) {
+      setLoading(true);
+    }
     try {
       const data: ViewerProfile | null = await UsersAPI.me();
       const normalizedFullName =
         data && typeof data.fullName === 'string' ? data.fullName : '';
       const normalizedAvatarKey = data?.avatarKey ?? null;
-      const normalizedInviteCode =
-        data && typeof data.inviteCode === 'string' && data.inviteCode.trim()
-          ? data.inviteCode.trim()
-          : null;
+      const normalizedInviteCode = inviteCodeFromPayload(data);
 
       setFullName(normalizedFullName);
       setInitialFullName(normalizedFullName);
@@ -58,7 +119,7 @@ export default function SettingsScreen({ navigation }: any) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [inviteCodeFromPayload]);
 
   React.useEffect(() => {
     loadViewer();
@@ -79,7 +140,8 @@ export default function SettingsScreen({ navigation }: any) {
       try {
         const key = await uploadMedia({ uri, intent: 'avatar-image' });
         setAvatarKey(key);
-        setAvatarPreviewUri(uri);
+        const remotePreview = mediaUrlFromKey(key);
+        setAvatarPreviewUri(remotePreview ?? uri);
       } catch (error: any) {
         console.error('Failed to upload avatar:', error);
         Alert.alert('Error', error?.message || 'Failed to upload profile photo.');
@@ -104,6 +166,8 @@ export default function SettingsScreen({ navigation }: any) {
           result = await ImagePicker.launchCameraAsync({
             mediaTypes: 'images',
             quality: 0.8,
+            allowsEditing: true,
+            aspect: [1, 1],
           });
         } else {
           const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -114,6 +178,8 @@ export default function SettingsScreen({ navigation }: any) {
           result = await ImagePicker.launchImageLibraryAsync({
             mediaTypes: 'images',
             quality: 0.8,
+            allowsEditing: true,
+            aspect: [1, 1],
           });
         }
 
@@ -176,12 +242,8 @@ export default function SettingsScreen({ navigation }: any) {
     setSaving(true);
     try {
       await UsersAPI.updateMe(payload);
+      await loadViewer({ silent: true });
       Alert.alert('Profile updated', 'Your changes have been saved.');
-      setInitialFullName(normalizedName);
-      setInitialAvatarKey(avatarKey ?? null);
-      if (!avatarKey) {
-        setAvatarPreviewUri(null);
-      }
     } catch (error: any) {
       console.error('Failed to save profile:', error);
       Alert.alert('Error', error?.message || 'Failed to update your profile.');

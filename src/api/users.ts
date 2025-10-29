@@ -12,7 +12,33 @@ export async function me(){
 }
 
 export async function updateMe(payload: { fullName?: string | null; avatarKey?: string | null }){
-  return api('/me', { method: 'PATCH', body: JSON.stringify(payload) });
+  const body: Record<string, unknown> = {};
+
+  if ('fullName' in payload) {
+    body.fullName = payload.fullName === undefined ? undefined : payload.fullName;
+    if (!('full_name' in body)) {
+      body.full_name = payload.fullName === undefined ? undefined : payload.fullName;
+    }
+  }
+
+  if ('avatarKey' in payload) {
+    const keyValue = payload.avatarKey === undefined ? undefined : payload.avatarKey;
+    body.avatarKey = keyValue;
+    if (!('avatar' in body)) {
+      body.avatar = keyValue;
+    }
+    if (!('avatar_key' in body)) {
+      body.avatar_key = keyValue;
+    }
+    if (!('avatarUrl' in body)) {
+      body.avatarUrl = keyValue;
+    }
+    if (!('avatar_url' in body)) {
+      body.avatar_url = keyValue;
+    }
+  }
+
+  return api('/me', { method: 'PATCH', body: JSON.stringify(body) });
 }
 
 export async function getUser(handle: string){
