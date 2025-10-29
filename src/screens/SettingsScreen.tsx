@@ -150,6 +150,16 @@ export default function SettingsScreen({ navigation }: any) {
         setAvatarKey(key);
         const remotePreview = mediaUrlFromKey(key);
         setAvatarPreviewUri(remotePreview ?? uri);
+
+        // Auto-save the avatar to persist the change immediately
+        try {
+          await UsersAPI.updateMe({ avatarKey: key });
+          setInitialAvatarKey(key);
+          console.log('Avatar saved successfully');
+        } catch (saveError: any) {
+          console.error('Failed to save avatar:', saveError);
+          Alert.alert('Error', saveError?.message || 'Failed to save profile photo. You can try clicking "Save changes" to retry.');
+        }
       } catch (error: any) {
         console.error('Failed to upload avatar:', error);
         Alert.alert('Error', error?.message || 'Failed to upload profile photo.');

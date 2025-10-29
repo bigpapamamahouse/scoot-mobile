@@ -770,12 +770,6 @@ export default function ProfileScreen({ navigation, route }: any) {
               </TouchableOpacity>
             </View>
 
-            {isViewingSelf && (
-              <TouchableOpacity style={styles.editButton} onPress={openSettings}>
-                <Text style={styles.editButtonText}>Open Settings</Text>
-              </TouchableOpacity>
-            )}
-
             {!isViewingSelf && (
               <TouchableOpacity
                 style={[
