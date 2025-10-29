@@ -154,7 +154,8 @@ export default function SettingsScreen({ navigation }: any) {
         // Auto-save the avatar to persist the change immediately
         try {
           await UsersAPI.updateMe({ avatarKey: key });
-          setInitialAvatarKey(key);
+          // Reload viewer data to refresh the profile with the new avatar
+          await loadViewer({ silent: true });
           console.log('Avatar saved successfully');
         } catch (saveError: any) {
           console.error('Failed to save avatar:', saveError);
@@ -168,7 +169,7 @@ export default function SettingsScreen({ navigation }: any) {
         setUploading(false);
       }
     },
-    []
+    [loadViewer]
   );
 
   const pickImage = React.useCallback(
