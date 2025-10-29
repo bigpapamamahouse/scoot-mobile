@@ -434,9 +434,10 @@ export default function ProfileScreen({ navigation, route }: any) {
             setFollowingCount(following.length);
 
             // Check follow status from profile data
-            const viewerId = viewer?.id?.trim() || null;
-            console.log('[Profile] Checking follow status - isSelfRequest:', isSelfRequest, 'viewerId:', viewerId);
-            if (!isSelfRequest && viewerId) {
+            // Use currentUser directly instead of viewer state (which may not be updated yet)
+            const currentViewerId = currentUser?.id?.trim() || null;
+            console.log('[Profile] Checking follow status - isSelfRequest:', isSelfRequest, 'currentViewerId:', currentViewerId);
+            if (!isSelfRequest && currentViewerId) {
               console.log('[Profile] Entered follow status check block');
               // Use followStatus and isFollowPending from API if available
               if (profileData && typeof profileData === 'object') {
@@ -462,18 +463,18 @@ export default function ProfileScreen({ navigation, route }: any) {
                   setFollowStatus('following');
                 } else {
                   // Fallback: check if in followers list
-                  const isUserFollowing = followers.some((f: any) => f.id === viewerId);
+                  const isUserFollowing = followers.some((f: any) => f.id === currentViewerId);
                   console.log('[Profile] Follow status: fallback check -', isUserFollowing ? 'following' : 'none');
                   setFollowStatus(isUserFollowing ? 'following' : 'none');
                 }
               } else {
                 console.log('[Profile] profileData is not a valid object');
                 // Fallback: check if in followers list
-                const isUserFollowing = followers.some((f: any) => f.id === viewerId);
+                const isUserFollowing = followers.some((f: any) => f.id === currentViewerId);
                 setFollowStatus(isUserFollowing ? 'following' : 'none');
               }
             } else {
-              console.log('[Profile] Skipped follow status check - isSelfRequest:', isSelfRequest, 'viewerId:', viewerId);
+              console.log('[Profile] Skipped follow status check - isSelfRequest:', isSelfRequest, 'currentViewerId:', currentViewerId);
             }
           } catch (err) {
             console.warn('Failed to load follower/following counts:', err);
