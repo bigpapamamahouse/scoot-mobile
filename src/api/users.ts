@@ -24,11 +24,13 @@ const isRecord = (value: unknown): value is Record<string, unknown> => {
 };
 
 const isUserLike = (value: unknown): value is User => {
-  return (
-    isRecord(value) &&
-    typeof value.id === 'string' &&
-    value.id.trim().length > 0
-  );
+  if (!isRecord(value)) return false;
+
+  // Check for either 'id' or 'userId' field
+  const hasId = typeof value.id === 'string' && value.id.trim().length > 0;
+  const hasUserId = typeof value.userId === 'string' && value.userId.trim().length > 0;
+
+  return hasId || hasUserId;
 };
 
 function extractUserFromPayload(payload: unknown, visited = new Set<unknown>()): User | null {
@@ -45,7 +47,13 @@ function extractUserFromPayload(payload: unknown, visited = new Set<unknown>()):
   }
 
   if (isUserLike(payload)) {
-    return payload as User;
+    const record = payload as Record<string, unknown>;
+    // Normalize userId -> id
+    const user = { ...record } as User;
+    if (!user.id && record.userId) {
+      user.id = record.userId as string;
+    }
+    return user;
   }
 
   if (Array.isArray(payload)) {
