@@ -506,19 +506,19 @@ export default function ProfileScreen({ navigation, route }: any) {
   const handleFollowPress = React.useCallback(async () => {
     console.log('[Follow] Button pressed');
     console.log('[Follow] User:', user);
-    console.log('[Follow] User ID:', user?.id);
+    console.log('[Follow] User handle:', user?.handle);
     console.log('[Follow] Follow status:', followStatus);
     console.log('[Follow] Follow loading:', followLoading);
 
-    if (!user?.id || followLoading) {
-      console.log('[Follow] Blocked - user.id:', user?.id, 'followLoading:', followLoading);
+    const userHandle = user?.handle?.replace(/^@/, '');
+    if (!userHandle || followLoading) {
+      console.log('[Follow] Blocked - userHandle:', userHandle, 'followLoading:', followLoading);
       return;
     }
 
     // If already following, show confirmation dialog
     if (followStatus === 'following') {
       console.log('[Follow] Already following, showing unfollow dialog');
-      const userHandle = user?.handle?.replace(/^@/, '') || 'this user';
       Alert.alert(
         'Unfollow',
         `Are you sure you want to unfollow @${userHandle}?`,
@@ -531,10 +531,10 @@ export default function ProfileScreen({ navigation, route }: any) {
             text: 'Unfollow',
             style: 'destructive',
             onPress: async () => {
-              console.log('[Follow] Unfollowing user:', user.id);
+              console.log('[Follow] Unfollowing user:', userHandle);
               setFollowLoading(true);
               try {
-                await UsersAPI.unfollowUser(user.id!);
+                await UsersAPI.unfollowUser(userHandle);
                 console.log('[Follow] Unfollow successful');
                 setFollowStatus('none');
                 setFollowerCount(prev => Math.max(0, prev - 1));
@@ -552,10 +552,10 @@ export default function ProfileScreen({ navigation, route }: any) {
     }
 
     // Send follow request
-    console.log('[Follow] Sending follow request to user:', user.id);
+    console.log('[Follow] Sending follow request to user:', userHandle);
     setFollowLoading(true);
     try {
-      const response = await UsersAPI.followUser(user.id);
+      const response = await UsersAPI.followUser(userHandle);
       console.log('[Follow] Follow response:', response);
 
       // Check if response indicates a pending request
