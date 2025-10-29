@@ -13,7 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { signOutFn } from '../api/auth';
-import { UsersAPI } from '../api';
+import { UsersAPI, InvitesAPI } from '../api';
 import { Avatar } from '../components/Avatar';
 import { uploadMedia } from '../lib/upload';
 import { mediaUrlFromKey } from '../lib/media';
@@ -39,61 +39,22 @@ export default function SettingsScreen({ navigation }: any) {
   const [initialAvatarKey, setInitialAvatarKey] = React.useState<string | null>(null);
   const [avatarPreviewUri, setAvatarPreviewUri] = React.useState<string | null>(null);
 
-  const inviteCodeFromPayload = React.useCallback((payload: unknown): string | null => {
-    const readString = (value: unknown): string | null => {
-      if (typeof value !== 'string') return null;
-      const trimmed = value.trim();
-      return trimmed.length > 0 ? trimmed : null;
-    };
-
-    const search = (value: unknown, isNested = false): string | null => {
-      const directString = readString(value);
-      if (directString) {
-        return directString;
+  const ensureInviteCode = React.useCallback(async (): Promise<string | null> => {
+    try {
+      const payload = await InvitesAPI.createInvite(1);
+      const code = UsersAPI.findInviteCode?.(payload) ?? null;
+      if (code) {
+        return code;
       }
-
-      if (!value || typeof value !== 'object') {
-        return null;
-      }
-
-      const record = value as Record<string, unknown>;
-      const directKeys = ['inviteCode', 'invite_code', 'invitecode'];
-      if (isNested) {
-        directKeys.push('code');
-      }
-      for (const key of directKeys) {
-        if (key in record) {
-          const result = readString(record[key]);
-          if (result) {
-            return result;
-          }
-        }
-      }
-
-      const nestedKeys = ['invite', 'invitation', 'inviteInfo', 'data'];
-      for (const key of nestedKeys) {
-        if (!(key in record)) {
-          continue;
-        }
-        const nested = search(record[key], true);
-        if (nested) {
-          return nested;
-        }
-      }
-
-      if (Array.isArray(record.invites)) {
-        for (const entry of record.invites) {
-          const nested = search(entry, true);
-          if (nested) {
-            return nested;
-          }
-        }
-      }
-
+      const fallback =
+        payload && typeof payload === 'object' && 'code' in (payload as any)
+          ? String((payload as any).code)
+          : null;
+      return fallback && fallback.trim().length > 0 ? fallback.trim() : null;
+    } catch (error: any) {
+      console.error('Failed to generate invite code:', error);
       return null;
-    };
-
-    return search(payload);
+    }
   }, []);
 
   const loadViewer = React.useCallback(async (options?: LoadViewerOptions) => {
@@ -105,7 +66,14 @@ export default function SettingsScreen({ navigation }: any) {
       const normalizedFullName =
         data && typeof data.fullName === 'string' ? data.fullName : '';
       const normalizedAvatarKey = data?.avatarKey ?? null;
-      const normalizedInviteCode = inviteCodeFromPayload(data);
+      let normalizedInviteCode =
+        data && typeof data.inviteCode === 'string' && data.inviteCode.trim().length
+          ? data.inviteCode.trim()
+          : null;
+
+      if (!normalizedInviteCode) {
+        normalizedInviteCode = await ensureInviteCode();
+      }
 
       setFullName(normalizedFullName);
       setInitialFullName(normalizedFullName);
@@ -119,7 +87,7 @@ export default function SettingsScreen({ navigation }: any) {
     } finally {
       setLoading(false);
     }
-  }, [inviteCodeFromPayload]);
+  }, [ensureInviteCode]);
 
   React.useEffect(() => {
     loadViewer();
