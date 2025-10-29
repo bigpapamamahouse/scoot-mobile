@@ -286,8 +286,17 @@ export default function SettingsScreen({ navigation }: any) {
         avatarKey: avatarKey ?? null,
       };
 
-      console.log('[SettingsScreen] Saving profile via PATCH /me:', payload);
-      await UsersAPI.updateMe(payload);
+      if (hasNameChange || hasHandleChange || hasEmailChange) {
+        console.log('[SettingsScreen] Saving profile via PATCH /me:', payload);
+        await UsersAPI.updateMe(payload);
+      } else {
+        console.log('[SettingsScreen] Skipping PATCH /me because only avatar changed');
+      }
+
+      if (hasAvatarChange) {
+        console.log('[SettingsScreen] Saving avatar via POST /me/avatar:', avatarKey ?? null);
+        await UsersAPI.updateAvatar(avatarKey ?? null);
+      }
 
       await loadViewer({ silent: true });
 
