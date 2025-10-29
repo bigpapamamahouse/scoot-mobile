@@ -194,10 +194,20 @@ export async function searchUsers(query: string): Promise<User[]> {
 
 export async function followUser(handle: string) {
   console.log('[API] followUser called with handle:', handle);
-  const result = await api('/follow', { method: 'POST', body: JSON.stringify({ handle }) });
+  const requestBody = { handle };
+  console.log('[API] followUser request body:', JSON.stringify(requestBody));
+
+  const result = await api('/follow', {
+    method: 'POST',
+    body: JSON.stringify(requestBody)
+  });
+
   console.log('[API] followUser response:', result);
   console.log('[API] followUser response type:', typeof result);
-  console.log('[API] followUser response keys:', result && typeof result === 'object' ? Object.keys(result) : 'not an object');
+  console.log('[API] followUser response JSON:', JSON.stringify(result, null, 2));
+  if (result && typeof result === 'object') {
+    console.log('[API] followUser response keys:', Object.keys(result));
+  }
   return result;
 }
 
