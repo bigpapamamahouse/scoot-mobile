@@ -34,6 +34,8 @@ export default function SettingsScreen({ navigation }: any) {
   const [saving, setSaving] = React.useState(false);
   const [uploading, setUploading] = React.useState(false);
   const [fullName, setFullName] = React.useState('');
+  const [handle, setHandle] = React.useState('');
+  const [email, setEmail] = React.useState('');
   const [avatarKey, setAvatarKey] = React.useState<string | null>(null);
   const [inviteCode, setInviteCode] = React.useState<string | null>(null);
   const [initialFullName, setInitialFullName] = React.useState('');
@@ -94,6 +96,10 @@ export default function SettingsScreen({ navigation }: any) {
       const normalizedFullName =
         data && typeof data.fullName === 'string' ? data.fullName : '';
       const normalizedAvatarKey = data?.avatarKey ?? null;
+      const normalizedHandle =
+        data && typeof (data as any).handle === 'string' ? (data as any).handle : '';
+      const normalizedEmail =
+        data && typeof (data as any).email === 'string' ? (data as any).email : '';
       const normalizedId =
         data && typeof (data as any).id === 'string' && (data as any).id.trim().length
           ? (data as any).id.trim()
@@ -114,6 +120,8 @@ export default function SettingsScreen({ navigation }: any) {
       console.log('[SettingsScreen loadViewer] Setting state - avatarKey:', normalizedAvatarKey);
       setFullName(normalizedFullName);
       setInitialFullName(normalizedFullName);
+      setHandle(normalizedHandle);
+      setEmail(normalizedEmail);
       setAvatarKey(normalizedAvatarKey);
       setInitialAvatarKey(normalizedAvatarKey);
       setInviteCode(normalizedInviteCode);
@@ -248,15 +256,24 @@ export default function SettingsScreen({ navigation }: any) {
 
     setSaving(true);
     try {
-      // Update avatar using dedicated endpoint if changed
-      if (hasAvatarChange) {
-        await UsersAPI.updateAvatar(avatarKey ?? null);
+      // Always use PATCH /me and include all fields to prevent data loss
+      // The POST /me/avatar endpoint has a backend bug that wipes other fields
+      const payload: any = {};
+
+      // Always include fullName to preserve it
+      payload.fullName = trimmedName.length ? trimmedName : null;
+
+      // Always include avatar (even if unchanged) to preserve it
+      if (hasAvatarChange || avatarKey) {
+        payload.avatarKey = avatarKey;
       }
 
-      // Update name using PATCH /me if changed
-      if (hasNameChange) {
-        await UsersAPI.updateMe({ fullName: trimmedName.length ? trimmedName : null });
-      }
+      // Preserve handle and email
+      if (handle) payload.handle = handle;
+      if (email) payload.email = email;
+
+      console.log('[SettingsScreen] Saving all user data via PATCH /me:', payload);
+      await UsersAPI.updateMe(payload);
 
       await loadViewer({ silent: true });
 
