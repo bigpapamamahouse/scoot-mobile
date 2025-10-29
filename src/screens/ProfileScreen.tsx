@@ -557,24 +557,47 @@ export default function ProfileScreen({ navigation, route }: any) {
     try {
       const response = await UsersAPI.followUser(userHandle);
       console.log('[Follow] Follow response:', response);
-
-      // Check if response indicates a pending request
-      // The API might return { status: 'pending' } or similar
+      console.log('[Follow] Follow response type:', typeof response);
       if (response && typeof response === 'object') {
-        if ('status' in response && response.status === 'pending') {
-          console.log('[Follow] Status: pending');
-          setFollowStatus('pending');
-          // Don't increment follower count yet since it's pending
-        } else {
-          console.log('[Follow] Status: following (immediate)');
-          // Immediate follow (no approval required)
-          setFollowStatus('following');
-          setFollowerCount(prev => prev + 1);
+        console.log('[Follow] Follow response keys:', Object.keys(response));
+      }
+
+      // Check if response indicates a pending request or immediate follow
+      // Look for various possible response formats
+      let isPending = true; // Default to pending (requires approval)
+      let isImmediate = false;
+
+      if (response && typeof response === 'object') {
+        // Check for explicit status field
+        if ('status' in response) {
+          isPending = response.status === 'pending' || response.status === 'requested';
+          isImmediate = response.status === 'following' || response.status === 'accepted';
         }
+        // Check for followStatus field
+        else if ('followStatus' in response) {
+          isPending = response.followStatus === 'pending' || response.followStatus === 'requested';
+          isImmediate = response.followStatus === 'following' || response.followStatus === 'accepted';
+        }
+        // Check for isFollowing field
+        else if ('isFollowing' in response) {
+          isImmediate = response.isFollowing === true;
+          isPending = !isImmediate;
+        }
+        // Check for pending field
+        else if ('pending' in response) {
+          isPending = response.pending === true;
+          isImmediate = !isPending;
+        }
+      }
+
+      if (isImmediate) {
+        console.log('[Follow] Status: following (immediate/auto-accepted)');
+        setFollowStatus('following');
+        setFollowerCount(prev => prev + 1);
       } else {
-        console.log('[Follow] Status: pending (default)');
-        // Default to pending for safety
+        console.log('[Follow] Status: pending (requires approval)');
         setFollowStatus('pending');
+        // Don't increment follower count yet since it's pending
       }
     } catch (err: any) {
       console.error('[Follow] Failed to follow user:', err);

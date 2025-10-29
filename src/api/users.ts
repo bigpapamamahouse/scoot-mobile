@@ -196,12 +196,44 @@ export async function followUser(handle: string) {
   console.log('[API] followUser called with handle:', handle);
   const result = await api('/follow', { method: 'POST', body: JSON.stringify({ handle }) });
   console.log('[API] followUser response:', result);
+  console.log('[API] followUser response type:', typeof result);
+  console.log('[API] followUser response keys:', result && typeof result === 'object' ? Object.keys(result) : 'not an object');
   return result;
 }
 
 export async function unfollowUser(handle: string) {
   console.log('[API] unfollowUser called with handle:', handle);
-  const result = await api('/follow', { method: 'DELETE', body: JSON.stringify({ handle }) });
-  console.log('[API] unfollowUser response:', result);
-  return result;
+
+  // Try different unfollow endpoint patterns
+  const attempts = [
+    { method: 'POST', path: '/unfollow', body: JSON.stringify({ handle }) },
+    { method: 'DELETE', path: `/follow/${handle}`, body: undefined },
+    { method: 'DELETE', path: '/follow', body: JSON.stringify({ handle }) },
+    { method: 'POST', path: '/follow/remove', body: JSON.stringify({ handle }) },
+  ];
+
+  let lastError: any;
+  for (const attempt of attempts) {
+    try {
+      console.log(`[API] Trying unfollow: ${attempt.method} ${attempt.path}`);
+      const result = await api(attempt.path, {
+        method: attempt.method,
+        body: attempt.body
+      });
+      console.log('[API] unfollowUser success with:', attempt.path, result);
+      return result;
+    } catch (err: any) {
+      lastError = err;
+      const message = String(err?.message || '');
+      if (message.includes('404')) {
+        console.log(`[API] ${attempt.path} returned 404, trying next...`);
+        continue;
+      }
+      // If it's not a 404, throw immediately
+      throw err;
+    }
+  }
+
+  console.error('[API] All unfollow attempts failed:', lastError);
+  throw lastError;
 }
