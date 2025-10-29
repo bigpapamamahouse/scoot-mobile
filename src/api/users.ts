@@ -3,7 +3,12 @@ import { api } from './client';
 import type { User } from '../types';
 
 export async function me(){
-  return api('/me');
+  console.log('[API] me() called');
+  const result = await api('/me');
+  console.log('[API] me() response:', result);
+  console.log('[API] me() result.id:', result?.id);
+  console.log('[API] me() result.userId:', result?.userId);
+  return result;
 }
 
 export async function updateMe(payload: { fullName?: string | null }){
