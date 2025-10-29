@@ -39,8 +39,9 @@ export interface Comment {
   postId: string;
   userId: string;
   handle?: string;
+  avatarKey?: string;
   text: string;
-  createdAt: string;
+  createdAt?: string;
 }
 
 export interface Reaction {

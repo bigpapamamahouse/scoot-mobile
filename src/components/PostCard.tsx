@@ -3,7 +3,7 @@ import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
 import { Post, Reaction } from '../types';
 import { mediaUrlFromKey } from '../lib/media';
 import { Avatar } from './Avatar';
-import { ReactionsAPI, CommentsAPI } from '../api';
+import { ReactionsAPI } from '../api';
 
 export default function PostCard({
   post,
@@ -16,6 +16,10 @@ export default function PostCard({
 }) {
   const [reactions, setReactions] = React.useState<Reaction[]>([]);
   const [commentCount, setCommentCount] = React.useState(post.commentCount || 0);
+
+  React.useEffect(() => {
+    setCommentCount(post.commentCount || 0);
+  }, [post.commentCount]);
 
   // Load reactions
   React.useEffect(() => {

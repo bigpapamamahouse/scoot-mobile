@@ -70,7 +70,11 @@ export default function FeedScreen({ navigation }: any){
         data={items}
         keyExtractor={(it)=>it.id}
         renderItem={({ item }) => (
-          <PostCard post={item} onPressAuthor={() => openProfile(item)} />
+          <PostCard
+            post={item}
+            onPress={() => navigation.navigate('Post', { post: item })}
+            onPressAuthor={() => openProfile(item)}
+          />
         )}
         ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>{ setRefreshing(true); load().finally(()=>setRefreshing(false)); }} />}
