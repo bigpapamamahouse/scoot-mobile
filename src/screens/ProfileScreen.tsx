@@ -435,14 +435,18 @@ export default function ProfileScreen({ navigation, route }: any) {
 
             // Check follow status from profile data
             const viewerId = viewer?.id?.trim() || null;
+            console.log('[Profile] Checking follow status - isSelfRequest:', isSelfRequest, 'viewerId:', viewerId);
             if (!isSelfRequest && viewerId) {
+              console.log('[Profile] Entered follow status check block');
               // Use followStatus and isFollowPending from API if available
               if (profileData && typeof profileData === 'object') {
+                console.log('[Profile] profileData is valid object');
                 if ('isFollowPending' in profileData && profileData.isFollowPending === true) {
                   console.log('[Profile] Follow status: pending (from API)');
                   setFollowStatus('pending');
                 } else if ('followStatus' in profileData) {
                   const status = profileData.followStatus;
+                  console.log('[Profile] followStatus field found:', status);
                   if (status === 'pending' || status === 'requested') {
                     console.log('[Profile] Follow status: pending (from followStatus)');
                     setFollowStatus('pending');
@@ -463,10 +467,13 @@ export default function ProfileScreen({ navigation, route }: any) {
                   setFollowStatus(isUserFollowing ? 'following' : 'none');
                 }
               } else {
+                console.log('[Profile] profileData is not a valid object');
                 // Fallback: check if in followers list
                 const isUserFollowing = followers.some((f: any) => f.id === viewerId);
                 setFollowStatus(isUserFollowing ? 'following' : 'none');
               }
+            } else {
+              console.log('[Profile] Skipped follow status check - isSelfRequest:', isSelfRequest, 'viewerId:', viewerId);
             }
           } catch (err) {
             console.warn('Failed to load follower/following counts:', err);
