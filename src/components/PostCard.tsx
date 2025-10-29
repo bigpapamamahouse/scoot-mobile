@@ -1,25 +1,36 @@
 import React from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
-import { Post, Reaction } from '../types';
+import { Post, Reaction, Comment } from '../types';
 import { mediaUrlFromKey } from '../lib/media';
 import { Avatar } from './Avatar';
-import { ReactionsAPI } from '../api';
+import { CommentsAPI, ReactionsAPI } from '../api';
+import { resolveHandle } from '../lib/resolveHandle';
 
 export default function PostCard({
   post,
   onPress,
   onPressAuthor,
+  showCommentPreview = true,
 }: {
   post: Post;
   onPress?: () => void;
   onPressAuthor?: () => void;
+  showCommentPreview?: boolean;
 }) {
   const [reactions, setReactions] = React.useState<Reaction[]>([]);
-  const [commentCount, setCommentCount] = React.useState(post.commentCount || 0);
+  const [commentCount, setCommentCount] = React.useState(
+    post.commentCount ?? post.comments?.length ?? 0
+  );
+  const [previewComments, setPreviewComments] = React.useState<Comment[]>(
+    () => (post.comments || []).slice(0, 3)
+  );
 
   React.useEffect(() => {
-    setCommentCount(post.commentCount || 0);
-  }, [post.commentCount]);
+    setCommentCount(post.commentCount ?? post.comments?.length ?? 0);
+    if (post.comments) {
+      setPreviewComments(post.comments.slice(0, 3));
+    }
+  }, [post.commentCount, post.comments]);
 
   // Load reactions
   React.useEffect(() => {
@@ -51,6 +62,62 @@ export default function PostCard({
     }
   };
 
+  React.useEffect(() => {
+    if (!showCommentPreview) {
+      setPreviewComments([]);
+      return;
+    }
+    if (post.comments && post.comments.length) {
+      return;
+    }
+
+    let cancelled = false;
+
+    CommentsAPI.listComments(post.id)
+      .then((result) => {
+        if (cancelled) {
+          return;
+        }
+        const dataArray: Comment[] = Array.isArray(result)
+          ? result
+          : result?.comments || result?.items || [];
+        const preview = dataArray.slice(0, 3);
+        setPreviewComments(preview);
+        const totalCount: number =
+          typeof result?.count === 'number'
+            ? result.count
+            : typeof result?.total === 'number'
+            ? result.total
+            : dataArray.length;
+        setCommentCount((prev) => Math.max(prev, totalCount));
+      })
+      .catch((err) => {
+        console.warn('Failed to load preview comments for post', post.id, err);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [post.comments, post.id, showCommentPreview]);
+
+  const renderCommentPreview = React.useCallback(
+    (comment: Comment) => {
+      const handle = resolveHandle(comment);
+      const displayHandle = handle ? `@${handle}` : 'Anonymous';
+      return (
+        <View key={comment.id} style={styles.commentPreviewRow}>
+          <Text style={styles.commentPreviewHandle}>{displayHandle}</Text>
+          <Text style={styles.commentPreviewText}>{comment.text}</Text>
+        </View>
+      );
+    },
+    []
+  );
+
+  const postHandle = resolveHandle(post);
+  const displayHandle = postHandle ? `@${postHandle}` : `@${post.userId.slice(0, 8)}`;
+  const hasMoreComments = commentCount > previewComments.length;
+
   return (
     <TouchableOpacity
       onPress={onPress}
@@ -66,7 +133,7 @@ export default function PostCard({
           activeOpacity={onPressAuthor ? 0.7 : 1}
         >
           <Avatar avatarKey={post.avatarKey} size={32} />
-          <Text style={styles.handle}>@{post.handle || post.userId.slice(0, 8)}</Text>
+          <Text style={styles.handle}>{displayHandle}</Text>
         </TouchableOpacity>
         <Text style={styles.timestamp}>
           {new Date(post.createdAt).toLocaleString()}
@@ -122,6 +189,15 @@ export default function PostCard({
           </View>
         )}
       </View>
+
+      {showCommentPreview && previewComments.length > 0 && (
+        <View style={styles.commentPreviewContainer}>
+          {previewComments.map(renderCommentPreview)}
+          {hasMoreComments && (
+            <Text style={styles.viewMoreComments}>view more comments</Text>
+          )}
+        </View>
+      )}
     </TouchableOpacity>
   );
 }
@@ -197,6 +273,29 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: '#333',
+  },
+  commentPreviewContainer: {
+    marginTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+    paddingTop: 8,
+    gap: 6,
+  },
+  commentPreviewRow: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  commentPreviewHandle: {
+    fontWeight: '600',
+    color: '#333',
+  },
+  commentPreviewText: {
+    flex: 1,
+    color: '#444',
+  },
+  viewMoreComments: {
+    color: '#1d4ed8',
+    fontWeight: '500',
   },
   quickReactions: {
     flexDirection: 'row',

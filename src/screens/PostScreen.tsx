@@ -14,6 +14,7 @@ import PostCard from '../components/PostCard';
 import { CommentsAPI, PostsAPI } from '../api';
 import { Comment, Post } from '../types';
 import { Avatar } from '../components/Avatar';
+import { resolveHandle } from '../lib/resolveHandle';
 
 interface PostScreenRoute {
   params?: {
@@ -38,13 +39,7 @@ export default function PostScreen({ route, navigation }: { route: PostScreenRou
         return;
       }
       const anyPost: any = targetPost;
-      const handleCandidate: unknown =
-        anyPost?.handle ||
-        anyPost?.user?.handle ||
-        anyPost?.author?.handle ||
-        anyPost?.username ||
-        anyPost?.user?.username ||
-        anyPost?.profile?.handle;
+      const handle = resolveHandle(anyPost);
       const userIdCandidate: unknown =
         anyPost?.userId ||
         anyPost?.user?.id ||
@@ -53,10 +48,6 @@ export default function PostScreen({ route, navigation }: { route: PostScreenRou
         anyPost?.createdById ||
         anyPost?.profileId;
 
-      const handle =
-        typeof handleCandidate === 'string' && handleCandidate.trim()
-          ? handleCandidate.trim()
-          : undefined;
       const userId =
         typeof userIdCandidate === 'string' && userIdCandidate.trim()
           ? userIdCandidate.trim()
@@ -140,7 +131,8 @@ export default function PostScreen({ route, navigation }: { route: PostScreenRou
 
   React.useEffect(() => {
     if (post) {
-      const label = post.handle ? `Post by @${post.handle}` : 'Post';
+      const handle = resolveHandle(post);
+      const label = handle ? `Post by @${handle}` : 'Post';
       navigation.setOptions({ title: label });
     }
   }, [navigation, post]);
@@ -174,20 +166,8 @@ export default function PostScreen({ route, navigation }: { route: PostScreenRou
 
   const renderComment = ({ item }: { item: Comment }) => {
     const anyComment: any = item;
-    const fallbackIdCandidate: unknown =
-      item.userId ||
-      anyComment?.authorId ||
-      anyComment?.user?.id ||
-      anyComment?.fromUserId;
-    const fallbackId =
-      typeof fallbackIdCandidate === 'string' && fallbackIdCandidate.trim()
-        ? fallbackIdCandidate.trim()
-        : '';
-    const handle = item.handle
-      ? `@${item.handle}`
-      : fallbackId
-      ? `@${fallbackId.slice(0, 8)}`
-      : 'Anonymous';
+    const handleCandidate = resolveHandle(anyComment);
+    const handle = handleCandidate ? `@${handleCandidate}` : 'Anonymous';
     const createdAt = item.createdAt ? new Date(item.createdAt).toLocaleString() : '';
     return (
       <View style={styles.commentRow}>
@@ -221,7 +201,11 @@ export default function PostScreen({ route, navigation }: { route: PostScreenRou
         ListHeaderComponent={
           post ? (
             <View style={styles.postContainer}>
-              <PostCard post={post} onPressAuthor={() => openProfile(post)} />
+              <PostCard
+                post={post}
+                onPressAuthor={() => openProfile(post)}
+                showCommentPreview={false}
+              />
               <Text style={styles.commentHeaderLabel}>Comments</Text>
             </View>
           ) : (

@@ -11,6 +11,7 @@ export interface Post {
   updatedAt?: string;
   reactionCount?: number;
   commentCount?: number;
+  comments?: Comment[];
 }
 
 export interface User {
