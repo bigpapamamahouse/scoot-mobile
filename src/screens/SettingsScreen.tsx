@@ -1,18 +1,425 @@
-// src/screens/SettingsScreen.tsx
 import React from 'react';
-import { View, Text, Button } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ActivityIndicator,
+  Alert,
+  TextInput,
+  ScrollView,
+  Image,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import * as ImagePicker from 'expo-image-picker';
 import { signOutFn } from '../api/auth';
+import { UsersAPI } from '../api';
+import { Avatar } from '../components/Avatar';
+import { uploadMedia } from '../lib/upload';
+
+type ViewerProfile = {
+  fullName?: string | null;
+  avatarKey?: string | null;
+  inviteCode?: string | null;
+};
 
 export default function SettingsScreen({ navigation }: any) {
+  const [loading, setLoading] = React.useState(true);
+  const [saving, setSaving] = React.useState(false);
+  const [uploading, setUploading] = React.useState(false);
+  const [fullName, setFullName] = React.useState('');
+  const [avatarKey, setAvatarKey] = React.useState<string | null>(null);
+  const [inviteCode, setInviteCode] = React.useState<string | null>(null);
+  const [initialFullName, setInitialFullName] = React.useState('');
+  const [initialAvatarKey, setInitialAvatarKey] = React.useState<string | null>(null);
+  const [avatarPreviewUri, setAvatarPreviewUri] = React.useState<string | null>(null);
+
+  const loadViewer = React.useCallback(async () => {
+    setLoading(true);
+    try {
+      const data: ViewerProfile | null = await UsersAPI.me();
+      const normalizedFullName =
+        data && typeof data.fullName === 'string' ? data.fullName : '';
+      const normalizedAvatarKey = data?.avatarKey ?? null;
+      const normalizedInviteCode =
+        data && typeof data.inviteCode === 'string' && data.inviteCode.trim()
+          ? data.inviteCode.trim()
+          : null;
+
+      setFullName(normalizedFullName);
+      setInitialFullName(normalizedFullName);
+      setAvatarKey(normalizedAvatarKey);
+      setInitialAvatarKey(normalizedAvatarKey);
+      setInviteCode(normalizedInviteCode);
+      setAvatarPreviewUri(null);
+    } catch (error: any) {
+      console.error('Failed to load profile:', error);
+      Alert.alert('Error', error?.message || 'Unable to load settings.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    loadViewer();
+  }, [loadViewer]);
+
   const handleLogout = async () => {
-    await signOutFn();
-    navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
+    try {
+      await signOutFn();
+      navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
+    } catch (error: any) {
+      Alert.alert('Error', error?.message || 'Failed to sign out.');
+    }
   };
 
+  const uploadAvatar = React.useCallback(
+    async (uri: string) => {
+      setUploading(true);
+      try {
+        const key = await uploadMedia({ uri, intent: 'avatar-image' });
+        setAvatarKey(key);
+        setAvatarPreviewUri(uri);
+      } catch (error: any) {
+        console.error('Failed to upload avatar:', error);
+        Alert.alert('Error', error?.message || 'Failed to upload profile photo.');
+        setAvatarPreviewUri(null);
+      } finally {
+        setUploading(false);
+      }
+    },
+    []
+  );
+
+  const pickImage = React.useCallback(
+    async (fromCamera: boolean) => {
+      try {
+        let result;
+        if (fromCamera) {
+          const { status } = await ImagePicker.requestCameraPermissionsAsync();
+          if (status !== 'granted') {
+            Alert.alert('Permission needed', 'Camera permission is required.');
+            return;
+          }
+          result = await ImagePicker.launchCameraAsync({
+            mediaTypes: 'images',
+            quality: 0.8,
+          });
+        } else {
+          const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+          if (status !== 'granted') {
+            Alert.alert('Permission needed', 'Photo library permission is required.');
+            return;
+          }
+          result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: 'images',
+            quality: 0.8,
+          });
+        }
+
+        if (!result.canceled && result.assets?.[0]?.uri) {
+          const uri = result.assets[0].uri;
+          setAvatarPreviewUri(uri);
+          await uploadAvatar(uri);
+        }
+      } catch (error: any) {
+        console.error('Error selecting image:', error);
+        Alert.alert('Error', 'Failed to select image.');
+      }
+    },
+    [uploadAvatar]
+  );
+
+  const showImageOptions = () => {
+    Alert.alert('Update profile photo', 'Choose an option', [
+      { text: 'Camera', onPress: () => pickImage(true) },
+      { text: 'Photo library', onPress: () => pickImage(false) },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+
+  const removePhoto = () => {
+    if (!avatarKey && !avatarPreviewUri) {
+      return;
+    }
+    Alert.alert('Remove photo', 'Are you sure you want to remove your profile photo?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: () => {
+          setAvatarKey(null);
+          setAvatarPreviewUri(null);
+        },
+      },
+    ]);
+  };
+
+  const handleSave = async () => {
+    const trimmedName = fullName.trim();
+    const normalizedName = trimmedName.length ? trimmedName : '';
+    const payload: { fullName?: string | null; avatarKey?: string | null } = {};
+
+    if (normalizedName !== initialFullName.trim()) {
+      payload.fullName = trimmedName.length ? trimmedName : null;
+    }
+
+    if ((avatarKey ?? null) !== (initialAvatarKey ?? null)) {
+      payload.avatarKey = avatarKey ?? null;
+    }
+
+    if (!Object.keys(payload).length) {
+      Alert.alert('No changes', 'Update your profile before saving.');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await UsersAPI.updateMe(payload);
+      Alert.alert('Profile updated', 'Your changes have been saved.');
+      setInitialFullName(normalizedName);
+      setInitialAvatarKey(avatarKey ?? null);
+      if (!avatarKey) {
+        setAvatarPreviewUri(null);
+      }
+    } catch (error: any) {
+      console.error('Failed to save profile:', error);
+      Alert.alert('Error', error?.message || 'Failed to update your profile.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#2196f3" />
+      </View>
+    );
+  }
+
+  const inviteCodeLabel = inviteCode || 'Unavailable';
+
   return (
-    <View style={{ padding: 16, gap: 12 }}>
-      <Text style={{ fontSize: 18, fontWeight: '700' }}>Settings</Text>
-      <Button title="Log out" onPress={handleLogout} />
-    </View>
+    <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+      <ScrollView contentContainerStyle={styles.container}>
+        <Text style={styles.title}>Settings</Text>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Profile photo</Text>
+          <View style={styles.avatarRow}>
+            <View style={styles.avatarWrapper}>
+              {avatarPreviewUri ? (
+                <Image source={{ uri: avatarPreviewUri }} style={styles.avatarImage} />
+              ) : (
+                <Avatar avatarKey={avatarKey} size={88} />
+              )}
+              {uploading && (
+                <View style={styles.avatarOverlay}>
+                  <ActivityIndicator color="#fff" />
+                </View>
+              )}
+            </View>
+            <View style={styles.avatarActions}>
+              <TouchableOpacity
+                style={[styles.secondaryButton, uploading && styles.disabledButton]}
+                onPress={showImageOptions}
+                disabled={uploading}
+              >
+                <Text style={styles.secondaryButtonText}>
+                  {uploading ? 'Uploading…' : 'Change photo'}
+                </Text>
+              </TouchableOpacity>
+              {(avatarKey || avatarPreviewUri) && (
+                <TouchableOpacity
+                  onPress={removePhoto}
+                  disabled={uploading}
+                  style={styles.linkButton}
+                >
+                  <Text style={[styles.linkButtonText, uploading && styles.linkButtonDisabled]}>Remove photo</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Full name</Text>
+          <TextInput
+            style={styles.input}
+            value={fullName}
+            onChangeText={setFullName}
+            placeholder="Enter your full name"
+            autoCapitalize="words"
+            editable={!saving && !uploading}
+          />
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Invite code</Text>
+          <View style={styles.inviteCodeBox}>
+            <Text selectable style={styles.inviteCodeText}>
+              {inviteCodeLabel}
+            </Text>
+          </View>
+          <Text style={styles.inviteHint}>Share this code with friends to invite them.</Text>
+        </View>
+
+        <TouchableOpacity
+          style={[styles.primaryButton, (saving || uploading) && styles.primaryButtonDisabled]}
+          onPress={handleSave}
+          disabled={saving || uploading}
+        >
+          {saving ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.primaryButtonText}>Save changes</Text>
+          )}
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+          <Text style={styles.logoutButtonText}>Log out</Text>
+        </TouchableOpacity>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#f5f7fa',
+  },
+  container: {
+    padding: 20,
+    paddingBottom: 40,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: '700',
+    marginBottom: 24,
+  },
+  section: {
+    marginBottom: 24,
+  },
+  sectionLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 12,
+  },
+  avatarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  avatarWrapper: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    overflow: 'hidden',
+    position: 'relative',
+    marginRight: 20,
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 44,
+  },
+  avatarOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarActions: {
+    flex: 1,
+    alignItems: 'flex-start',
+  },
+  secondaryButton: {
+    borderWidth: 1,
+    borderColor: '#2196f3',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  secondaryButtonText: {
+    color: '#2196f3',
+    fontWeight: '600',
+  },
+  disabledButton: {
+    opacity: 0.6,
+  },
+  linkButton: {
+    paddingVertical: 4,
+    marginTop: 4,
+  },
+  linkButtonText: {
+    color: '#e53935',
+    fontWeight: '600',
+  },
+  linkButtonDisabled: {
+    color: '#e57373',
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#d0d7de',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    backgroundColor: '#fff',
+    fontSize: 16,
+  },
+  inviteCodeBox: {
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: '#90caf9',
+    borderRadius: 10,
+    padding: 16,
+    backgroundColor: '#e3f2fd',
+  },
+  inviteCodeText: {
+    fontSize: 18,
+    fontWeight: '700',
+    textAlign: 'center',
+    letterSpacing: 1,
+  },
+  inviteHint: {
+    marginTop: 8,
+    color: '#607d8b',
+    fontSize: 13,
+  },
+  primaryButton: {
+    backgroundColor: '#2196f3',
+    paddingVertical: 14,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  primaryButtonDisabled: {
+    opacity: 0.7,
+  },
+  primaryButtonText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 16,
+  },
+  logoutButton: {
+    marginTop: 32,
+    alignItems: 'center',
+  },
+  logoutButtonText: {
+    color: '#e53935',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+});

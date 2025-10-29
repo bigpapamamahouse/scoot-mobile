@@ -11,7 +11,7 @@ export async function me(){
   return result;
 }
 
-export async function updateMe(payload: { fullName?: string | null }){
+export async function updateMe(payload: { fullName?: string | null; avatarKey?: string | null }){
   return api('/me', { method: 'PATCH', body: JSON.stringify(payload) });
 }
 
