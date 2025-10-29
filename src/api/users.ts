@@ -197,7 +197,7 @@ export async function followUser(handle: string) {
   const requestBody = { handle };
   console.log('[API] followUser request body:', JSON.stringify(requestBody));
 
-  const result = await api('/follow', {
+  const result = await api('/follow-request', {
     method: 'POST',
     body: JSON.stringify(requestBody)
   });
