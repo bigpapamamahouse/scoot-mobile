@@ -159,7 +159,7 @@ export default function SettingsScreen({ navigation }: any) {
         // Auto-save the avatar to persist the change immediately
         try {
           console.log('[SettingsScreen] Auto-saving avatar with key:', key);
-          await UsersAPI.updateMe({ avatarKey: key });
+          await UsersAPI.updateAvatar(key);
           console.log('[SettingsScreen] Auto-save successful, reloading viewer data...');
           // Reload viewer data to refresh the profile with the new avatar
           await loadViewer({ silent: true });
@@ -239,9 +239,19 @@ export default function SettingsScreen({ navigation }: any) {
       {
         text: 'Remove',
         style: 'destructive',
-        onPress: () => {
+        onPress: async () => {
           setAvatarKey(null);
           setAvatarPreviewUri(null);
+
+          // Auto-save the removal
+          try {
+            await UsersAPI.updateAvatar(null);
+            await loadViewer({ silent: true });
+            console.log('[SettingsScreen] Avatar removed successfully');
+          } catch (error: any) {
+            console.error('[SettingsScreen] Failed to remove avatar:', error);
+            Alert.alert('Error', error?.message || 'Failed to remove profile photo.');
+          }
         },
       },
     ]);
@@ -250,24 +260,27 @@ export default function SettingsScreen({ navigation }: any) {
   const handleSave = async () => {
     const trimmedName = fullName.trim();
     const normalizedName = trimmedName.length ? trimmedName : '';
-    const payload: { fullName?: string | null; avatarKey?: string | null } = {};
 
-    if (normalizedName !== initialFullName.trim()) {
-      payload.fullName = trimmedName.length ? trimmedName : null;
-    }
+    const hasNameChange = normalizedName !== initialFullName.trim();
+    const hasAvatarChange = (avatarKey ?? null) !== (initialAvatarKey ?? null);
 
-    if ((avatarKey ?? null) !== (initialAvatarKey ?? null)) {
-      payload.avatarKey = avatarKey ?? null;
-    }
-
-    if (!Object.keys(payload).length) {
+    if (!hasNameChange && !hasAvatarChange) {
       Alert.alert('No changes', 'Update your profile before saving.');
       return;
     }
 
     setSaving(true);
     try {
-      await UsersAPI.updateMe(payload);
+      // Update avatar using dedicated endpoint if changed
+      if (hasAvatarChange) {
+        await UsersAPI.updateAvatar(avatarKey ?? null);
+      }
+
+      // Update name using PATCH /me if changed
+      if (hasNameChange) {
+        await UsersAPI.updateMe({ fullName: trimmedName.length ? trimmedName : null });
+      }
+
       await loadViewer({ silent: true });
       Alert.alert('Profile updated', 'Your changes have been saved.');
     } catch (error: any) {
