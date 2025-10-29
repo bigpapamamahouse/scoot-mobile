@@ -313,27 +313,76 @@ export async function updateMe(payload: { fullName?: string | null; avatarKey?: 
 
   if ('avatarKey' in payload) {
     const details = resolveAvatarDetails(payload.avatarKey);
+    const keyValue =
+      details.key !== undefined
+        ? details.key
+        : typeof payload.avatarKey === 'string'
+        ? payload.avatarKey
+        : null;
+    const urlValue =
+      details.url !== undefined
+        ? details.url
+        : typeof keyValue === 'string'
+        ? mediaUrlFromKey(keyValue) || keyValue
+        : typeof payload.avatarKey === 'string'
+        ? payload.avatarKey
+        : null;
 
-    if (!('avatarKey' in body)) {
-      body.avatarKey = details.key;
+    const keyTargets = [
+      'avatarKey',
+      'avatar_key',
+      'avatarId',
+      'avatar_id',
+      'avatarID',
+      'photoKey',
+      'photo_key',
+      'photoId',
+      'photo_id',
+      'profilePhotoKey',
+      'profile_photo_key',
+      'profileImageKey',
+      'profile_image_key',
+      'imageKey',
+      'image_key',
+      'pictureKey',
+      'picture_key',
+    ];
+
+    for (const field of keyTargets) {
+      if (!(field in body)) {
+        body[field] = keyValue ?? null;
+      }
     }
-    if (!('avatar_key' in body)) {
-      body.avatar_key = details.key;
-    }
-    if (!('avatar' in body)) {
-      body.avatar = details.url ?? details.key ?? null;
-    }
-    if (!('avatarUrl' in body)) {
-      body.avatarUrl = details.url ?? details.key ?? null;
-    }
-    if (!('avatar_url' in body)) {
-      body.avatar_url = details.url ?? details.key ?? null;
-    }
-    if (!('profilePhoto' in body)) {
-      body.profilePhoto = details.url ?? details.key ?? null;
-    }
-    if (!('profile_photo' in body)) {
-      body.profile_photo = details.url ?? details.key ?? null;
+
+    const urlTargets = [
+      'avatar',
+      'avatarUrl',
+      'avatar_url',
+      'avatarUri',
+      'avatar_uri',
+      'photo',
+      'photoUrl',
+      'photo_url',
+      'profilePhoto',
+      'profile_photo',
+      'profilePhotoUrl',
+      'profile_photo_url',
+      'profileImage',
+      'profile_image',
+      'profileImageUrl',
+      'profile_image_url',
+      'image',
+      'imageUrl',
+      'image_url',
+      'picture',
+      'pictureUrl',
+      'picture_url',
+    ];
+
+    for (const field of urlTargets) {
+      if (!(field in body)) {
+        body[field] = urlValue ?? keyValue ?? null;
+      }
     }
   }
 

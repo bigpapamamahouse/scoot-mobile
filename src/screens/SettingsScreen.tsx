@@ -17,6 +17,7 @@ import { UsersAPI, InvitesAPI } from '../api';
 import { Avatar } from '../components/Avatar';
 import { uploadMedia } from '../lib/upload';
 import { mediaUrlFromKey } from '../lib/media';
+import { readStoredInviteCode, writeStoredInviteCode } from '../lib/storage';
 
 type ViewerProfile = {
   fullName?: string | null;
@@ -39,23 +40,50 @@ export default function SettingsScreen({ navigation }: any) {
   const [initialAvatarKey, setInitialAvatarKey] = React.useState<string | null>(null);
   const [avatarPreviewUri, setAvatarPreviewUri] = React.useState<string | null>(null);
 
-  const ensureInviteCode = React.useCallback(async (): Promise<string | null> => {
-    try {
-      const payload = await InvitesAPI.createInvite(1);
-      const code = UsersAPI.findInviteCode?.(payload) ?? null;
-      if (code) {
-        return code;
+  const ensureInviteCode = React.useCallback(
+    async (viewerId?: string | null): Promise<string | null> => {
+      const normalizedId = typeof viewerId === 'string' ? viewerId.trim() : '';
+      if (normalizedId) {
+        const cached = await readStoredInviteCode(normalizedId);
+        if (cached) {
+          return cached;
+        }
       }
-      const fallback =
-        payload && typeof payload === 'object' && 'code' in (payload as any)
-          ? String((payload as any).code)
-          : null;
-      return fallback && fallback.trim().length > 0 ? fallback.trim() : null;
-    } catch (error: any) {
-      console.error('Failed to generate invite code:', error);
-      return null;
-    }
-  }, []);
+
+      try {
+        if (InvitesAPI.listInvites) {
+          const existing = await InvitesAPI.listInvites();
+          const existingCode = UsersAPI.findInviteCode?.(existing) ?? null;
+          if (existingCode) {
+            if (normalizedId) {
+              await writeStoredInviteCode(normalizedId, existingCode);
+            }
+            return existingCode;
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to load existing invites:', error);
+      }
+
+      try {
+        const payload = await InvitesAPI.createInvite(10);
+        const code = UsersAPI.findInviteCode?.(payload) ?? null;
+        const fallback =
+          payload && typeof payload === 'object' && 'code' in (payload as any)
+            ? String((payload as any).code)
+            : null;
+        const normalizedCode = code || (fallback && fallback.trim().length > 0 ? fallback.trim() : null);
+        if (normalizedCode && normalizedId) {
+          await writeStoredInviteCode(normalizedId, normalizedCode);
+        }
+        return normalizedCode ?? null;
+      } catch (error: any) {
+        console.error('Failed to generate invite code:', error);
+        return null;
+      }
+    },
+    []
+  );
 
   const loadViewer = React.useCallback(async (options?: LoadViewerOptions) => {
     if (!options?.silent) {
@@ -66,13 +94,21 @@ export default function SettingsScreen({ navigation }: any) {
       const normalizedFullName =
         data && typeof data.fullName === 'string' ? data.fullName : '';
       const normalizedAvatarKey = data?.avatarKey ?? null;
+      const normalizedId =
+        data && typeof (data as any).id === 'string' && (data as any).id.trim().length
+          ? (data as any).id.trim()
+          : null;
       let normalizedInviteCode =
         data && typeof data.inviteCode === 'string' && data.inviteCode.trim().length
           ? data.inviteCode.trim()
           : null;
 
+      if (!normalizedInviteCode && normalizedId) {
+        normalizedInviteCode = await readStoredInviteCode(normalizedId);
+      }
+
       if (!normalizedInviteCode) {
-        normalizedInviteCode = await ensureInviteCode();
+        normalizedInviteCode = await ensureInviteCode(normalizedId);
       }
 
       setFullName(normalizedFullName);
@@ -81,6 +117,10 @@ export default function SettingsScreen({ navigation }: any) {
       setInitialAvatarKey(normalizedAvatarKey);
       setInviteCode(normalizedInviteCode);
       setAvatarPreviewUri(null);
+
+      if (normalizedInviteCode && normalizedId) {
+        await writeStoredInviteCode(normalizedId, normalizedInviteCode);
+      }
     } catch (error: any) {
       console.error('Failed to load profile:', error);
       Alert.alert('Error', error?.message || 'Unable to load settings.');
