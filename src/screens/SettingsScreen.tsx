@@ -155,19 +155,6 @@ export default function SettingsScreen({ navigation }: any) {
         const remotePreview = mediaUrlFromKey(key);
         console.log('[SettingsScreen] Remote preview URL:', remotePreview);
         setAvatarPreviewUri(remotePreview ?? uri);
-
-        // Auto-save the avatar to persist the change immediately
-        try {
-          console.log('[SettingsScreen] Auto-saving avatar with key:', key);
-          await UsersAPI.updateAvatar(key);
-          console.log('[SettingsScreen] Auto-save successful, reloading viewer data...');
-          // Reload viewer data to refresh the profile with the new avatar
-          await loadViewer({ silent: true });
-          console.log('[SettingsScreen] Viewer data reloaded');
-        } catch (saveError: any) {
-          console.error('[SettingsScreen] Failed to save avatar:', saveError);
-          Alert.alert('Error', saveError?.message || 'Failed to save profile photo. You can try clicking "Save changes" to retry.');
-        }
       } catch (error: any) {
         console.error('[SettingsScreen] Failed to upload avatar:', error);
         Alert.alert('Error', error?.message || 'Failed to upload profile photo.');
@@ -176,7 +163,7 @@ export default function SettingsScreen({ navigation }: any) {
         setUploading(false);
       }
     },
-    [loadViewer]
+    []
   );
 
   const pickImage = React.useCallback(
@@ -239,19 +226,9 @@ export default function SettingsScreen({ navigation }: any) {
       {
         text: 'Remove',
         style: 'destructive',
-        onPress: async () => {
+        onPress: () => {
           setAvatarKey(null);
           setAvatarPreviewUri(null);
-
-          // Auto-save the removal
-          try {
-            await UsersAPI.updateAvatar(null);
-            await loadViewer({ silent: true });
-            console.log('[SettingsScreen] Avatar removed successfully');
-          } catch (error: any) {
-            console.error('[SettingsScreen] Failed to remove avatar:', error);
-            Alert.alert('Error', error?.message || 'Failed to remove profile photo.');
-          }
         },
       },
     ]);
@@ -282,7 +259,9 @@ export default function SettingsScreen({ navigation }: any) {
       }
 
       await loadViewer({ silent: true });
-      Alert.alert('Profile updated', 'Your changes have been saved.');
+
+      // Navigate back to profile after successful save
+      navigation.goBack();
     } catch (error: any) {
       console.error('Failed to save profile:', error);
       Alert.alert('Error', error?.message || 'Failed to update your profile.');
