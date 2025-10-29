@@ -274,25 +274,20 @@ export default function SettingsScreen({ navigation }: any) {
 
     setSaving(true);
     try {
-      const updateCalls: Array<Promise<any>> = [];
+      const payload: {
+        fullName: string | null;
+        handle: string | null;
+        email: string | null;
+        avatarKey: string | null;
+      } = {
+        fullName: normalizedName,
+        handle: normalizedHandle,
+        email: normalizedEmail,
+        avatarKey: avatarKey ?? null,
+      };
 
-      if (hasNameChange || hasHandleChange || hasEmailChange) {
-        const payload = {
-          fullName: normalizedName,
-          handle: normalizedHandle,
-          email: normalizedEmail,
-        };
-
-        console.log('[SettingsScreen] Saving profile details via PATCH /me:', payload);
-        updateCalls.push(UsersAPI.updateMe(payload));
-      }
-
-      if (hasAvatarChange) {
-        console.log('[SettingsScreen] Saving avatar via POST /me/avatar:', avatarKey);
-        updateCalls.push(UsersAPI.updateAvatar(avatarKey ?? null));
-      }
-
-      await Promise.all(updateCalls);
+      console.log('[SettingsScreen] Saving profile via PATCH /me:', payload);
+      await UsersAPI.updateMe(payload);
 
       await loadViewer({ silent: true });
 
