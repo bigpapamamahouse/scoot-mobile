@@ -1,5 +1,5 @@
 import React from 'react';
-import { Platform } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
@@ -105,29 +105,30 @@ async function requestPushPermissions() {
   return { granted: true, token: response.data ?? null };
 }
 
-async function ensurePushTokenRegistered() {
+async function ensurePushTokenRegistered(): Promise<{ granted: boolean }> {
   try {
     const { granted, token } = await requestPushPermissions();
-    if (!granted || !token) {
-      return false;
+    if (!granted) {
+      return { granted: false };
     }
 
-    const stored = await readPushToken();
-    if (stored === token) {
-      return true;
+    if (token) {
+      const stored = await readPushToken();
+      if (stored !== token) {
+        try {
+          await NotificationsAPI.registerPushToken(token, Platform.OS);
+          await writePushToken(token);
+        } catch (err) {
+          console.warn('Failed to register push token', err);
+        }
+      }
     }
 
-    try {
-      await NotificationsAPI.registerPushToken(token, Platform.OS);
-      await writePushToken(token);
-      return true;
-    } catch (err) {
-      console.warn('Failed to register push token', err);
-    }
+    return { granted: true };
   } catch (error) {
     console.warn('Push registration error', error);
   }
-  return false;
+  return { granted: false };
 }
 
 function isFollowRequest(type?: string | null) {
@@ -212,7 +213,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
   }, []);
 
   React.useEffect(() => {
-    ensurePushTokenRegistered().then((granted) => {
+    ensurePushTokenRegistered().then(({ granted }) => {
       permissionGrantedRef.current = granted;
     });
   }, []);
@@ -221,13 +222,22 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     refresh();
     const interval = setInterval(() => {
       refresh();
-    }, 60_000);
+    }, 15_000);
     const subscription = Notifications.addNotificationReceivedListener(() => {
       refresh();
+    });
+    const appStateSubscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') {
+        ensurePushTokenRegistered().then(({ granted }) => {
+          permissionGrantedRef.current = granted;
+        });
+        refresh();
+      }
     });
     return () => {
       clearInterval(interval);
       subscription.remove();
+      appStateSubscription.remove();
     };
   }, [refresh]);
 
