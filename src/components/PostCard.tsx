@@ -6,6 +6,8 @@ import { Avatar } from './Avatar';
 import { CommentsAPI, ReactionsAPI, PostsAPI } from '../api';
 import { resolveHandle } from '../lib/resolveHandle';
 import { useCurrentUser, isOwner } from '../hooks/useCurrentUser';
+import { GlassCard } from './ui/GlassCard';
+import { palette } from '../theme/colors';
 
 export default function PostCard({
   post,
@@ -241,147 +243,148 @@ export default function PostCard({
   return (
     <TouchableOpacity
       onPress={onPress}
-      style={styles.card}
-      activeOpacity={onPress ? 0.7 : 1}
+      style={styles.cardTouchable}
+      activeOpacity={onPress ? 0.85 : 1}
     >
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          disabled={!onPressAuthor}
-          onPress={onPressAuthor}
-          style={styles.author}
-          activeOpacity={onPressAuthor ? 0.7 : 1}
-        >
-          <Avatar avatarKey={localPost.avatarKey} size={32} />
-          <Text style={styles.handle}>{displayHandle}</Text>
-        </TouchableOpacity>
-        <View style={styles.headerRight}>
-          <Text style={styles.timestamp}>
-            {new Date(localPost.createdAt).toLocaleString()}
-          </Text>
-          {userOwnsPost && (
-            <TouchableOpacity onPress={handleOptionsPress} style={styles.optionsButton}>
-              <Text style={styles.optionsIcon}>⋯</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
-
-      {/* Content */}
-      <Text style={styles.text}>{localPost.text}</Text>
-
-      {/* Image */}
-      {imageUri && (
-        <Image
-          source={{ uri: imageUri }}
-          style={[
-            styles.image,
-            imageAspectRatio
-              ? { aspectRatio: imageAspectRatio }
-              : styles.imageFallback,
-          ]}
-          resizeMode="contain"
-        />
-      )}
-
-      {/* Reactions */}
-      {reactions.length > 0 && (
-        <View style={styles.reactions}>
-          {reactions.map((reaction) => (
-            <TouchableOpacity
-              key={reaction.emoji}
-              onPress={() => handleReaction(reaction.emoji)}
-              style={[
-                styles.reactionButton,
-                reaction.userReacted && styles.reactionButtonActive
-              ]}
-            >
-              <Text style={styles.reactionEmoji}>{reaction.emoji}</Text>
-              <Text style={styles.reactionCount}>{reaction.count}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      )}
-
-      {/* Quick Reactions */}
-      <View style={styles.quickReactions}>
-        {['❤️', '👍', '😂', '🎉'].map((emoji) => (
+      <GlassCard style={styles.card} contentStyle={styles.cardContent}>
+        {/* Header */}
+        <View style={styles.header}>
           <TouchableOpacity
-            key={emoji}
-            onPress={() => handleReaction(emoji)}
-            style={styles.quickReactionButton}
+            disabled={!onPressAuthor}
+            onPress={onPressAuthor}
+            style={styles.author}
+            activeOpacity={onPressAuthor ? 0.7 : 1}
           >
-            <Text style={styles.quickReactionEmoji}>{emoji}</Text>
+            <Avatar avatarKey={localPost.avatarKey} size={36} />
+            <Text style={styles.handle}>{displayHandle}</Text>
           </TouchableOpacity>
-        ))}
+          <View style={styles.headerRight}>
+            <Text style={styles.timestamp}>
+              {new Date(localPost.createdAt).toLocaleString()}
+            </Text>
+            {userOwnsPost && (
+              <TouchableOpacity onPress={handleOptionsPress} style={styles.optionsButton}>
+                <Text style={styles.optionsIcon}>⋯</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
 
-        {commentCount > 0 && (
-          <View style={styles.commentBadge}>
-            <Text style={styles.commentCount}>💬 {commentCount}</Text>
+        {/* Content */}
+        <Text style={styles.text}>{localPost.text}</Text>
+
+        {/* Image */}
+        {imageUri && (
+          <Image
+            source={{ uri: imageUri }}
+            style={[
+              styles.image,
+              imageAspectRatio
+                ? { aspectRatio: imageAspectRatio }
+                : styles.imageFallback,
+            ]}
+            resizeMode="cover"
+          />
+        )}
+
+        {/* Reactions */}
+        {reactions.length > 0 && (
+          <View style={styles.reactions}>
+            {reactions.map((reaction) => (
+              <TouchableOpacity
+                key={reaction.emoji}
+                onPress={() => handleReaction(reaction.emoji)}
+                style={[
+                  styles.reactionButton,
+                  reaction.userReacted && styles.reactionButtonActive,
+                ]}
+              >
+                <Text style={styles.reactionEmoji}>{reaction.emoji}</Text>
+                <Text style={styles.reactionCount}>{reaction.count}</Text>
+              </TouchableOpacity>
+            ))}
           </View>
         )}
-      </View>
 
-      {showCommentPreview && previewComments.length > 0 && (
-        <View style={styles.commentPreviewContainer}>
-          {previewComments.map(renderCommentPreview)}
-          {hasMoreComments && (
-            <Text style={styles.viewMoreComments}>view more comments</Text>
+        {/* Quick Reactions */}
+        <View style={styles.quickReactions}>
+          {['❤️', '👍', '😂', '🎉'].map((emoji) => (
+            <TouchableOpacity
+              key={emoji}
+              onPress={() => handleReaction(emoji)}
+              style={styles.quickReactionButton}
+            >
+              <Text style={styles.quickReactionEmoji}>{emoji}</Text>
+            </TouchableOpacity>
+          ))}
+
+          {commentCount > 0 && (
+            <View style={styles.commentBadge}>
+              <Text style={styles.commentCount}>💬 {commentCount}</Text>
+            </View>
           )}
         </View>
-      )}
+
+        {showCommentPreview && previewComments.length > 0 && (
+          <View style={styles.commentPreviewContainer}>
+            {previewComments.map(renderCommentPreview)}
+            {hasMoreComments && (
+              <Text style={styles.viewMoreComments}>View more comments</Text>
+            )}
+          </View>
+        )}
+      </GlassCard>
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
+  cardTouchable: {
+    width: '100%',
+  },
   card: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    width: '100%',
+  },
+  cardContent: {
+    padding: 22,
+    gap: 16,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
     justifyContent: 'space-between',
   },
   headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
   },
   author: {
     flexDirection: 'row',
     alignItems: 'center',
     flexShrink: 1,
-    marginRight: 12,
+    marginRight: 16,
   },
   handle: {
-    fontWeight: '600',
-    fontSize: 15,
-    marginLeft: 8,
+    fontWeight: '700',
+    fontSize: 16,
+    marginLeft: 12,
     flexShrink: 1,
+    color: palette.textPrimary,
   },
   timestamp: {
-    color: '#888',
+    color: palette.textMuted,
     fontSize: 12,
   },
   text: {
-    fontSize: 15,
-    lineHeight: 20,
-    marginBottom: 8,
+    fontSize: 16,
+    lineHeight: 22,
+    color: palette.textPrimary,
   },
   image: {
     width: '100%',
-    borderRadius: 8,
-    marginBottom: 8,
-    backgroundColor: '#f2f2f2',
+    borderRadius: 20,
+    backgroundColor: 'rgba(15,23,42,0.45)',
   },
   imageFallback: {
     aspectRatio: 1,
@@ -389,74 +392,82 @@ const styles = StyleSheet.create({
   reactions: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 6,
-    marginBottom: 8,
+    gap: 10,
   },
   reactionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f0f0f0',
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    gap: 4,
+    backgroundColor: 'rgba(148,163,184,0.2)',
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    gap: 6,
   },
   reactionButtonActive: {
-    backgroundColor: '#e3f2fd',
+    backgroundColor: 'rgba(56,189,248,0.25)',
     borderWidth: 1,
-    borderColor: '#2196f3',
+    borderColor: palette.accent,
   },
   reactionEmoji: {
-    fontSize: 14,
+    fontSize: 16,
   },
   reactionCount: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#333',
+    fontSize: 13,
+    fontWeight: '700',
+    color: palette.textPrimary,
   },
   commentPreviewContainer: {
-    marginTop: 8,
     borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
-    paddingTop: 8,
-    gap: 6,
+    borderTopColor: 'rgba(148,163,184,0.2)',
+    paddingTop: 12,
+    gap: 10,
   },
   commentPreviewRow: {
     flexDirection: 'row',
-    gap: 6,
+    gap: 8,
   },
   commentPreviewHandle: {
     fontWeight: '600',
-    color: '#333',
+    color: palette.textSecondary,
   },
   commentPreviewText: {
     flex: 1,
-    color: '#444',
+    color: palette.textPrimary,
   },
   viewMoreComments: {
-    color: '#1d4ed8',
-    fontWeight: '500',
+    color: palette.accent,
+    fontWeight: '700',
+    fontSize: 12,
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
   },
   quickReactions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    paddingTop: 8,
+    gap: 10,
+    paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
+    borderTopColor: 'rgba(148,163,184,0.2)',
   },
   quickReactionButton: {
-    padding: 4,
+    padding: 6,
+    borderRadius: 12,
+    backgroundColor: 'rgba(148,163,184,0.18)',
   },
   quickReactionEmoji: {
-    fontSize: 18,
+    fontSize: 22,
   },
   commentBadge: {
     marginLeft: 'auto',
+    backgroundColor: 'rgba(148,163,184,0.18)',
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
   },
   commentCount: {
     fontSize: 13,
-    color: '#666',
+    color: palette.textSecondary,
+    fontWeight: '600',
   },
   optionsButton: {
     padding: 4,
@@ -465,6 +476,6 @@ const styles = StyleSheet.create({
   optionsIcon: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#666',
+    color: palette.textMuted,
   },
 });

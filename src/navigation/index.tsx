@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { TouchableOpacity, Text, View } from 'react-native';
 import FeedScreen from '../screens/FeedScreen';
@@ -16,6 +16,7 @@ import { SearchScreen } from '../screens/SearchScreen';
 import { UserListScreen } from '../screens/UserListScreen';
 import { useNotifications } from '../lib/notifications';
 import PostScreen from '../screens/PostScreen';
+import { palette } from '../theme/colors';
 
 const Stack = createNativeStackNavigator();
 
@@ -57,10 +58,38 @@ function HeaderActions({ navigation }: { navigation: any }) {
   );
 }
 
+const navigationTheme = {
+  ...DefaultTheme,
+  colors: {
+    ...DefaultTheme.colors,
+    background: 'transparent',
+    card: 'rgba(15,23,42,0.85)',
+    text: palette.textPrimary,
+    border: 'rgba(148,163,184,0.35)',
+    primary: palette.accent,
+  },
+};
+
 export default function RootNavigator(){
   return (
-    <NavigationContainer>
-      <Stack.Navigator>
+    <NavigationContainer theme={navigationTheme}>
+      <Stack.Navigator
+        screenOptions={{
+          headerStyle: {
+            backgroundColor: 'rgba(15,23,42,0.85)',
+          },
+          headerTitleStyle: {
+            color: palette.textPrimary,
+            fontWeight: '700',
+            letterSpacing: 0.5,
+          },
+          headerTintColor: palette.textPrimary,
+          headerShadowVisible: false,
+          contentStyle: {
+            backgroundColor: 'transparent',
+          },
+        }}
+      >
         <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
         <Stack.Screen name="Signup" component={SignupScreen} options={{ title: 'Sign up' }} />
         <Stack.Screen name="ConfirmCode" component={ConfirmCodeScreen} options={{ title: 'Confirm' }} />
