@@ -26,11 +26,33 @@ export function Avatar({ avatarKey, size = 32 }: { avatarKey?: string | null; si
     console.log('[Avatar] No URI, showing placeholder');
     return <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: '#ddd' }} />;
   }
+
+  // Test fetch to see what CloudFront returns
+  React.useEffect(() => {
+    if (uri) {
+      fetch(uri)
+        .then(async (response) => {
+          console.log('[Avatar] Fetch test for:', uri);
+          console.log('[Avatar] Response status:', response.status);
+          console.log('[Avatar] Response headers:', response.headers);
+          const text = await response.text();
+          console.log('[Avatar] Response body length:', text.length);
+          console.log('[Avatar] Response body preview:', text.substring(0, 500));
+        })
+        .catch((error) => {
+          console.error('[Avatar] Fetch test failed:', error);
+        });
+    }
+  }, [uri]);
+
   return (
     <Image
       source={{ uri }}
       style={{ width: size, height: size, borderRadius: size / 2 }}
-      onError={(error) => console.error('[Avatar] Image load error:', error.nativeEvent)}
+      onError={(error) => {
+        console.error('[Avatar] Image load error for URI:', uri);
+        console.error('[Avatar] Image load error details:', error.nativeEvent);
+      }}
       onLoad={() => console.log('[Avatar] Image loaded successfully:', uri)}
     />
   );
