@@ -3,6 +3,7 @@ import React from 'react';
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { TouchableOpacity, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import FeedScreen from '../screens/FeedScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
@@ -26,11 +27,15 @@ function HeaderActions({ navigation }: { navigation: any }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
       <TouchableOpacity onPress={() => navigation.navigate('Search')} style={{ paddingHorizontal: 12 }}>
-        <Text style={{ fontSize: 24 }}>🔍</Text>
+        <Ionicons name="search-outline" size={24} color={palette.textPrimary} />
       </TouchableOpacity>
       <TouchableOpacity onPress={() => navigation.navigate('Notifications')} style={{ paddingHorizontal: 12 }}>
         <View style={{ position: 'relative', alignItems: 'center', justifyContent: 'center' }}>
-          <Text style={{ fontSize: 24 }}>🔔</Text>
+          <Ionicons
+            name={unreadCount > 0 ? 'notifications' : 'notifications-outline'}
+            size={24}
+            color={palette.textPrimary}
+          />
           {unreadCount > 0 && (
             <View
               style={{
@@ -52,7 +57,7 @@ function HeaderActions({ navigation }: { navigation: any }) {
         </View>
       </TouchableOpacity>
       <TouchableOpacity onPress={() => navigation.navigate('Profile')} style={{ paddingHorizontal: 12 }}>
-        <Text style={{ fontSize: 24 }}>👤</Text>
+        <Ionicons name="person-circle-outline" size={24} color={palette.textPrimary} />
       </TouchableOpacity>
     </View>
   );
