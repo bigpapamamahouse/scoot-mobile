@@ -237,7 +237,18 @@ export default function PostCard({
   );
 
   const postHandle = resolveHandle(localPost);
-  const displayHandle = postHandle ? `@${postHandle}` : `@${localPost.userId.slice(0, 8)}`;
+  const sanitizedHandle = React.useMemo(() => {
+    if (!postHandle) {
+      return undefined;
+    }
+    return postHandle.replace(/\s+/g, '');
+  }, [postHandle]);
+
+  const displayHandle = sanitizedHandle
+    ? `@${sanitizedHandle}`
+    : localPost.userId
+    ? `@${localPost.userId.slice(0, 8)}`
+    : '@member';
   const hasMoreComments = commentCount > previewComments.length;
 
   return (
@@ -256,7 +267,9 @@ export default function PostCard({
             activeOpacity={onPressAuthor ? 0.7 : 1}
           >
             <Avatar avatarKey={localPost.avatarKey} size={36} />
-            <Text style={styles.handle}>{displayHandle}</Text>
+            <Text style={styles.handle} numberOfLines={1} ellipsizeMode="tail">
+              {displayHandle}
+            </Text>
           </TouchableOpacity>
           <View style={styles.headerRight}>
             <Text style={styles.timestamp}>

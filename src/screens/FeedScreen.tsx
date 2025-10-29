@@ -75,12 +75,13 @@ export default function FeedScreen({ navigation }: any){
       return 'Welcome back';
     }
     if (currentUser.fullName) {
-      return `Hello, ${currentUser.fullName.split(' ')[0]} 👋`;
+      const firstName = currentUser.fullName.split(' ')[0];
+      return firstName ? `Hi, ${firstName}` : 'Hi there';
     }
     if (currentUser.handle) {
-      return `Hello, @${currentUser.handle}`;
+      return `Hi, @${currentUser.handle}`;
     }
-    return 'Hello there';
+    return 'Hi there';
   }, [currentUser]);
 
   return (
@@ -114,11 +115,9 @@ export default function FeedScreen({ navigation }: any){
         }
         ListHeaderComponent={
           <View style={styles.heroContainer}>
-            <GlassCard>
+            <GlassCard contentStyle={styles.heroContent}>
               <Text style={styles.heroGreeting}>{greeting}</Text>
-              <Text style={styles.heroSubtext}>
-                Share your latest ride, story, or inspiration with the community.
-              </Text>
+              <Text style={styles.heroSubtext}>What's on your mind?</Text>
               <TouchableOpacity
                 style={styles.heroButton}
                 onPress={() => navigation.navigate('ComposePost')}
@@ -173,18 +172,21 @@ const styles = StyleSheet.create({
   heroContainer: {
     marginBottom: 12,
   },
+  heroContent: {
+    padding: 18,
+  },
   heroGreeting: {
     color: palette.textPrimary,
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: '700',
-    marginBottom: 8,
+    marginBottom: 4,
     letterSpacing: 0.2,
   },
   heroSubtext: {
     color: palette.textSecondary,
-    fontSize: 15,
-    lineHeight: 20,
-    marginBottom: 18,
+    fontSize: 14,
+    lineHeight: 18,
+    marginBottom: 16,
   },
   heroButton: {
     borderRadius: 18,

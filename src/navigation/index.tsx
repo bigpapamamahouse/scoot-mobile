@@ -2,7 +2,7 @@
 import React from 'react';
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { TouchableOpacity, Text, View } from 'react-native';
+import { TouchableOpacity, Text, View, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import FeedScreen from '../screens/FeedScreen';
 import ProfileScreen from '../screens/ProfileScreen';
@@ -18,48 +18,60 @@ import { UserListScreen } from '../screens/UserListScreen';
 import { useNotifications } from '../lib/notifications';
 import PostScreen from '../screens/PostScreen';
 import { palette } from '../theme/colors';
+import { GlassCard } from '../components/ui/GlassCard';
 
 const Stack = createNativeStackNavigator();
 
+const HIT_SLOP = { top: 8, bottom: 8, left: 8, right: 8 } as const;
+
 function HeaderActions({ navigation }: { navigation: any }) {
   const { unreadCount } = useNotifications();
-  const notificationLabel = unreadCount > 9 ? '9+' : unreadCount.toString();
+  const safeUnreadCount = typeof unreadCount === 'number' ? unreadCount : 0;
+  const notificationLabel = safeUnreadCount > 9 ? '9+' : safeUnreadCount.toString();
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-      <TouchableOpacity onPress={() => navigation.navigate('Search')} style={{ paddingHorizontal: 12 }}>
-        <Ionicons name="search-outline" size={24} color={palette.textPrimary} />
+    <GlassCard style={styles.headerGlass} contentStyle={styles.headerGlassContent} accessibilityRole="toolbar">
+      <TouchableOpacity
+        onPress={() => navigation.navigate('Search')}
+        style={styles.headerIconButton}
+        hitSlop={HIT_SLOP}
+        activeOpacity={0.7}
+        accessibilityRole="button"
+        accessibilityLabel="Search"
+      >
+        <Ionicons name="search-outline" size={22} color={palette.textPrimary} />
       </TouchableOpacity>
-      <TouchableOpacity onPress={() => navigation.navigate('Notifications')} style={{ paddingHorizontal: 12 }}>
-        <View style={{ position: 'relative', alignItems: 'center', justifyContent: 'center' }}>
+      <TouchableOpacity
+        onPress={() => navigation.navigate('Notifications')}
+        style={styles.headerIconButton}
+        hitSlop={HIT_SLOP}
+        activeOpacity={0.7}
+        accessibilityRole="button"
+        accessibilityLabel="Notifications"
+      >
+        <View style={styles.notificationIconWrapper}>
           <Ionicons
-            name={unreadCount > 0 ? 'notifications' : 'notifications-outline'}
-            size={24}
+            name={safeUnreadCount > 0 ? 'notifications' : 'notifications-outline'}
+            size={22}
             color={palette.textPrimary}
           />
-          {unreadCount > 0 && (
-            <View
-              style={{
-                position: 'absolute',
-                top: -4,
-                right: -8,
-                minWidth: 18,
-                height: 18,
-                borderRadius: 9,
-                backgroundColor: '#e53935',
-                paddingHorizontal: 4,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <Text style={{ color: 'white', fontSize: 10, fontWeight: '700' }}>{notificationLabel}</Text>
+          {safeUnreadCount > 0 && (
+            <View style={styles.notificationBadge}>
+              <Text style={styles.notificationBadgeText}>{notificationLabel}</Text>
             </View>
           )}
         </View>
       </TouchableOpacity>
-      <TouchableOpacity onPress={() => navigation.navigate('Profile')} style={{ paddingHorizontal: 12 }}>
-        <Ionicons name="person-circle-outline" size={24} color={palette.textPrimary} />
+      <TouchableOpacity
+        onPress={() => navigation.navigate('Profile')}
+        style={styles.headerIconButton}
+        hitSlop={HIT_SLOP}
+        activeOpacity={0.7}
+        accessibilityRole="button"
+        accessibilityLabel="Profile"
+      >
+        <Ionicons name="person-circle-outline" size={22} color={palette.textPrimary} />
       </TouchableOpacity>
-    </View>
+    </GlassCard>
   );
 }
 
@@ -127,4 +139,47 @@ export default function RootNavigator(){
       </Stack.Navigator>
     </NavigationContainer>
   );
-}
+} 
+
+const styles = StyleSheet.create({
+  headerGlass: {
+    marginRight: 4,
+    borderRadius: 999,
+    minWidth: 132,
+  },
+  headerGlassContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    gap: 8,
+  },
+  headerIconButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  notificationIconWrapper: {
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  notificationBadge: {
+    position: 'absolute',
+    top: -6,
+    right: -10,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#e53935',
+    paddingHorizontal: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  notificationBadgeText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+});
