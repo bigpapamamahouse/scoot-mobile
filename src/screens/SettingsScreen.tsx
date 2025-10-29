@@ -23,6 +23,9 @@ type ViewerProfile = {
   fullName?: string | null;
   avatarKey?: string | null;
   inviteCode?: string | null;
+  handle?: string | null;
+  email?: string | null;
+  id?: string | null;
 };
 
 type LoadViewerOptions = {
@@ -95,17 +98,12 @@ export default function SettingsScreen({ navigation }: any) {
     }
     try {
       const data: ViewerProfile | null = await UsersAPI.me();
-      const normalizedFullName =
-        data && typeof data.fullName === 'string' ? data.fullName : '';
+      const normalizedFullName = typeof data?.fullName === 'string' ? data.fullName : '';
       const normalizedAvatarKey = data?.avatarKey ?? null;
-      const normalizedHandle =
-        data && typeof (data as any).handle === 'string' ? (data as any).handle : '';
-      const normalizedEmail =
-        data && typeof (data as any).email === 'string' ? (data as any).email : '';
+      const normalizedHandle = typeof data?.handle === 'string' ? data.handle : '';
+      const normalizedEmail = typeof data?.email === 'string' ? data.email : '';
       const normalizedId =
-        data && typeof (data as any).id === 'string' && (data as any).id.trim().length
-          ? (data as any).id.trim()
-          : null;
+        typeof data?.id === 'string' && data.id.trim().length ? data.id.trim() : null;
       let normalizedInviteCode =
         data && typeof data.inviteCode === 'string' && data.inviteCode.trim().length
           ? data.inviteCode.trim()

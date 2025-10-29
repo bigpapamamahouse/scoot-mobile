@@ -215,6 +215,33 @@ const ensureFullName = (value: Record<string, unknown>): void => {
   }
 };
 
+const ensureHandle = (value: Record<string, unknown>): void => {
+  if (trimString(value.handle)) {
+    return;
+  }
+  const candidates = [
+    trimString(value.username),
+    trimString((value as any)?.userHandle),
+    trimString((value as any)?.user_handle),
+    trimString((value as any)?.userName),
+    trimString((value as any)?.profileHandle),
+    trimString((value as any)?.profile_handle),
+    trimString((value as any)?.profileName),
+    trimString((value.user as any)?.handle),
+    trimString((value.user as any)?.username),
+    trimString((value.user as any)?.userName),
+    trimString((value.profile as any)?.handle),
+    trimString((value.profile as any)?.username),
+    trimString((value.profile as any)?.userName),
+    trimString((value.account as any)?.handle),
+    trimString((value.account as any)?.username),
+    trimString((value.account as any)?.userName),
+  ].filter(Boolean);
+  if (candidates.length > 0) {
+    value.handle = candidates[0] as string;
+  }
+};
+
 const collectAvatarCandidates = (source: unknown): string[] => {
   if (!isRecord(source)) {
     return [];
@@ -292,6 +319,7 @@ export async function me(){
   ensureId(normalized);
   ensureCreatedAt(normalized);
   ensureFullName(normalized);
+  ensureHandle(normalized);
 
   const inviteCode = findInviteCode(result);
   if (inviteCode) {
