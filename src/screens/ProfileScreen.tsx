@@ -413,11 +413,16 @@ export default function ProfileScreen({ navigation, route }: any) {
         console.log('[Profile] targetIdentity:', targetIdentity);
         setUser(finalUserToSet);
 
-        // Load follower/following counts
+        // Load follower/following counts and follow status
         const finalIdentity = resolvedIdentity ?? targetIdentity;
         const userHandle = finalIdentity?.handle?.replace(/^@/, '').trim();
         if (userHandle) {
           try {
+            // Fetch fresh user profile data to get follow status
+            console.log('[Profile] Fetching user profile for follow status:', userHandle);
+            const profileData = await UsersAPI.getUser(userHandle);
+            console.log('[Profile] Profile data:', profileData);
+
             const followersData = await UsersAPI.listFollowers(userHandle);
             const followers = Array.isArray(followersData) ? followersData :
               (followersData?.items || followersData?.followers || []);
@@ -428,11 +433,40 @@ export default function ProfileScreen({ navigation, route }: any) {
               (followingData?.items || followingData?.following || []);
             setFollowingCount(following.length);
 
-            // Check if current user is following this profile
+            // Check follow status from profile data
             const viewerId = viewer?.id?.trim() || null;
             if (!isSelfRequest && viewerId) {
-              const isUserFollowing = followers.some((f: any) => f.id === viewerId);
-              setFollowStatus(isUserFollowing ? 'following' : 'none');
+              // Use followStatus and isFollowPending from API if available
+              if (profileData && typeof profileData === 'object') {
+                if ('isFollowPending' in profileData && profileData.isFollowPending === true) {
+                  console.log('[Profile] Follow status: pending (from API)');
+                  setFollowStatus('pending');
+                } else if ('followStatus' in profileData) {
+                  const status = profileData.followStatus;
+                  if (status === 'pending' || status === 'requested') {
+                    console.log('[Profile] Follow status: pending (from followStatus)');
+                    setFollowStatus('pending');
+                  } else if (status === 'following' || status === 'accepted') {
+                    console.log('[Profile] Follow status: following (from followStatus)');
+                    setFollowStatus('following');
+                  } else {
+                    console.log('[Profile] Follow status: none (from followStatus)');
+                    setFollowStatus('none');
+                  }
+                } else if ('isFollowing' in profileData && profileData.isFollowing === true) {
+                  console.log('[Profile] Follow status: following (from isFollowing)');
+                  setFollowStatus('following');
+                } else {
+                  // Fallback: check if in followers list
+                  const isUserFollowing = followers.some((f: any) => f.id === viewerId);
+                  console.log('[Profile] Follow status: fallback check -', isUserFollowing ? 'following' : 'none');
+                  setFollowStatus(isUserFollowing ? 'following' : 'none');
+                }
+              } else {
+                // Fallback: check if in followers list
+                const isUserFollowing = followers.some((f: any) => f.id === viewerId);
+                setFollowStatus(isUserFollowing ? 'following' : 'none');
+              }
             }
           } catch (err) {
             console.warn('Failed to load follower/following counts:', err);
