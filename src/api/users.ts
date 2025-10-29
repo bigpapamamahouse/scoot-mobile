@@ -11,7 +11,10 @@ export async function updateMe(payload: { fullName?: string | null }){
 }
 
 export async function getUser(handle: string){
-  return api(`/u/${encodeURIComponent(handle)}`);
+  console.log('[API] getUser called with handle:', handle);
+  const result = await api(`/u/${encodeURIComponent(handle)}`);
+  console.log('[API] getUser response:', result);
+  return result;
 }
 
 export interface UserIdentityOptions {
