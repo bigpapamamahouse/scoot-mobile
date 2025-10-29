@@ -279,16 +279,27 @@ export default function SettingsScreen({ navigation }: any) {
 
       if (hasNameChange || hasHandleChange || hasEmailChange || hasAvatarChange) {
         const payload: {
-          fullName: string | null;
-          handle: string | null;
-          email: string | null;
-          avatarKey: string | null;
-        } = {
-          fullName: normalizedName ?? normalizedInitialName ?? null,
-          handle: normalizedHandle ?? normalizedInitialHandle ?? null,
-          email: normalizedEmail ?? normalizedInitialEmail ?? null,
-          avatarKey: (avatarKey ?? initialAvatarKey) ?? null,
-        };
+          fullName?: string | null;
+          handle?: string | null;
+          email?: string | null;
+          avatarKey?: string | null;
+        } = {};
+
+        if (hasNameChange || normalizedInitialName !== null) {
+          payload.fullName = normalizedName ?? normalizedInitialName ?? null;
+        }
+
+        if (hasHandleChange || normalizedInitialHandle !== null || normalizedHandle !== null) {
+          payload.handle = normalizedHandle ?? normalizedInitialHandle ?? null;
+        }
+
+        if (hasEmailChange || normalizedInitialEmail !== null) {
+          payload.email = normalizedEmail ?? normalizedInitialEmail ?? null;
+        }
+
+        if (hasAvatarChange || (initialAvatarKey ?? null) !== null || (avatarKey ?? null) !== null) {
+          payload.avatarKey = (avatarKey ?? initialAvatarKey) ?? null;
+        }
 
         console.log('[SettingsScreen] Saving profile via PATCH /me:', payload);
         await UsersAPI.updateMe(payload);
