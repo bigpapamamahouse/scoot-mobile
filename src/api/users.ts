@@ -311,7 +311,14 @@ export async function updateMe(payload: { fullName?: string | null; avatarKey?: 
     }
   }
 
-  if ('avatarKey' in payload) {
+  // Don't include avatarKey in PATCH /me - use updateAvatar() instead
+  if ('avatarKey' in payload && !('fullName' in payload)) {
+    // If only updating avatar, use the dedicated endpoint
+    console.warn('[updateMe] avatarKey should be updated via updateAvatar() instead');
+  }
+
+  if ('avatarKey' in payload && 'fullName' in payload) {
+    // Legacy support: If updating both, include avatar in PATCH /me
     const details = resolveAvatarDetails(payload.avatarKey);
     const keyValue =
       details.key !== undefined
@@ -387,6 +394,15 @@ export async function updateMe(payload: { fullName?: string | null; avatarKey?: 
   }
 
   return api('/me', { method: 'PATCH', body: JSON.stringify(body) });
+}
+
+export async function updateAvatar(avatarKey: string | null) {
+  console.log('[API] updateAvatar called with key:', avatarKey);
+  const body: Record<string, unknown> = {
+    key: avatarKey ?? null,
+  };
+
+  return api('/me/avatar', { method: 'POST', body: JSON.stringify(body) });
 }
 
 export async function getUser(handle: string){

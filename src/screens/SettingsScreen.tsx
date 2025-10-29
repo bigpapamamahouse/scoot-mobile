@@ -111,12 +111,14 @@ export default function SettingsScreen({ navigation }: any) {
         normalizedInviteCode = await ensureInviteCode(normalizedId);
       }
 
+      console.log('[SettingsScreen loadViewer] Setting state - avatarKey:', normalizedAvatarKey);
       setFullName(normalizedFullName);
       setInitialFullName(normalizedFullName);
       setAvatarKey(normalizedAvatarKey);
       setInitialAvatarKey(normalizedAvatarKey);
       setInviteCode(normalizedInviteCode);
       setAvatarPreviewUri(null);
+      console.log('[SettingsScreen loadViewer] Avatar preview URI cleared');
 
       if (normalizedInviteCode && normalizedId) {
         await writeStoredInviteCode(normalizedId, normalizedInviteCode);
@@ -146,12 +148,15 @@ export default function SettingsScreen({ navigation }: any) {
     async (uri: string) => {
       setUploading(true);
       try {
+        console.log('[SettingsScreen] Starting avatar upload...');
         const key = await uploadMedia({ uri, intent: 'avatar-image' });
+        console.log('[SettingsScreen] Upload complete, key:', key);
         setAvatarKey(key);
         const remotePreview = mediaUrlFromKey(key);
+        console.log('[SettingsScreen] Remote preview URL:', remotePreview);
         setAvatarPreviewUri(remotePreview ?? uri);
       } catch (error: any) {
-        console.error('Failed to upload avatar:', error);
+        console.error('[SettingsScreen] Failed to upload avatar:', error);
         Alert.alert('Error', error?.message || 'Failed to upload profile photo.');
         setAvatarPreviewUri(null);
       } finally {
@@ -232,26 +237,31 @@ export default function SettingsScreen({ navigation }: any) {
   const handleSave = async () => {
     const trimmedName = fullName.trim();
     const normalizedName = trimmedName.length ? trimmedName : '';
-    const payload: { fullName?: string | null; avatarKey?: string | null } = {};
 
-    if (normalizedName !== initialFullName.trim()) {
-      payload.fullName = trimmedName.length ? trimmedName : null;
-    }
+    const hasNameChange = normalizedName !== initialFullName.trim();
+    const hasAvatarChange = (avatarKey ?? null) !== (initialAvatarKey ?? null);
 
-    if ((avatarKey ?? null) !== (initialAvatarKey ?? null)) {
-      payload.avatarKey = avatarKey ?? null;
-    }
-
-    if (!Object.keys(payload).length) {
+    if (!hasNameChange && !hasAvatarChange) {
       Alert.alert('No changes', 'Update your profile before saving.');
       return;
     }
 
     setSaving(true);
     try {
-      await UsersAPI.updateMe(payload);
+      // Update avatar using dedicated endpoint if changed
+      if (hasAvatarChange) {
+        await UsersAPI.updateAvatar(avatarKey ?? null);
+      }
+
+      // Update name using PATCH /me if changed
+      if (hasNameChange) {
+        await UsersAPI.updateMe({ fullName: trimmedName.length ? trimmedName : null });
+      }
+
       await loadViewer({ silent: true });
-      Alert.alert('Profile updated', 'Your changes have been saved.');
+
+      // Navigate back to profile after successful save
+      navigation.goBack();
     } catch (error: any) {
       console.error('Failed to save profile:', error);
       Alert.alert('Error', error?.message || 'Failed to update your profile.');

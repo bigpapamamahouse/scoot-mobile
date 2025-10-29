@@ -214,6 +214,7 @@ export default function ProfileScreen({ navigation, route }: any) {
 
   const load = React.useCallback(
     async (options?: { skipSpinner?: boolean }) => {
+      console.log('[ProfileScreen] load() called, skipSpinner:', options?.skipSpinner);
       if (!options?.skipSpinner) {
         setLoading(true);
       }
@@ -256,9 +257,10 @@ export default function ProfileScreen({ navigation, route }: any) {
         let currentUser: User | null = null;
         try {
           currentUser = await UsersAPI.me();
-          console.log('[Profile] currentUser from me():', currentUser);
-          console.log('[Profile] currentUser?.id:', currentUser?.id);
-          console.log('[Profile] currentUser?.userId:', (currentUser as any)?.userId);
+          console.log('[ProfileScreen] currentUser from me():', currentUser);
+          console.log('[ProfileScreen] currentUser avatarKey:', currentUser?.avatarKey);
+          console.log('[ProfileScreen] currentUser?.id:', currentUser?.id);
+          console.log('[ProfileScreen] currentUser?.userId:', (currentUser as any)?.userId);
         } catch (viewerError: any) {
           console.warn(
             'Failed to load signed-in user profile:',
@@ -421,9 +423,10 @@ export default function ProfileScreen({ navigation, route }: any) {
         }
 
         const finalUserToSet = resolvedIdentity ?? targetIdentity ?? null;
-        console.log('[Profile] Setting user state:', finalUserToSet);
-        console.log('[Profile] resolvedIdentity:', resolvedIdentity);
-        console.log('[Profile] targetIdentity:', targetIdentity);
+        console.log('[ProfileScreen] Setting user state:', finalUserToSet);
+        console.log('[ProfileScreen] User avatarKey being set:', finalUserToSet?.avatarKey);
+        console.log('[ProfileScreen] resolvedIdentity:', resolvedIdentity);
+        console.log('[ProfileScreen] targetIdentity:', targetIdentity);
         setUser(finalUserToSet);
 
         // Load follower/following counts and follow status
@@ -769,12 +772,6 @@ export default function ProfileScreen({ navigation, route }: any) {
                 <Text style={styles.statLabel}>Following</Text>
               </TouchableOpacity>
             </View>
-
-            {isViewingSelf && (
-              <TouchableOpacity style={styles.editButton} onPress={openSettings}>
-                <Text style={styles.editButtonText}>Open Settings</Text>
-              </TouchableOpacity>
-            )}
 
             {!isViewingSelf && (
               <TouchableOpacity
