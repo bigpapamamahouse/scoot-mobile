@@ -55,13 +55,19 @@ function extractUserFromPayload(payload: unknown, visited = new Set<unknown>()):
   }
 
   if (isUserLike(payload)) {
-    const record = payload as Record<string, unknown>;
+    const record = payload as unknown as Record<string, unknown>;
     // Normalize userId -> id
-    const user = { ...record } as User;
-    if (!user.id && record.userId) {
-      user.id = record.userId as string;
+    const normalized: Partial<User> = { ...(record as Partial<User>) };
+    if (!normalized.id && typeof record.userId === 'string') {
+      normalized.id = record.userId;
     }
-    return user;
+    if (!normalized.createdAt && typeof record.createdAt === 'string') {
+      normalized.createdAt = record.createdAt;
+    }
+    if (normalized.id && normalized.createdAt) {
+      return normalized as User;
+    }
+    return null;
   }
 
   if (Array.isArray(payload)) {
