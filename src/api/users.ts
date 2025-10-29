@@ -399,7 +399,7 @@ export async function updateMe(payload: { fullName?: string | null; avatarKey?: 
 export async function updateAvatar(avatarKey: string | null) {
   console.log('[API] updateAvatar called with key:', avatarKey);
   const body: Record<string, unknown> = {
-    avatarKey: avatarKey ?? null,
+    key: avatarKey ?? null,
   };
 
   return api('/me/avatar', { method: 'POST', body: JSON.stringify(body) });
