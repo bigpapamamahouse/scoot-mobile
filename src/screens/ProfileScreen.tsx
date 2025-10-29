@@ -272,7 +272,16 @@ export default function ProfileScreen({ navigation, route }: any) {
 
         const viewerHandle =
           currentUser?.handle?.replace(/^@/, '').trim().toLowerCase() || null;
-        const viewerId = currentUser?.id?.trim() || null;
+        const viewerId = (() => {
+          const rawId = currentUser?.id ?? (currentUser as any)?.userId;
+          if (typeof rawId === 'string') {
+            const trimmed = rawId.trim();
+            if (trimmed.length > 0) {
+              return trimmed;
+            }
+          }
+          return null;
+        })();
         console.log('[Profile] viewerId after me():', viewerId);
 
         const isSelfRequest = (() => {
@@ -440,7 +449,7 @@ export default function ProfileScreen({ navigation, route }: any) {
             // Check follow status from profile data
             // Use viewerId from earlier in the function (it's in the same scope)
             console.log('[Profile] Checking follow status - isSelfRequest:', isSelfRequest, 'viewerId:', viewerId);
-            if (!isSelfRequest && viewerId) {
+            if (!isSelfRequest) {
               console.log('[Profile] Entered follow status check block');
               // Use followStatus and isFollowPending from API if available
               if (profileData && typeof profileData === 'object') {
@@ -465,15 +474,19 @@ export default function ProfileScreen({ navigation, route }: any) {
                   console.log('[Profile] Follow status: following (from isFollowing)');
                   setFollowStatus('following');
                 } else {
-                  // Fallback: check if in followers list
-                  const isUserFollowing = followers.some((f: any) => f.id === viewerId);
+                  // Fallback: check if in followers list (requires viewerId)
+                  const isUserFollowing = viewerId
+                    ? followers.some((f: any) => f.id === viewerId)
+                    : false;
                   console.log('[Profile] Follow status: fallback check -', isUserFollowing ? 'following' : 'none');
                   setFollowStatus(isUserFollowing ? 'following' : 'none');
                 }
               } else {
                 console.log('[Profile] profileData is not a valid object');
-                // Fallback: check if in followers list
-                const isUserFollowing = followers.some((f: any) => f.id === viewerId);
+                // Fallback: check if in followers list (requires viewerId)
+                const isUserFollowing = viewerId
+                  ? followers.some((f: any) => f.id === viewerId)
+                  : false;
                 setFollowStatus(isUserFollowing ? 'following' : 'none');
               }
             } else {
