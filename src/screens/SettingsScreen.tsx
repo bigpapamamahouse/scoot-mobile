@@ -256,23 +256,19 @@ export default function SettingsScreen({ navigation }: any) {
 
     setSaving(true);
     try {
-      // Always use PATCH /me and include all fields to prevent data loss
-      // The POST /me/avatar endpoint has a backend bug that wipes other fields
+      // ONLY send fields that actually changed
+      // Don't try to "preserve" other fields - let backend keep what it has
       const payload: any = {};
 
-      // Always include fullName to preserve it
-      payload.fullName = trimmedName.length ? trimmedName : null;
+      if (hasNameChange) {
+        payload.fullName = trimmedName.length ? trimmedName : null;
+      }
 
-      // Always include avatar (even if unchanged) to preserve it
-      if (hasAvatarChange || avatarKey) {
+      if (hasAvatarChange) {
         payload.avatarKey = avatarKey;
       }
 
-      // Preserve handle and email
-      if (handle) payload.handle = handle;
-      if (email) payload.email = email;
-
-      console.log('[SettingsScreen] Saving all user data via PATCH /me:', payload);
+      console.log('[SettingsScreen] Saving changes via PATCH /me:', payload);
       await UsersAPI.updateMe(payload);
 
       await loadViewer({ silent: true });

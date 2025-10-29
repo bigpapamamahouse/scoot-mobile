@@ -170,25 +170,32 @@ async function performDescriptorUpload(
       type,
     } as any);
 
+    console.log('[Upload] Uploading via form-data to:', descriptor.uploadUrl);
     const uploadResponse = await fetch(descriptor.uploadUrl, {
       method: descriptor.method || 'POST',
       body: formData,
     });
 
+    console.log('[Upload] Form-data upload response status:', uploadResponse.status);
     if (!uploadResponse.ok) {
       const text = await uploadResponse.text().catch(() => '');
+      console.error('[Upload] Form-data upload failed:', text);
       throw new Error(
         text ? `Storage upload failed: ${text}` : `Storage upload failed: HTTP ${uploadResponse.status}`
       );
     }
+    console.log('[Upload] Form-data upload succeeded');
 
     finalKey = finalKey || descriptor.fields?.key;
   } else {
+    console.log('[Upload] Reading file from URI:', uri);
     const fileResponse = await fetch(uri);
     if (!fileResponse.ok) {
       throw new Error('Failed to read image data for upload');
     }
     const blob = await fileResponse.blob();
+    console.log('[Upload] File blob size:', blob.size);
+
     const uploadHeaders: Record<string, string> = {
       ...(descriptor.headers || {}),
     };
@@ -197,24 +204,30 @@ async function performDescriptorUpload(
       uploadHeaders['Content-Type'] = type;
     }
 
+    console.log('[Upload] Uploading via PUT to:', descriptor.uploadUrl);
+    console.log('[Upload] Upload headers:', uploadHeaders);
     const uploadResponse = await fetch(descriptor.uploadUrl, {
       method: descriptor.method || 'PUT',
       headers: uploadHeaders,
       body: blob,
     });
 
+    console.log('[Upload] PUT upload response status:', uploadResponse.status);
     if (!uploadResponse.ok) {
       const text = await uploadResponse.text().catch(() => '');
+      console.error('[Upload] PUT upload failed:', text);
       throw new Error(
         text ? `Storage upload failed: ${text}` : `Storage upload failed: HTTP ${uploadResponse.status}`
       );
     }
+    console.log('[Upload] PUT upload succeeded');
   }
 
   if (!finalKey) {
     throw new Error('Upload failed: storage key missing from descriptor response');
   }
 
+  console.log('[Upload] Final key:', finalKey);
   return finalKey;
 }
 
