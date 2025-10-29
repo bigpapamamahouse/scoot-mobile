@@ -157,7 +157,7 @@ export default function SettingsScreen({ navigation }: any) {
       setUploading(true);
       try {
         console.log('[SettingsScreen] Starting avatar upload...');
-        const key = await uploadMedia({ uri, intent: 'avatar-image' });
+        const key = await uploadMedia({ uri, intent: 'avatar' });
         console.log('[SettingsScreen] Upload complete, key:', key);
         setAvatarKey(key);
         const remotePreview = mediaUrlFromKey(key);
