@@ -4,6 +4,7 @@ import { View, Text, FlatList, RefreshControl, TouchableOpacity, StyleSheet } fr
 import { PostsAPI } from '../api';
 import PostCard from '../components/PostCard';
 import { Post } from '../types';
+import { resolveHandle } from '../lib/resolveHandle';
 
 export default function FeedScreen({ navigation }: any){
   const [items, setItems] = React.useState<Post[]>([]);
@@ -12,13 +13,7 @@ export default function FeedScreen({ navigation }: any){
   const openProfile = React.useCallback(
     (post: Post) => {
       const anyPost: any = post;
-      const handleCandidate: unknown =
-        anyPost?.handle ||
-        anyPost?.user?.handle ||
-        anyPost?.author?.handle ||
-        anyPost?.username ||
-        anyPost?.user?.username ||
-        anyPost?.profile?.handle;
+      const handle = resolveHandle(anyPost);
       const userIdCandidate: unknown =
         anyPost?.userId ||
         anyPost?.user?.id ||
@@ -27,10 +22,6 @@ export default function FeedScreen({ navigation }: any){
         anyPost?.createdById ||
         anyPost?.profileId;
 
-      const handle =
-        typeof handleCandidate === 'string' && handleCandidate.trim()
-          ? handleCandidate.trim()
-          : undefined;
       const userId =
         typeof userIdCandidate === 'string' && userIdCandidate.trim()
           ? userIdCandidate.trim()
@@ -70,7 +61,11 @@ export default function FeedScreen({ navigation }: any){
         data={items}
         keyExtractor={(it)=>it.id}
         renderItem={({ item }) => (
-          <PostCard post={item} onPressAuthor={() => openProfile(item)} />
+          <PostCard
+            post={item}
+            onPress={() => navigation.navigate('Post', { post: item })}
+            onPressAuthor={() => openProfile(item)}
+          />
         )}
         ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>{ setRefreshing(true); load().finally(()=>setRefreshing(false)); }} />}

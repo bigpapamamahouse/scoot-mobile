@@ -15,6 +15,7 @@ import ComposePostScreen from '../screens/ComposePostScreen';
 import { SearchScreen } from '../screens/SearchScreen';
 import { UserListScreen } from '../screens/UserListScreen';
 import { useNotifications } from '../lib/notifications';
+import PostScreen from '../screens/PostScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -71,6 +72,11 @@ export default function RootNavigator(){
             title: 'Feed',
             headerRight: () => <HeaderActions navigation={navigation} />,
           })}
+        />
+        <Stack.Screen
+          name="Post"
+          component={PostScreen}
+          options={{ title: 'Post' }}
         />
         <Stack.Screen name="ComposePost" component={ComposePostScreen} options={{ headerShown: false, presentation: 'modal' }} />
         <Stack.Screen name="Search" component={SearchScreen as any} options={{ title: 'Search Users' }} />
