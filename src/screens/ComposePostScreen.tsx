@@ -11,10 +11,13 @@ import {
   ActivityIndicator,
   Image,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { PostsAPI } from '../api';
 import { uploadMedia } from '../lib/upload';
+import { ModernScreen } from '../components/ui/ModernScreen';
+import { GlassCard } from '../components/ui/GlassCard';
+import { LinearGradient } from 'expo-linear-gradient';
+import { palette } from '../theme/colors';
 
 export default function ComposePostScreen({ navigation }: any) {
   const [text, setText] = React.useState('');
@@ -112,128 +115,166 @@ export default function ComposePostScreen({ navigation }: any) {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['bottom']}>
+    <ModernScreen edges={['top', 'left', 'right', 'bottom']} style={styles.screen}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
       >
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()}>
-            <Text style={styles.cancelButton}>Cancel</Text>
-          </TouchableOpacity>
-          <Text style={styles.title}>New Post</Text>
-          <TouchableOpacity
-            onPress={handlePost}
-            disabled={loading || uploading || (!text.trim() && !imageKey)}
-            style={[
-              styles.postButton,
-              (loading || uploading || (!text.trim() && !imageKey)) && styles.postButtonDisabled,
-            ]}
-          >
-            {loading ? (
-              <ActivityIndicator color="white" />
-            ) : (
-              <Text style={styles.postButtonText}>Post</Text>
-            )}
-          </TouchableOpacity>
-        </View>
+        <GlassCard style={styles.sheet} contentStyle={styles.sheetContent}>
+          <View style={styles.inner}>
+            <View style={styles.header}>
+              <TouchableOpacity onPress={() => navigation.goBack()}>
+                <Text style={styles.cancelButton}>Cancel</Text>
+              </TouchableOpacity>
+              <Text style={styles.title}>New Post</Text>
+              <TouchableOpacity
+                onPress={handlePost}
+                disabled={loading || uploading || (!text.trim() && !imageKey)}
+                style={[
+                  styles.postButton,
+                  (loading || uploading || (!text.trim() && !imageKey)) && styles.postButtonDisabled,
+                ]}
+                activeOpacity={0.85}
+              >
+                <LinearGradient
+                  colors={[palette.accent, palette.accentSecondary]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={StyleSheet.absoluteFill}
+                />
+                {loading ? (
+                  <ActivityIndicator color={palette.textPrimary} />
+                ) : (
+                  <Text style={styles.postButtonText}>Post</Text>
+                )}
+              </TouchableOpacity>
+            </View>
 
-        <TextInput
-          style={styles.textInput}
-          placeholder="What's on your mind?"
-          value={text}
-          onChangeText={setText}
-          multiline
-          maxLength={500}
-        />
+            <View style={styles.body}>
+              <TextInput
+                style={styles.textInput}
+                placeholder="Share something with everyone..."
+                placeholderTextColor={palette.textMuted}
+                value={text}
+                onChangeText={setText}
+                multiline
+                maxLength={500}
+              />
 
-        {imageUri && (
-          <View style={styles.imageContainer}>
-            <Image source={{ uri: imageUri }} style={styles.imagePreview} />
-            {uploading && (
-              <View style={styles.uploadingOverlay}>
-                <ActivityIndicator size="large" color="white" />
-                <Text style={styles.uploadingText}>Uploading...</Text>
-              </View>
-            )}
-            <TouchableOpacity style={styles.removeImageButton} onPress={removeImage}>
-              <Text style={styles.removeImageText}>✕</Text>
-            </TouchableOpacity>
+              {imageUri && (
+                <View style={styles.imageContainer}>
+                  <Image source={{ uri: imageUri }} style={styles.imagePreview} />
+                  {uploading && (
+                    <View style={styles.uploadingOverlay}>
+                      <ActivityIndicator size="large" color={palette.textPrimary} />
+                      <Text style={styles.uploadingText}>Uploading...</Text>
+                    </View>
+                  )}
+                  <TouchableOpacity style={styles.removeImageButton} onPress={removeImage}>
+                    <Text style={styles.removeImageText}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+
+            <View style={styles.footer}>
+              <TouchableOpacity
+                style={styles.addPhotoButton}
+                onPress={showImageOptions}
+                disabled={uploading}
+                activeOpacity={0.85}
+              >
+                <LinearGradient
+                  colors={['rgba(148,163,184,0.4)', 'rgba(129,140,248,0.4)']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={StyleSheet.absoluteFill}
+                />
+                <View style={styles.addPhotoContent}>
+                  <Text style={styles.addPhotoIcon}>📷</Text>
+                  <Text style={styles.addPhotoText}>Add Photo</Text>
+                </View>
+              </TouchableOpacity>
+              <Text style={styles.charCount}>{text.length}/500</Text>
+            </View>
           </View>
-        )}
-
-        <View style={styles.footer}>
-          <TouchableOpacity
-            style={styles.addPhotoButton}
-            onPress={showImageOptions}
-            disabled={uploading}
-          >
-            <Text style={styles.addPhotoIcon}>📷</Text>
-            <Text style={styles.addPhotoText}>Add Photo</Text>
-          </TouchableOpacity>
-          <Text style={styles.charCount}>
-            {text.length}/500
-          </Text>
-        </View>
+        </GlassCard>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </ModernScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: 'white',
+  screen: {
+    paddingHorizontal: 20,
+    paddingVertical: 24,
   },
   keyboardView: {
     flex: 1,
+    justifyContent: 'flex-start',
+  },
+  sheet: {
+    width: '100%',
+    flexGrow: 1,
+  },
+  sheetContent: {
+    padding: 24,
+  },
+  inner: {
+    gap: 24,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
   },
   cancelButton: {
     fontSize: 16,
-    color: '#666',
+    color: palette.textSecondary,
   },
   title: {
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 20,
+    fontWeight: '700',
+    color: palette.textPrimary,
   },
   postButton: {
-    backgroundColor: '#2196f3',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
     borderRadius: 20,
-    minWidth: 60,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    minWidth: 96,
     alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
   },
   postButtonDisabled: {
-    backgroundColor: '#ccc',
+    opacity: 0.4,
   },
   postButtonText: {
-    color: 'white',
+    color: palette.textPrimary,
     fontWeight: '600',
-    fontSize: 15,
+    fontSize: 16,
+  },
+  body: {
+    gap: 16,
   },
   textInput: {
-    padding: 16,
+    padding: 18,
     fontSize: 16,
     textAlignVertical: 'top',
-    minHeight: 120,
+    minHeight: 140,
+    borderRadius: 22,
+    backgroundColor: 'rgba(15,23,42,0.55)',
+    color: palette.textPrimary,
+    lineHeight: 22,
   },
   imageContainer: {
-    margin: 16,
+    borderRadius: 22,
+    overflow: 'hidden',
     position: 'relative',
   },
   imagePreview: {
     width: '100%',
-    height: 200,
-    borderRadius: 12,
+    height: 220,
   },
   uploadingOverlay: {
     position: 'absolute',
@@ -241,55 +282,57 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(15,23,42,0.6)',
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 12,
   },
   uploadingText: {
-    color: 'white',
+    color: palette.textPrimary,
     marginTop: 8,
     fontSize: 14,
   },
   removeImageButton: {
     position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    top: 12,
+    right: 12,
+    backgroundColor: 'rgba(15,23,42,0.75)',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
   },
   removeImageText: {
-    color: 'white',
+    color: palette.textPrimary,
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   footer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
   },
   addPhotoButton: {
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  addPhotoContent: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
   },
   addPhotoIcon: {
-    fontSize: 24,
+    fontSize: 20,
   },
   addPhotoText: {
-    color: '#2196f3',
-    fontSize: 16,
-    fontWeight: '500',
+    color: palette.textPrimary,
+    fontSize: 15,
+    fontWeight: '600',
   },
   charCount: {
-    color: '#999',
+    color: palette.textMuted,
     fontSize: 13,
   },
 });

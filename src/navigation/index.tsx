@@ -1,8 +1,9 @@
 
 import React from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { TouchableOpacity, Text, View } from 'react-native';
+import { TouchableOpacity, Text, View, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import FeedScreen from '../screens/FeedScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
@@ -16,51 +17,96 @@ import { SearchScreen } from '../screens/SearchScreen';
 import { UserListScreen } from '../screens/UserListScreen';
 import { useNotifications } from '../lib/notifications';
 import PostScreen from '../screens/PostScreen';
+import { palette } from '../theme/colors';
+import { GlassCard } from '../components/ui/GlassCard';
 
 const Stack = createNativeStackNavigator();
 
+const HIT_SLOP = { top: 8, bottom: 8, left: 8, right: 8 } as const;
+
 function HeaderActions({ navigation }: { navigation: any }) {
   const { unreadCount } = useNotifications();
-  const notificationLabel = unreadCount > 9 ? '9+' : unreadCount.toString();
+  const safeUnreadCount = typeof unreadCount === 'number' ? unreadCount : 0;
+  const notificationLabel = safeUnreadCount > 9 ? '9+' : safeUnreadCount.toString();
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-      <TouchableOpacity onPress={() => navigation.navigate('Search')} style={{ paddingHorizontal: 12 }}>
-        <Text style={{ fontSize: 24 }}>🔍</Text>
+    <GlassCard style={styles.headerGlass} contentStyle={styles.headerGlassContent} accessibilityRole="toolbar">
+      <TouchableOpacity
+        onPress={() => navigation.navigate('Search')}
+        style={styles.headerIconButton}
+        hitSlop={HIT_SLOP}
+        activeOpacity={0.7}
+        accessibilityRole="button"
+        accessibilityLabel="Search"
+      >
+        <Ionicons name="search-outline" size={22} color={palette.textPrimary} />
       </TouchableOpacity>
-      <TouchableOpacity onPress={() => navigation.navigate('Notifications')} style={{ paddingHorizontal: 12 }}>
-        <View style={{ position: 'relative', alignItems: 'center', justifyContent: 'center' }}>
-          <Text style={{ fontSize: 24 }}>🔔</Text>
-          {unreadCount > 0 && (
-            <View
-              style={{
-                position: 'absolute',
-                top: -4,
-                right: -8,
-                minWidth: 18,
-                height: 18,
-                borderRadius: 9,
-                backgroundColor: '#e53935',
-                paddingHorizontal: 4,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <Text style={{ color: 'white', fontSize: 10, fontWeight: '700' }}>{notificationLabel}</Text>
+      <TouchableOpacity
+        onPress={() => navigation.navigate('Notifications')}
+        style={styles.headerIconButton}
+        hitSlop={HIT_SLOP}
+        activeOpacity={0.7}
+        accessibilityRole="button"
+        accessibilityLabel="Notifications"
+      >
+        <View style={styles.notificationIconWrapper}>
+          <Ionicons
+            name={safeUnreadCount > 0 ? 'notifications' : 'notifications-outline'}
+            size={22}
+            color={palette.textPrimary}
+          />
+          {safeUnreadCount > 0 && (
+            <View style={styles.notificationBadge}>
+              <Text style={styles.notificationBadgeText}>{notificationLabel}</Text>
             </View>
           )}
         </View>
       </TouchableOpacity>
-      <TouchableOpacity onPress={() => navigation.navigate('Profile')} style={{ paddingHorizontal: 12 }}>
-        <Text style={{ fontSize: 24 }}>👤</Text>
+      <TouchableOpacity
+        onPress={() => navigation.navigate('Profile')}
+        style={styles.headerIconButton}
+        hitSlop={HIT_SLOP}
+        activeOpacity={0.7}
+        accessibilityRole="button"
+        accessibilityLabel="Profile"
+      >
+        <Ionicons name="person-circle-outline" size={22} color={palette.textPrimary} />
       </TouchableOpacity>
-    </View>
+    </GlassCard>
   );
 }
 
+const navigationTheme = {
+  ...DefaultTheme,
+  colors: {
+    ...DefaultTheme.colors,
+    background: 'transparent',
+    card: 'rgba(15,23,42,0.85)',
+    text: palette.textPrimary,
+    border: 'rgba(148,163,184,0.35)',
+    primary: palette.accent,
+  },
+};
+
 export default function RootNavigator(){
   return (
-    <NavigationContainer>
-      <Stack.Navigator>
+    <NavigationContainer theme={navigationTheme}>
+      <Stack.Navigator
+        screenOptions={{
+          headerStyle: {
+            backgroundColor: 'rgba(15,23,42,0.85)',
+          },
+          headerTitleStyle: {
+            color: palette.textPrimary,
+            fontWeight: '700',
+            letterSpacing: 0.5,
+          },
+          headerTintColor: palette.textPrimary,
+          headerShadowVisible: false,
+          contentStyle: {
+            backgroundColor: 'transparent',
+          },
+        }}
+      >
         <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
         <Stack.Screen name="Signup" component={SignupScreen} options={{ title: 'Sign up' }} />
         <Stack.Screen name="ConfirmCode" component={ConfirmCodeScreen} options={{ title: 'Confirm' }} />
@@ -93,4 +139,47 @@ export default function RootNavigator(){
       </Stack.Navigator>
     </NavigationContainer>
   );
-}
+} 
+
+const styles = StyleSheet.create({
+  headerGlass: {
+    marginRight: 4,
+    borderRadius: 999,
+    minWidth: 132,
+  },
+  headerGlassContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    gap: 8,
+  },
+  headerIconButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  notificationIconWrapper: {
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  notificationBadge: {
+    position: 'absolute',
+    top: -6,
+    right: -10,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#e53935',
+    paddingHorizontal: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  notificationBadgeText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+});

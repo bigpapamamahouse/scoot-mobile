@@ -7,12 +7,14 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  SafeAreaView,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { searchUsers } from '../api/users';
 import { Avatar } from '../components/Avatar';
 import type { User } from '../types';
+import { ModernScreen } from '../components/ui/ModernScreen';
+import { GlassCard } from '../components/ui/GlassCard';
+import { palette } from '../theme/colors';
 
 type RootStackParamList = {
   Search: undefined;
@@ -65,14 +67,19 @@ export function SearchScreen({ navigation }: Props) {
 
   const renderUserItem = useCallback(({ item }: { item: User }) => (
     <TouchableOpacity
-      style={styles.userItem}
+      style={styles.userTouchable}
       onPress={() => handleUserPress(item)}
+      activeOpacity={0.85}
     >
-      <Avatar avatarKey={item.avatarKey} size={48} />
-      <View style={styles.userInfo}>
-        <Text style={styles.userName}>{item.fullName || 'Unknown'}</Text>
-        <Text style={styles.userHandle}>@{item.handle || 'unknown'}</Text>
-      </View>
+      <GlassCard style={styles.userCard} contentStyle={styles.userCardContent}>
+        <View style={styles.userRow}>
+          <Avatar avatarKey={item.avatarKey} size={52} />
+          <View style={styles.userInfo}>
+            <Text style={styles.userName}>{item.fullName || 'Unknown rider'}</Text>
+            <Text style={styles.userHandle}>@{item.handle || 'unknown'}</Text>
+          </View>
+        </View>
+      </GlassCard>
     </TouchableOpacity>
   ), [handleUserPress]);
 
@@ -113,23 +120,25 @@ export function SearchScreen({ navigation }: Props) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <ModernScreen edges={['top', 'left', 'right', 'bottom']} style={styles.screen}>
       <View style={styles.searchContainer}>
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search users..."
-          placeholderTextColor="#999"
-          value={query}
-          onChangeText={setQuery}
-          autoFocus
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
+        <GlassCard style={styles.searchCard} contentStyle={styles.searchCardContent}>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search riders by name or handle"
+            placeholderTextColor={palette.textMuted}
+            value={query}
+            onChangeText={setQuery}
+            autoFocus
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+        </GlassCard>
       </View>
 
       {loading && (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#2196f3" />
+          <ActivityIndicator size="large" color={palette.accent} />
         </View>
       )}
 
@@ -139,66 +148,80 @@ export function SearchScreen({ navigation }: Props) {
         keyExtractor={(item) => item.id || item.handle || Math.random().toString()}
         contentContainerStyle={styles.listContainer}
         ListEmptyComponent={renderEmptyState}
+        showsVerticalScrollIndicator={false}
       />
-    </SafeAreaView>
+    </ModernScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
+  screen: {
+    paddingHorizontal: 20,
+    paddingVertical: 24,
   },
   searchContainer: {
-    padding: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    marginBottom: 16,
+  },
+  searchCard: {
+    width: '100%',
+  },
+  searchCardContent: {
+    paddingVertical: 6,
+    paddingHorizontal: 18,
   },
   searchInput: {
     height: 44,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 8,
-    paddingHorizontal: 16,
     fontSize: 16,
+    color: palette.textPrimary,
   },
   loadingContainer: {
-    padding: 20,
+    paddingVertical: 12,
     alignItems: 'center',
   },
   listContainer: {
     flexGrow: 1,
+    paddingBottom: 100,
+    gap: 16,
   },
-  userItem: {
+  userTouchable: {
+    width: '100%',
+  },
+  userCard: {
+    width: '100%',
+  },
+  userCardContent: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+  userRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    gap: 16,
   },
   userInfo: {
-    marginLeft: 12,
     flex: 1,
   },
   userName: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#000',
+    fontWeight: '700',
+    color: palette.textPrimary,
     marginBottom: 2,
   },
   userHandle: {
     fontSize: 14,
-    color: '#666',
+    color: palette.textSecondary,
   },
   emptyContainer: {
-    flex: 1,
+    flexGrow: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 40,
-    paddingHorizontal: 20,
+    paddingVertical: 60,
+    paddingHorizontal: 30,
   },
   emptyText: {
-    fontSize: 16,
-    color: '#999',
+    fontSize: 15,
+    color: palette.textSecondary,
     textAlign: 'center',
+    lineHeight: 22,
   },
 });
