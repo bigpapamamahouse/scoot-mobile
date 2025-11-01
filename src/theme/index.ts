@@ -3,10 +3,11 @@
  * Centralized theme for consistent styling across the app
  */
 
-export { colors } from './colors';
+export { colors, lightColors, darkColors } from './colors';
 export { typography } from './typography';
 export { spacing, borderRadius, iconSizes } from './spacing';
 export { shadows, glassEffect } from './shadows';
+export { ThemeProvider, useTheme } from './ThemeContext';
 
 // Re-export types
 export type { ColorPalette } from './colors';

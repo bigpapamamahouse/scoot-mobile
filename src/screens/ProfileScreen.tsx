@@ -14,6 +14,7 @@ import { UsersAPI, PostsAPI } from '../api';
 import { User, Post } from '../types';
 import PostCard from '../components/PostCard';
 import { Avatar } from '../components/Avatar';
+import { Button } from '../components/ui';
 import { colors, spacing, typography, borderRadius, shadows } from '../theme';
 
 type ProfileIdentity = {
@@ -580,9 +581,12 @@ export default function ProfileScreen({ navigation, route }: any) {
       return undefined;
     }
     return () => (
-      <TouchableOpacity onPress={openSettings} style={styles.headerSettingsButton}>
-        <Text style={styles.headerSettingsButtonText}>Settings</Text>
-      </TouchableOpacity>
+      <Button
+        title="Settings"
+        onPress={openSettings}
+        variant="outline"
+        size="sm"
+      />
     );
   }, [isViewingSelf, openSettings]);
 

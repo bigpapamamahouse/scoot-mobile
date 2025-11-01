@@ -9,6 +9,7 @@ import {
   TextInput,
   ScrollView,
   Image,
+  Switch,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
@@ -18,6 +19,7 @@ import { Avatar } from '../components/Avatar';
 import { uploadMedia } from '../lib/upload';
 import { mediaUrlFromKey } from '../lib/media';
 import { readStoredInviteCode, writeStoredInviteCode } from '../lib/storage';
+import { useTheme } from '../theme';
 
 type ViewerProfile = {
   fullName?: string | null;
@@ -30,6 +32,7 @@ type LoadViewerOptions = {
 };
 
 export default function SettingsScreen({ navigation }: any) {
+  const { mode, toggleTheme, colors } = useTheme();
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
   const [uploading, setUploading] = React.useState(false);
@@ -272,8 +275,8 @@ export default function SettingsScreen({ navigation }: any) {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#2196f3" />
+      <View style={[styles.loadingContainer, { backgroundColor: colors.background.primary }]}>
+        <ActivityIndicator size="large" color={colors.primary[500]} />
       </View>
     );
   }
@@ -281,12 +284,12 @@ export default function SettingsScreen({ navigation }: any) {
   const inviteCodeLabel = inviteCode || 'Unavailable';
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background.secondary }]} edges={['bottom']}>
       <ScrollView contentContainerStyle={styles.container}>
-        <Text style={styles.title}>Settings</Text>
+        <Text style={[styles.title, { color: colors.text.primary }]}>Settings</Text>
 
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Profile photo</Text>
+          <Text style={[styles.sectionLabel, { color: colors.text.primary }]}>Profile photo</Text>
           <View style={styles.avatarRow}>
             <View style={styles.avatarWrapper}>
               {avatarPreviewUri ? (
@@ -324,25 +327,43 @@ export default function SettingsScreen({ navigation }: any) {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Full name</Text>
+          <Text style={[styles.sectionLabel, { color: colors.text.primary }]}>Full name</Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, { backgroundColor: colors.background.elevated, color: colors.text.primary, borderColor: colors.border.main }]}
             value={fullName}
             onChangeText={setFullName}
             placeholder="Enter your full name"
+            placeholderTextColor={colors.text.tertiary}
             autoCapitalize="words"
             editable={!saving && !uploading}
           />
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Invite code</Text>
-          <View style={styles.inviteCodeBox}>
-            <Text selectable style={styles.inviteCodeText}>
+          <Text style={[styles.sectionLabel, { color: colors.text.primary }]}>Invite code</Text>
+          <View style={[styles.inviteCodeBox, { backgroundColor: colors.background.elevated, borderColor: colors.border.main }]}>
+            <Text selectable style={[styles.inviteCodeText, { color: colors.text.primary }]}>
               {inviteCodeLabel}
             </Text>
           </View>
-          <Text style={styles.inviteHint}>Share this code with friends to invite them.</Text>
+          <Text style={[styles.inviteHint, { color: colors.text.secondary }]}>Share this code with friends to invite them.</Text>
+        </View>
+
+        <View style={styles.section}>
+          <View style={styles.settingRow}>
+            <View>
+              <Text style={[styles.sectionLabel, { color: colors.text.primary }]}>Dark mode</Text>
+              <Text style={[styles.settingDescription, { color: colors.text.secondary }]}>
+                {mode === 'dark' ? 'Dark mode is on' : 'Light mode is on'}
+              </Text>
+            </View>
+            <Switch
+              value={mode === 'dark'}
+              onValueChange={toggleTheme}
+              trackColor={{ false: '#E0E0E0', true: colors.primary[500] }}
+              thumbColor={'#FFFFFF'}
+            />
+          </View>
         </View>
 
         <TouchableOpacity
@@ -386,6 +407,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 12,
+  },
+  settingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  settingDescription: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 4,
   },
   avatarRow: {
     flexDirection: 'row',

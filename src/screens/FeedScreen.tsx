@@ -96,8 +96,9 @@ export default function FeedScreen({ navigation }: any){
       <IconButton
         icon="add"
         onPress={() => navigation.navigate('ComposePost')}
-        variant="solid"
+        variant="glass"
         size="lg"
+        color={colors.primary[600]}
         style={styles.fab}
       />
     </View>
