@@ -14,15 +14,19 @@ import { useFocusEffect } from '@react-navigation/native';
 import { NotificationsAPI } from '../api';
 import { Notification } from '../types';
 import { isFollowRequestNotification, useNotifications } from '../lib/notifications';
+import { useTheme, spacing, borderRadius, shadows } from '../theme';
 
 type NotificationListItem = Notification & { handledAction?: 'accept' | 'decline' };
 
 export default function NotificationsScreen(){
+  const { colors } = useTheme();
   const { markAllRead, recordSeen, refresh } = useNotifications();
   const [items, setItems] = React.useState<NotificationListItem[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [refreshing, setRefreshing] = React.useState(false);
   const [actionLoading, setActionLoading] = React.useState<string | null>(null);
+
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
 
   const load = React.useCallback(async (opts?: { refreshing?: boolean }) => {
     if (opts?.refreshing) {
@@ -198,62 +202,59 @@ export default function NotificationsScreen(){
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: colors.background.secondary,
   },
   listContent: {
-    padding: 12,
+    padding: spacing[3],
     flexGrow: 1,
   },
   card: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 2,
+    backgroundColor: colors.background.elevated,
+    borderRadius: borderRadius.lg,
+    padding: spacing[4],
+    ...shadows.base,
   },
   cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 6,
+    marginBottom: spacing[2],
   },
   sender: {
     fontWeight: '700',
     fontSize: 16,
+    color: colors.text.primary,
   },
   message: {
     fontSize: 14,
-    color: '#333',
+    color: colors.text.primary,
   },
   timestamp: {
-    marginTop: 12,
+    marginTop: spacing[3],
     fontSize: 12,
-    color: '#777',
+    color: colors.text.secondary,
   },
   actionsRow: {
     flexDirection: 'row',
-    marginTop: 12,
+    marginTop: spacing[3],
   },
   actionButton: {
     paddingHorizontal: 18,
     paddingVertical: 8,
     borderRadius: 24,
-    marginRight: 12,
+    marginRight: spacing[3],
   },
   acceptButton: {
-    backgroundColor: '#43a047',
+    backgroundColor: colors.success.main,
   },
   declineButton: {
-    backgroundColor: '#e53935',
+    backgroundColor: colors.error.main,
   },
   actionLabel: {
-    color: '#fff',
+    color: colors.text.inverse,
     fontWeight: '700',
     fontSize: 14,
   },
@@ -261,32 +262,32 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingTop: 40,
+    paddingTop: spacing[10],
   },
   emptyText: {
-    color: '#666',
+    color: colors.text.secondary,
     fontSize: 14,
   },
   requestBadge: {
-    backgroundColor: '#ffb300',
-    borderRadius: 10,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
+    backgroundColor: colors.warning.main,
+    borderRadius: borderRadius.base,
+    paddingHorizontal: spacing[2],
+    paddingVertical: spacing[1],
   },
   requestBadgeText: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#6a4f00',
+    color: colors.warning.dark,
   },
   followStatus: {
-    marginTop: 12,
-    color: '#2e7d32',
+    marginTop: spacing[3],
+    color: colors.success.dark,
     fontWeight: '600',
   },
   followStatusDeclined: {
-    color: '#c62828',
+    color: colors.error.dark,
   },
   separator: {
-    height: 12,
+    height: spacing[3],
   },
 });

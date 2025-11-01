@@ -4,9 +4,9 @@
  */
 
 import React from 'react';
-import { TouchableOpacity, StyleSheet, ViewStyle } from 'react-native';
+import { TouchableOpacity, StyleSheet, ViewStyle, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, borderRadius, shadows } from '../../theme';
+import { useTheme, spacing, borderRadius, shadows } from '../../theme';
 
 export type IconButtonVariant = 'solid' | 'ghost' | 'glass';
 export type IconButtonSize = 'sm' | 'md' | 'lg';
@@ -34,6 +34,7 @@ export const IconButton: React.FC<IconButtonProps> = ({
   badge,
   style,
 }) => {
+  const { colors } = useTheme();
   const getSize = () => {
     switch (size) {
       case 'sm':
@@ -93,11 +94,13 @@ export const IconButton: React.FC<IconButtonProps> = ({
       disabled={disabled}
       activeOpacity={0.7}
     >
-      <Ionicons name={icon} size={sizes.icon} color={getIconColor()} />
+      <View style={{ marginTop: -1 }}>
+        <Ionicons name={icon} size={sizes.icon} color={getIconColor()} />
+      </View>
       {badge !== undefined && badge > 0 && (
-        <TouchableOpacity style={styles.badge}>
+        <View style={[styles.badge, { backgroundColor: colors.error.main }]}>
           <Ionicons name="ellipse" size={8} color={colors.error.main} />
-        </TouchableOpacity>
+        </View>
       )}
     </TouchableOpacity>
   );
@@ -108,7 +111,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 8,
     right: 8,
-    backgroundColor: colors.error.main,
     borderRadius: borderRadius.full,
     width: 8,
     height: 8,

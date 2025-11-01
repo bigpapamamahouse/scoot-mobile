@@ -69,8 +69,22 @@ function HeaderActions({ navigation }: { navigation: any }) {
 }
 
 export default function RootNavigator(){
+  const { colors, effectiveMode } = useTheme();
+
+  const navigationTheme = {
+    dark: effectiveMode === 'dark',
+    colors: {
+      primary: colors.primary[500],
+      background: colors.background.primary,
+      card: colors.background.elevated,
+      text: colors.text.primary,
+      border: colors.border.light,
+      notification: colors.error.main,
+    },
+  };
+
   return (
-    <NavigationContainer>
+    <NavigationContainer theme={navigationTheme}>
       <Stack.Navigator>
         <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
         <Stack.Screen name="Signup" component={SignupScreen} options={{ title: 'Sign up' }} />
