@@ -58,76 +58,76 @@ export const typography = {
     h1: {
       fontSize: 32,
       fontWeight: '700' as const,
-      lineHeight: 1.2,
+      lineHeight: 38,
       letterSpacing: -0.4,
     },
     h2: {
       fontSize: 28,
       fontWeight: '700' as const,
-      lineHeight: 1.2,
+      lineHeight: 34,
       letterSpacing: -0.2,
     },
     h3: {
       fontSize: 24,
       fontWeight: '600' as const,
-      lineHeight: 1.3,
+      lineHeight: 31,
     },
     h4: {
       fontSize: 20,
       fontWeight: '600' as const,
-      lineHeight: 1.4,
+      lineHeight: 28,
     },
     h5: {
       fontSize: 18,
       fontWeight: '600' as const,
-      lineHeight: 1.4,
+      lineHeight: 25,
     },
     h6: {
       fontSize: 16,
       fontWeight: '600' as const,
-      lineHeight: 1.5,
+      lineHeight: 24,
     },
 
     // Body text
     body: {
       fontSize: 16,
       fontWeight: '400' as const,
-      lineHeight: 1.5,
+      lineHeight: 24,
     },
     bodyLarge: {
       fontSize: 18,
       fontWeight: '400' as const,
-      lineHeight: 1.5,
+      lineHeight: 27,
     },
     bodySmall: {
       fontSize: 14,
       fontWeight: '400' as const,
-      lineHeight: 1.5,
+      lineHeight: 21,
     },
 
     // Labels and captions
     label: {
       fontSize: 14,
       fontWeight: '500' as const,
-      lineHeight: 1.4,
+      lineHeight: 20,
     },
     caption: {
       fontSize: 12,
       fontWeight: '400' as const,
-      lineHeight: 1.4,
+      lineHeight: 17,
     },
 
     // Buttons
     button: {
       fontSize: 16,
       fontWeight: '600' as const,
-      lineHeight: 1,
+      lineHeight: 16,
       letterSpacing: 0.2,
     },
     buttonSmall: {
       fontSize: 14,
       fontWeight: '600' as const,
-      lineHeight: 1,
+      lineHeight: 14,
       letterSpacing: 0.2,
     },
 
@@ -135,7 +135,7 @@ export const typography = {
     link: {
       fontSize: 16,
       fontWeight: '500' as const,
-      lineHeight: 1.5,
+      lineHeight: 24,
       textDecorationLine: 'underline' as const,
     },
   },
