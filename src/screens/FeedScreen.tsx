@@ -1,10 +1,12 @@
 
 import React from 'react';
-import { View, Text, FlatList, RefreshControl, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, FlatList, RefreshControl, StyleSheet } from 'react-native';
 import { PostsAPI } from '../api';
 import PostCard from '../components/PostCard';
 import { Post } from '../types';
 import { resolveHandle } from '../lib/resolveHandle';
+import { IconButton } from '../components/ui';
+import { colors, spacing, shadows } from '../theme';
 
 export default function FeedScreen({ navigation }: any){
   const [items, setItems] = React.useState<Post[]>([]);
@@ -65,9 +67,9 @@ export default function FeedScreen({ navigation }: any){
   }, [navigation, load]);
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={styles.container}>
       <FlatList
-        style={{ padding: 12 }}
+        style={styles.list}
         data={items}
         keyExtractor={(it)=>it.id}
         renderItem={({ item }) => (
@@ -79,42 +81,47 @@ export default function FeedScreen({ navigation }: any){
             onPostDeleted={handlePostDeleted}
           />
         )}
-        ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>{ setRefreshing(true); load().finally(()=>setRefreshing(false)); }} />}
-        ListEmptyComponent={<Text style={{ textAlign: 'center', color: '#666', marginTop: 40 }}>No posts yet.</Text>}
+        ItemSeparatorComponent={() => <View style={{ height: spacing[3] }} />}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={()=>{ setRefreshing(true); load().finally(()=>setRefreshing(false)); }}
+            tintColor={colors.primary[500]}
+          />
+        }
+        ListEmptyComponent={<Text style={styles.emptyText}>No posts yet.</Text>}
       />
 
-      {/* Floating Action Button */}
-      <TouchableOpacity
-        style={styles.fab}
+      {/* Floating Action Button with glass morphism */}
+      <IconButton
+        icon="add"
         onPress={() => navigation.navigate('ComposePost')}
-      >
-        <Text style={styles.fabIcon}>+</Text>
-      </TouchableOpacity>
+        variant="solid"
+        size="lg"
+        style={styles.fab}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.background.secondary,
+  },
+  list: {
+    padding: spacing[3],
+  },
+  emptyText: {
+    textAlign: 'center',
+    color: colors.text.secondary,
+    marginTop: spacing[10],
+    fontSize: 16,
+  },
   fab: {
     position: 'absolute',
-    right: 20,
-    bottom: 20,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#2196f3',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  fabIcon: {
-    fontSize: 32,
-    color: 'white',
-    fontWeight: '300',
+    right: spacing[5],
+    bottom: spacing[5],
+    ...shadows.lg,
   },
 });

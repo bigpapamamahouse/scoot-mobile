@@ -1,11 +1,14 @@
 import React from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Post, Reaction, Comment } from '../types';
 import { mediaUrlFromKey } from '../lib/media';
 import { Avatar } from './Avatar';
 import { CommentsAPI, ReactionsAPI, PostsAPI } from '../api';
 import { resolveHandle } from '../lib/resolveHandle';
 import { useCurrentUser, isOwner } from '../hooks/useCurrentUser';
+import { IconButton, Badge } from './ui';
+import { colors, spacing, typography, borderRadius, shadows } from '../theme';
 
 export default function PostCard({
   post,
@@ -260,9 +263,13 @@ export default function PostCard({
             {new Date(localPost.createdAt).toLocaleString()}
           </Text>
           {userOwnsPost && (
-            <TouchableOpacity onPress={handleOptionsPress} style={styles.optionsButton}>
-              <Text style={styles.optionsIcon}>⋯</Text>
-            </TouchableOpacity>
+            <IconButton
+              icon="ellipsis-horizontal"
+              onPress={handleOptionsPress}
+              variant="ghost"
+              size="sm"
+              color={colors.text.secondary}
+            />
           )}
         </View>
       </View>
@@ -305,19 +312,39 @@ export default function PostCard({
 
       {/* Quick Reactions */}
       <View style={styles.quickReactions}>
-        {['❤️', '👍', '😂', '🎉'].map((emoji) => (
-          <TouchableOpacity
-            key={emoji}
-            onPress={() => handleReaction(emoji)}
-            style={styles.quickReactionButton}
-          >
-            <Text style={styles.quickReactionEmoji}>{emoji}</Text>
-          </TouchableOpacity>
-        ))}
+        <IconButton
+          icon="heart-outline"
+          onPress={() => handleReaction('❤️')}
+          variant="ghost"
+          size="sm"
+          color={colors.social.like}
+        />
+        <IconButton
+          icon="thumbs-up-outline"
+          onPress={() => handleReaction('👍')}
+          variant="ghost"
+          size="sm"
+          color={colors.primary[500]}
+        />
+        <IconButton
+          icon="happy-outline"
+          onPress={() => handleReaction('😂')}
+          variant="ghost"
+          size="sm"
+          color={colors.social.laugh}
+        />
+        <IconButton
+          icon="sparkles-outline"
+          onPress={() => handleReaction('🎉')}
+          variant="ghost"
+          size="sm"
+          color={colors.social.celebrate}
+        />
 
         {commentCount > 0 && (
           <View style={styles.commentBadge}>
-            <Text style={styles.commentCount}>💬 {commentCount}</Text>
+            <Ionicons name="chatbubble-outline" size={16} color={colors.text.secondary} />
+            <Text style={styles.commentCount}>{commentCount}</Text>
           </View>
         )}
       </View>
@@ -336,52 +363,48 @@ export default function PostCard({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    backgroundColor: colors.background.elevated,
+    borderRadius: borderRadius.lg,
+    padding: spacing[3],
+    ...shadows.base,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: spacing[2],
     justifyContent: 'space-between',
   },
   headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: spacing[1],
   },
   author: {
     flexDirection: 'row',
     alignItems: 'center',
     flexShrink: 1,
-    marginRight: 12,
+    marginRight: spacing[3],
   },
   handle: {
-    fontWeight: '600',
-    fontSize: 15,
-    marginLeft: 8,
+    ...typography.styles.label,
+    marginLeft: spacing[2],
     flexShrink: 1,
+    color: colors.text.primary,
   },
   timestamp: {
-    color: '#888',
-    fontSize: 12,
+    ...typography.styles.caption,
+    color: colors.text.secondary,
   },
   text: {
-    fontSize: 15,
-    lineHeight: 20,
-    marginBottom: 8,
+    ...typography.styles.body,
+    marginBottom: spacing[2],
+    color: colors.text.primary,
   },
   image: {
     width: '100%',
-    borderRadius: 8,
-    marginBottom: 8,
-    backgroundColor: '#f2f2f2',
+    borderRadius: borderRadius.base,
+    marginBottom: spacing[2],
+    backgroundColor: colors.neutral[100],
   },
   imageFallback: {
     aspectRatio: 1,
@@ -389,82 +412,74 @@ const styles = StyleSheet.create({
   reactions: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 6,
-    marginBottom: 8,
+    gap: spacing[2],
+    marginBottom: spacing[2],
   },
   reactionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f0f0f0',
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    gap: 4,
+    backgroundColor: colors.neutral[100],
+    borderRadius: borderRadius.base,
+    paddingHorizontal: spacing[2],
+    paddingVertical: spacing[1],
+    gap: spacing[1],
   },
   reactionButtonActive: {
-    backgroundColor: '#e3f2fd',
+    backgroundColor: colors.primary[50],
     borderWidth: 1,
-    borderColor: '#2196f3',
+    borderColor: colors.primary[500],
   },
   reactionEmoji: {
-    fontSize: 14,
+    fontSize: typography.fontSize.sm,
   },
   reactionCount: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#333',
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.text.primary,
   },
   commentPreviewContainer: {
-    marginTop: 8,
+    marginTop: spacing[2],
     borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
-    paddingTop: 8,
-    gap: 6,
+    borderTopColor: colors.border.light,
+    paddingTop: spacing[2],
+    gap: spacing[2],
   },
   commentPreviewRow: {
     flexDirection: 'row',
-    gap: 6,
+    gap: spacing[2],
   },
   commentPreviewHandle: {
-    fontWeight: '600',
-    color: '#333',
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.text.primary,
+    fontSize: typography.fontSize.sm,
   },
   commentPreviewText: {
     flex: 1,
-    color: '#444',
+    color: colors.text.secondary,
+    fontSize: typography.fontSize.sm,
   },
   viewMoreComments: {
-    color: '#1d4ed8',
-    fontWeight: '500',
+    color: colors.primary[700],
+    fontWeight: typography.fontWeight.medium,
+    fontSize: typography.fontSize.sm,
   },
   quickReactions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    paddingTop: 8,
+    gap: spacing[1],
+    paddingTop: spacing[2],
     borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
-  },
-  quickReactionButton: {
-    padding: 4,
-  },
-  quickReactionEmoji: {
-    fontSize: 18,
+    borderTopColor: colors.border.light,
   },
   commentBadge: {
     marginLeft: 'auto',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[1],
   },
   commentCount: {
-    fontSize: 13,
-    color: '#666',
-  },
-  optionsButton: {
-    padding: 4,
-    marginLeft: 4,
-  },
-  optionsIcon: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#666',
+    fontSize: typography.fontSize.sm,
+    color: colors.text.secondary,
+    fontWeight: typography.fontWeight.medium,
   },
 });
