@@ -32,7 +32,7 @@ type LoadViewerOptions = {
 };
 
 export default function SettingsScreen({ navigation }: any) {
-  const { mode, toggleTheme, colors } = useTheme();
+  const { mode, setTheme, colors } = useTheme();
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
   const [uploading, setUploading] = React.useState(false);
@@ -350,20 +350,37 @@ export default function SettingsScreen({ navigation }: any) {
         </View>
 
         <View style={styles.section}>
-          <View style={styles.settingRow}>
-            <View>
-              <Text style={[styles.sectionLabel, { color: colors.text.primary }]}>Dark mode</Text>
-              <Text style={[styles.settingDescription, { color: colors.text.secondary }]}>
-                {mode === 'dark' ? 'Dark mode is on' : 'Light mode is on'}
-              </Text>
-            </View>
-            <Switch
-              value={mode === 'dark'}
-              onValueChange={toggleTheme}
-              trackColor={{ false: '#E0E0E0', true: colors.primary[500] }}
-              thumbColor={'#FFFFFF'}
-            />
-          </View>
+          <Text style={[styles.sectionLabel, { color: colors.text.primary }]}>Appearance</Text>
+
+          <TouchableOpacity
+            style={[styles.themeOption, mode === 'light' && styles.themeOptionActive, { backgroundColor: colors.background.elevated, borderColor: mode === 'light' ? colors.primary[500] : colors.border.main }]}
+            onPress={() => setTheme('light')}
+          >
+            <Text style={[styles.themeOptionText, { color: colors.text.primary }]}>Light</Text>
+            {mode === 'light' && (
+              <Text style={[styles.themeCheck, { color: colors.primary[500] }]}>✓</Text>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.themeOption, mode === 'dark' && styles.themeOptionActive, { backgroundColor: colors.background.elevated, borderColor: mode === 'dark' ? colors.primary[500] : colors.border.main }]}
+            onPress={() => setTheme('dark')}
+          >
+            <Text style={[styles.themeOptionText, { color: colors.text.primary }]}>Dark</Text>
+            {mode === 'dark' && (
+              <Text style={[styles.themeCheck, { color: colors.primary[500] }]}>✓</Text>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.themeOption, mode === 'system' && styles.themeOptionActive, { backgroundColor: colors.background.elevated, borderColor: mode === 'system' ? colors.primary[500] : colors.border.main }]}
+            onPress={() => setTheme('system')}
+          >
+            <Text style={[styles.themeOptionText, { color: colors.text.primary }]}>Match system setting</Text>
+            {mode === 'system' && (
+              <Text style={[styles.themeCheck, { color: colors.primary[500] }]}>✓</Text>
+            )}
+          </TouchableOpacity>
         </View>
 
         <TouchableOpacity
@@ -417,6 +434,26 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     marginTop: 4,
+  },
+  themeOption: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 2,
+    marginBottom: 12,
+  },
+  themeOptionActive: {
+    borderWidth: 2,
+  },
+  themeOptionText: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  themeCheck: {
+    fontSize: 20,
+    fontWeight: '700',
   },
   avatarRow: {
     flexDirection: 'row',

@@ -17,11 +17,12 @@ import { UserListScreen } from '../screens/UserListScreen';
 import { useNotifications } from '../lib/notifications';
 import PostScreen from '../screens/PostScreen';
 import { IconButton, Badge } from '../components/ui';
-import { colors, spacing } from '../theme';
+import { useTheme, spacing } from '../theme';
 
 const Stack = createNativeStackNavigator();
 
 function HeaderActions({ navigation }: { navigation: any }) {
+  const { colors } = useTheme();
   const { unreadCount } = useNotifications();
 
   return (

@@ -3,14 +3,16 @@
  */
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { useColorScheme } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { lightColors, darkColors, ColorPalette } from './colors';
 
-type ThemeMode = 'light' | 'dark';
+type ThemeMode = 'light' | 'dark' | 'system';
 
 interface ThemeContextType {
   mode: ThemeMode;
   colors: ColorPalette;
+  effectiveMode: 'light' | 'dark';
   toggleTheme: () => void;
   setTheme: (mode: ThemeMode) => void;
 }
@@ -20,8 +22,15 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 const THEME_STORAGE_KEY = '@app_theme_mode';
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [mode, setMode] = useState<ThemeMode>('light');
+  const systemColorScheme = useColorScheme();
+  const [mode, setMode] = useState<ThemeMode>('system');
   const [isLoading, setIsLoading] = useState(true);
+
+  // Determine effective mode based on setting
+  const effectiveMode: 'light' | 'dark' =
+    mode === 'system'
+      ? (systemColorScheme === 'dark' ? 'dark' : 'light')
+      : mode;
 
   // Load theme preference from storage on mount
   useEffect(() => {
@@ -31,7 +40,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const loadThemePreference = async () => {
     try {
       const savedTheme = await AsyncStorage.getItem(THEME_STORAGE_KEY);
-      if (savedTheme === 'dark' || savedTheme === 'light') {
+      if (savedTheme === 'dark' || savedTheme === 'light' || savedTheme === 'system') {
         setMode(savedTheme);
       }
     } catch (error) {
@@ -55,15 +64,17 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   };
 
   const toggleTheme = () => {
-    const newMode = mode === 'light' ? 'dark' : 'light';
+    // Toggle between light, dark, and system
+    const newMode = mode === 'light' ? 'dark' : mode === 'dark' ? 'system' : 'light';
     setTheme(newMode);
   };
 
-  const colors = mode === 'dark' ? darkColors : lightColors;
+  const colors = effectiveMode === 'dark' ? darkColors : lightColors;
 
   const value: ThemeContextType = {
     mode,
     colors,
+    effectiveMode,
     toggleTheme,
     setTheme,
   };

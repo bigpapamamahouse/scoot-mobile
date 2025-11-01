@@ -15,7 +15,7 @@ import { User, Post } from '../types';
 import PostCard from '../components/PostCard';
 import { Avatar } from '../components/Avatar';
 import { Button } from '../components/ui';
-import { colors, spacing, typography, borderRadius, shadows } from '../theme';
+import { useTheme, spacing, typography, borderRadius, shadows } from '../theme';
 
 type ProfileIdentity = {
   id?: string | null;
@@ -27,6 +27,7 @@ type ProfileIdentity = {
 };
 
 export default function ProfileScreen({ navigation, route }: any) {
+  const { colors } = useTheme();
   const [user, setUser] = React.useState<ProfileIdentity | null>(null);
   const [posts, setPosts] = React.useState<Post[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -746,10 +747,12 @@ export default function ProfileScreen({ navigation, route }: any) {
     }
   }, [navigation, user?.handle]);
 
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#2196f3" />
+        <ActivityIndicator size="large" color={colors.primary[500]} />
       </View>
     );
   }
@@ -847,7 +850,7 @@ export default function ProfileScreen({ navigation, route }: any) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background.secondary,

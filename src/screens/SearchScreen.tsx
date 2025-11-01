@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -13,7 +13,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { searchUsers } from '../api/users';
 import { Avatar } from '../components/Avatar';
 import type { User } from '../types';
-import { colors, spacing, typography, borderRadius } from '../theme';
+import { useTheme, spacing, typography, borderRadius } from '../theme';
 
 type RootStackParamList = {
   Search: undefined;
@@ -23,10 +23,13 @@ type RootStackParamList = {
 type Props = NativeStackScreenProps<RootStackParamList, 'Search'>;
 
 export function SearchScreen({ navigation }: Props) {
+  const { colors } = useTheme();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
 
   // Debounced search effect
   useEffect(() => {
@@ -145,7 +148,7 @@ export function SearchScreen({ navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background.elevated,

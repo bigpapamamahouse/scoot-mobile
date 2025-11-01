@@ -6,9 +6,10 @@ import PostCard from '../components/PostCard';
 import { Post } from '../types';
 import { resolveHandle } from '../lib/resolveHandle';
 import { IconButton } from '../components/ui';
-import { colors, spacing, shadows } from '../theme';
+import { useTheme, spacing, shadows } from '../theme';
 
 export default function FeedScreen({ navigation }: any){
+  const { colors } = useTheme();
   const [items, setItems] = React.useState<Post[]>([]);
   const [refreshing, setRefreshing] = React.useState(false);
 
@@ -67,9 +68,9 @@ export default function FeedScreen({ navigation }: any){
   }, [navigation, load]);
 
   return (
-    <View style={styles.container}>
+    <View style={{ flex: 1, backgroundColor: colors.background.secondary }}>
       <FlatList
-        style={styles.list}
+        style={{ padding: spacing[3] }}
         data={items}
         keyExtractor={(it)=>it.id}
         renderItem={({ item }) => (
@@ -89,7 +90,11 @@ export default function FeedScreen({ navigation }: any){
             tintColor={colors.primary[500]}
           />
         }
-        ListEmptyComponent={<Text style={styles.emptyText}>No posts yet.</Text>}
+        ListEmptyComponent={
+          <Text style={{ textAlign: 'center', color: colors.text.secondary, marginTop: spacing[10], fontSize: 16 }}>
+            No posts yet.
+          </Text>
+        }
       />
 
       {/* Floating Action Button with glass morphism */}
@@ -99,30 +104,13 @@ export default function FeedScreen({ navigation }: any){
         variant="glass"
         size="lg"
         color={colors.primary[600]}
-        style={styles.fab}
+        style={{
+          position: 'absolute',
+          right: spacing[5],
+          bottom: spacing[5],
+          ...shadows.lg,
+        }}
       />
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background.secondary,
-  },
-  list: {
-    padding: spacing[3],
-  },
-  emptyText: {
-    textAlign: 'center',
-    color: colors.text.secondary,
-    marginTop: spacing[10],
-    fontSize: 16,
-  },
-  fab: {
-    position: 'absolute',
-    right: spacing[5],
-    bottom: spacing[5],
-    ...shadows.lg,
-  },
-});

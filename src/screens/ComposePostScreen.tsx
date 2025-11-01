@@ -17,14 +17,17 @@ import * as ImagePicker from 'expo-image-picker';
 import { PostsAPI } from '../api';
 import { uploadMedia } from '../lib/upload';
 import { Button, IconButton } from '../components/ui';
-import { colors, spacing, typography, borderRadius, shadows } from '../theme';
+import { useTheme, spacing, typography, borderRadius, shadows } from '../theme';
 
 export default function ComposePostScreen({ navigation }: any) {
+  const { colors } = useTheme();
   const [text, setText] = React.useState('');
   const [imageUri, setImageUri] = React.useState<string | null>(null);
   const [imageKey, setImageKey] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(false);
   const [uploading, setUploading] = React.useState(false);
+
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
 
   const pickImage = async (fromCamera: boolean) => {
     try {
@@ -186,7 +189,7 @@ export default function ComposePostScreen({ navigation }: any) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background.elevated,

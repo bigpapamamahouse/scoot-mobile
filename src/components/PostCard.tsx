@@ -8,7 +8,7 @@ import { CommentsAPI, ReactionsAPI, PostsAPI } from '../api';
 import { resolveHandle } from '../lib/resolveHandle';
 import { useCurrentUser, isOwner } from '../hooks/useCurrentUser';
 import { IconButton, Badge } from './ui';
-import { colors, spacing, typography, borderRadius, shadows } from '../theme';
+import { useTheme, spacing, typography, borderRadius, shadows } from '../theme';
 
 export default function PostCard({
   post,
@@ -25,6 +25,7 @@ export default function PostCard({
   onPostUpdated?: (updatedPost: Post) => void;
   onPostDeleted?: (postId: string) => void;
 }) {
+  const { colors } = useTheme();
   const { currentUser } = useCurrentUser();
   const [reactions, setReactions] = React.useState<Reaction[]>([]);
   const [commentCount, setCommentCount] = React.useState(
@@ -241,6 +242,8 @@ export default function PostCard({
   const displayHandle = postHandle ? `@${postHandle}` : `@${localPost.userId.slice(0, 8)}`;
   const hasMoreComments = commentCount > previewComments.length;
 
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
+
   return (
     <TouchableOpacity
       onPress={onPress}
@@ -361,7 +364,7 @@ export default function PostCard({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   card: {
     backgroundColor: colors.background.elevated,
     borderRadius: borderRadius.lg,
