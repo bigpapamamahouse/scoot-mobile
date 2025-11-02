@@ -2,6 +2,7 @@
 import React from 'react';
 import { Image, View } from 'react-native';
 import { mediaUrlFromKey } from '../lib/media';
+import { useTheme } from '../theme/ThemeContext';
 
 const isAbsoluteUri = (value: string) => /^(https?:\/\/|data:|blob:)/i.test(value) || value.startsWith('//');
 
@@ -20,11 +21,12 @@ const resolveAvatarUri = (value?: string | null): string | null => {
 };
 
 export function Avatar({ avatarKey, size = 32 }: { avatarKey?: string | null; size?: number }){
+  const { colors } = useTheme();
   const uri = resolveAvatarUri(avatarKey);
   console.log('[Avatar] avatarKey:', avatarKey, 'resolved uri:', uri);
   if (!uri) {
     console.log('[Avatar] No URI, showing placeholder');
-    return <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: '#ddd' }} />;
+    return <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: colors.neutral[300] }} />;
   }
   return (
     <Image

@@ -17,6 +17,7 @@ import { Comment, Post } from '../types';
 import { Avatar } from '../components/Avatar';
 import { resolveHandle } from '../lib/resolveHandle';
 import { useCurrentUser, isOwner } from '../hooks/useCurrentUser';
+import { useTheme } from '../theme/ThemeContext';
 
 interface PostScreenRoute {
   params?: {
@@ -29,6 +30,7 @@ export default function PostScreen({ route, navigation }: { route: PostScreenRou
   const initialPost = route?.params?.post ?? null;
   const postId = route?.params?.postId ?? initialPost?.id;
 
+  const { colors } = useTheme();
   const { currentUser } = useCurrentUser();
   const [post, setPost] = React.useState<Post | null>(initialPost);
   const [comments, setComments] = React.useState<Comment[]>([]);
@@ -239,6 +241,8 @@ export default function PostScreen({ route, navigation }: { route: PostScreenRou
     ]);
   };
 
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
+
   const renderComment = ({ item }: { item: Comment }) => {
     const anyComment: any = item;
     const handleCandidate = resolveHandle(anyComment);
@@ -332,10 +336,10 @@ export default function PostScreen({ route, navigation }: { route: PostScreenRou
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   flex: {
     flex: 1,
-    backgroundColor: '#f7f7f7',
+    backgroundColor: colors.background.tertiary,
   },
   listContent: {
     padding: 12,
@@ -351,6 +355,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
     fontSize: 16,
     fontWeight: '600',
+    color: colors.text.primary,
   },
   loadingPost: {
     padding: 24,
@@ -358,18 +363,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   loadingText: {
-    color: '#666',
+    color: colors.text.secondary,
   },
   emptyText: {
     textAlign: 'center',
-    color: '#999',
+    color: colors.text.tertiary,
     marginTop: 24,
   },
   commentRow: {
     flexDirection: 'row',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#ececec',
+    borderBottomColor: colors.border.light,
     gap: 12,
   },
   commentContent: {
@@ -384,10 +389,11 @@ const styles = StyleSheet.create({
   commentHandle: {
     fontWeight: '600',
     fontSize: 14,
+    color: colors.text.primary,
   },
   commentTimestamp: {
     fontSize: 12,
-    color: '#999',
+    color: colors.text.tertiary,
     marginLeft: 'auto',
   },
   commentOptionsButton: {
@@ -396,19 +402,19 @@ const styles = StyleSheet.create({
   commentOptionsIcon: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#666',
+    color: colors.text.secondary,
   },
   commentText: {
     fontSize: 14,
-    color: '#333',
+    color: colors.text.primary,
   },
   inputContainer: {
     flexDirection: 'row',
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
-    backgroundColor: 'white',
+    borderTopColor: colors.border.main,
+    backgroundColor: colors.background.primary,
     alignItems: 'flex-end',
     gap: 12,
   },
@@ -417,15 +423,16 @@ const styles = StyleSheet.create({
     minHeight: 40,
     maxHeight: 120,
     borderWidth: 1,
-    borderColor: '#d0d0d0',
+    borderColor: colors.border.main,
     borderRadius: 20,
     paddingHorizontal: 16,
     paddingVertical: 10,
-    backgroundColor: '#fafafa',
+    backgroundColor: colors.background.secondary,
+    color: colors.text.primary,
     fontSize: 15,
   },
   sendButton: {
-    backgroundColor: '#2196f3',
+    backgroundColor: colors.primary[500],
     borderRadius: 20,
     paddingHorizontal: 16,
     paddingVertical: 10,
@@ -433,10 +440,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   sendButtonDisabled: {
-    backgroundColor: '#a0c8f6',
+    backgroundColor: colors.primary[300],
   },
   sendButtonText: {
-    color: 'white',
+    color: colors.text.inverse,
     fontWeight: '600',
     fontSize: 14,
   },
