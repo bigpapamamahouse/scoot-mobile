@@ -26,6 +26,34 @@ interface PostScreenRoute {
   };
 }
 
+// Helper function to normalize comment data and extract avatarKey from various possible fields
+const normalizeComment = (comment: any): Comment => {
+  // Log the raw comment to see what we're receiving
+  console.log('[PostScreen] Raw comment data:', JSON.stringify(comment, null, 2));
+
+  // Try to find avatarKey from various possible field names
+  const avatarKey =
+    comment.avatarKey ||
+    comment.avatar_key ||
+    comment.avatar ||
+    comment.avatarUrl ||
+    comment.avatar_url ||
+    comment.user?.avatarKey ||
+    comment.user?.avatar_key ||
+    comment.user?.avatar ||
+    comment.author?.avatarKey ||
+    comment.author?.avatar_key ||
+    comment.author?.avatar ||
+    null;
+
+  console.log('[PostScreen] Resolved avatarKey:', avatarKey);
+
+  return {
+    ...comment,
+    avatarKey: avatarKey,
+  };
+};
+
 export default function PostScreen({ route, navigation }: { route: PostScreenRoute; navigation: any }) {
   const initialPost = route?.params?.post ?? null;
   const postId = route?.params?.postId ?? initialPost?.id;
@@ -104,16 +132,24 @@ export default function PostScreen({ route, navigation }: { route: PostScreenRou
     setLoading(true);
     try {
       const result = await CommentsAPI.listComments(postId);
+      console.log('[PostScreen] Raw comments API response:', JSON.stringify(result, null, 2));
+
       const dataArray = Array.isArray(result)
         ? result
         : result?.comments || result?.items || [];
+
+      // Normalize each comment to ensure avatarKey is properly extracted
+      const normalizedComments = dataArray.map(normalizeComment);
+
       const totalCount: number =
         typeof result?.count === 'number'
           ? result.count
           : typeof result?.total === 'number'
           ? result.total
           : dataArray.length;
-      setComments(dataArray);
+
+      console.log('[PostScreen] Normalized comments:', normalizedComments.length);
+      setComments(normalizedComments);
       setPost((prev) =>
         prev ? { ...prev, commentCount: totalCount } : prev
       );
@@ -150,9 +186,15 @@ export default function PostScreen({ route, navigation }: { route: PostScreenRou
     setSubmitting(true);
     try {
       const result = await CommentsAPI.addComment(postId, trimmed);
+      console.log('[PostScreen] Add comment response:', JSON.stringify(result, null, 2));
+
       const created: Comment | null = (result && (result.comment || result.item || result.data || result)) || null;
       if (created) {
-        setComments((prev) => [...prev, created]);
+        // Normalize the newly created comment to extract avatarKey
+        const normalizedComment = normalizeComment(created);
+        console.log('[PostScreen] Normalized new comment:', normalizedComment);
+
+        setComments((prev) => [...prev, normalizedComment]);
         setPost((prev) => {
           if (!prev) {
             return prev;
