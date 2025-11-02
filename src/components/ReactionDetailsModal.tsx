@@ -42,11 +42,12 @@ export function ReactionDetailsModal({
           <Text style={styles.reactionCount}>{reaction.count}</Text>
         </View>
         <View style={styles.usersList}>
-          {reaction.users.map((user) => {
+          {reaction.users.map((user, index) => {
             const handle = resolveHandle(user);
-            const displayHandle = handle ? `@${handle}` : `@${user.id.slice(0, 8)}`;
+            const userId = user.id || `user-${index}`;
+            const displayHandle = handle ? `@${handle}` : `@${userId.slice(0, 8)}`;
             return (
-              <View key={user.id} style={styles.userRow}>
+              <View key={`${reaction.emoji}-${userId}-${index}`} style={styles.userRow}>
                 <Avatar avatarKey={user.avatarKey} size={32} />
                 <Text style={styles.userHandle}>{displayHandle}</Text>
               </View>
@@ -87,7 +88,7 @@ export function ReactionDetailsModal({
             <FlatList
               data={reactionsWithUsers}
               renderItem={renderReactionSection}
-              keyExtractor={(item) => item.emoji}
+              keyExtractor={(item, index) => `${item.emoji}-${index}`}
               contentContainerStyle={styles.listContent}
               showsVerticalScrollIndicator={false}
             />
