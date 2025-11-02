@@ -12,7 +12,7 @@ import {
   Alert,
 } from 'react-native';
 import PostCard from '../components/PostCard';
-import { CommentsAPI, PostsAPI } from '../api';
+import { CommentsAPI, PostsAPI, UsersAPI } from '../api';
 import { Comment, Post } from '../types';
 import { Avatar } from '../components/Avatar';
 import { resolveHandle } from '../lib/resolveHandle';
@@ -139,7 +139,7 @@ export default function PostScreen({ route, navigation }: { route: PostScreenRou
         : result?.comments || result?.items || [];
 
       // Normalize each comment to ensure avatarKey is properly extracted
-      const normalizedComments = dataArray.map(normalizeComment);
+      let normalizedComments = dataArray.map(normalizeComment);
 
       const totalCount: number =
         typeof result?.count === 'number'
@@ -148,7 +148,41 @@ export default function PostScreen({ route, navigation }: { route: PostScreenRou
           ? result.total
           : dataArray.length;
 
-      console.log('[PostScreen] Normalized comments:', normalizedComments.length);
+      // Fetch user avatars for comments that don't have avatarKey
+      const commentsNeedingAvatars = normalizedComments.filter(c => !c.avatarKey && c.userId);
+      if (commentsNeedingAvatars.length > 0) {
+        console.log('[PostScreen] Fetching avatars for', commentsNeedingAvatars.length, 'users');
+
+        // Get unique userIds
+        const uniqueUserIds = [...new Set(commentsNeedingAvatars.map(c => c.userId))];
+
+        // Fetch user data for each unique userId
+        const userDataPromises = uniqueUserIds.map(async (userId) => {
+          try {
+            const userData = await UsersAPI.getUserByIdentity({ userId });
+            console.log('[PostScreen] User data for', userId, ':', userData);
+            return { userId, avatarKey: userData?.avatarKey || null };
+          } catch (error) {
+            console.warn('[PostScreen] Failed to fetch user data for', userId, error);
+            return { userId, avatarKey: null };
+          }
+        });
+
+        const userAvatars = await Promise.all(userDataPromises);
+        const avatarMap = new Map(userAvatars.map(u => [u.userId, u.avatarKey]));
+
+        // Merge avatar data into comments
+        normalizedComments = normalizedComments.map(comment => {
+          if (!comment.avatarKey && comment.userId && avatarMap.has(comment.userId)) {
+            return { ...comment, avatarKey: avatarMap.get(comment.userId) || null };
+          }
+          return comment;
+        });
+
+        console.log('[PostScreen] Comments after merging avatar data:', normalizedComments);
+      }
+
+      console.log('[PostScreen] Final normalized comments:', normalizedComments.length);
       setComments(normalizedComments);
       setPost((prev) =>
         prev ? { ...prev, commentCount: totalCount } : prev
@@ -191,8 +225,15 @@ export default function PostScreen({ route, navigation }: { route: PostScreenRou
       const created: Comment | null = (result && (result.comment || result.item || result.data || result)) || null;
       if (created) {
         // Normalize the newly created comment to extract avatarKey
-        const normalizedComment = normalizeComment(created);
+        let normalizedComment = normalizeComment(created);
         console.log('[PostScreen] Normalized new comment:', normalizedComment);
+
+        // If the new comment doesn't have an avatarKey, use the current user's avatar
+        if (!normalizedComment.avatarKey && currentUser) {
+          const userAvatar = (currentUser as any).avatarKey || null;
+          console.log('[PostScreen] Using current user avatar:', userAvatar);
+          normalizedComment = { ...normalizedComment, avatarKey: userAvatar };
+        }
 
         setComments((prev) => [...prev, normalizedComment]);
         setPost((prev) => {
@@ -209,7 +250,7 @@ export default function PostScreen({ route, navigation }: { route: PostScreenRou
     } finally {
       setSubmitting(false);
     }
-  }, [newComment, postId, submitting]);
+  }, [newComment, postId, submitting, currentUser]);
 
   const handleEditComment = (comment: Comment) => {
     Alert.prompt(
