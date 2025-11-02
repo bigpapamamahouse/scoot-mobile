@@ -31,6 +31,7 @@ export default function PostCard({
   const [reactions, setReactions] = React.useState<Reaction[]>([]);
   const [detailedReactions, setDetailedReactions] = React.useState<ReactionWithUsers[]>([]);
   const [showReactionModal, setShowReactionModal] = React.useState(false);
+  const [selectedEmoji, setSelectedEmoji] = React.useState<string | null>(null);
   const [loadingReactionDetails, setLoadingReactionDetails] = React.useState(false);
   const [commentCount, setCommentCount] = React.useState(
     post.commentCount ?? post.comments?.length ?? 0
@@ -231,7 +232,8 @@ export default function PostCard({
     }
   };
 
-  const handleShowReactionDetails = async () => {
+  const handleShowReactionDetails = async (emoji: string) => {
+    setSelectedEmoji(emoji);
     setShowReactionModal(true);
     setLoadingReactionDetails(true);
 
@@ -396,29 +398,11 @@ export default function PostCard({
         />
       )}
 
-      {/* Reactions Summary - Shows who reacted */}
-      {reactions.length > 0 && (
-        <TouchableOpacity
-          onPress={handleShowReactionDetails}
-          style={styles.reactionsSummary}
-          activeOpacity={0.7}
-        >
-          <View style={styles.reactionsSummaryContent}>
-            {reactions.map((reaction, index) => (
-              <View key={reaction.emoji} style={styles.reactionSummaryItem}>
-                <Text style={styles.reactionSummaryEmoji}>{reaction.emoji}</Text>
-                <Text style={styles.reactionSummaryCount}>{reaction.count}</Text>
-              </View>
-            ))}
-          </View>
-          <Ionicons name="chevron-forward" size={14} color={colors.text.tertiary} />
-        </TouchableOpacity>
-      )}
-
-      {/* Quick Reactions */}
+      {/* Reactions */}
       <View style={styles.quickReactions}>
         <TouchableOpacity
           onPress={() => handleReaction('❤️')}
+          onLongPress={() => getReactionInfo('❤️').count > 0 && handleShowReactionDetails('❤️')}
           style={[
             styles.reactionButton,
             getReactionInfo('❤️').hasReacted && styles.reactionButtonActive,
@@ -430,10 +414,19 @@ export default function PostCard({
             size={20}
             color={getReactionInfo('❤️').hasReacted ? colors.social.like : colors.text.secondary}
           />
+          {getReactionInfo('❤️').count > 0 && (
+            <Text style={[
+              styles.reactionCount,
+              getReactionInfo('❤️').hasReacted && { color: colors.social.like }
+            ]}>
+              {getReactionInfo('❤️').count}
+            </Text>
+          )}
         </TouchableOpacity>
 
         <TouchableOpacity
           onPress={() => handleReaction('👍')}
+          onLongPress={() => getReactionInfo('👍').count > 0 && handleShowReactionDetails('👍')}
           style={[
             styles.reactionButton,
             getReactionInfo('👍').hasReacted && styles.reactionButtonActive,
@@ -445,10 +438,19 @@ export default function PostCard({
             size={20}
             color={getReactionInfo('👍').hasReacted ? colors.primary[500] : colors.text.secondary}
           />
+          {getReactionInfo('👍').count > 0 && (
+            <Text style={[
+              styles.reactionCount,
+              getReactionInfo('👍').hasReacted && { color: colors.primary[500] }
+            ]}>
+              {getReactionInfo('👍').count}
+            </Text>
+          )}
         </TouchableOpacity>
 
         <TouchableOpacity
           onPress={() => handleReaction('👏')}
+          onLongPress={() => getReactionInfo('👏').count > 0 && handleShowReactionDetails('👏')}
           style={[
             styles.reactionButton,
             getReactionInfo('👏').hasReacted && styles.reactionButtonActive,
@@ -460,10 +462,19 @@ export default function PostCard({
             size={20}
             color={getReactionInfo('👏').hasReacted ? colors.social.celebrate : colors.text.secondary}
           />
+          {getReactionInfo('👏').count > 0 && (
+            <Text style={[
+              styles.reactionCount,
+              getReactionInfo('👏').hasReacted && { color: colors.social.celebrate }
+            ]}>
+              {getReactionInfo('👏').count}
+            </Text>
+          )}
         </TouchableOpacity>
 
         <TouchableOpacity
           onPress={() => handleReaction('😂')}
+          onLongPress={() => getReactionInfo('😂').count > 0 && handleShowReactionDetails('😂')}
           style={[
             styles.reactionButton,
             getReactionInfo('😂').hasReacted && styles.reactionButtonActive,
@@ -475,10 +486,19 @@ export default function PostCard({
             size={20}
             color={getReactionInfo('😂').hasReacted ? colors.social.laugh : colors.text.secondary}
           />
+          {getReactionInfo('😂').count > 0 && (
+            <Text style={[
+              styles.reactionCount,
+              getReactionInfo('😂').hasReacted && { color: colors.social.laugh }
+            ]}>
+              {getReactionInfo('😂').count}
+            </Text>
+          )}
         </TouchableOpacity>
 
         <TouchableOpacity
           onPress={() => handleReaction('🔥')}
+          onLongPress={() => getReactionInfo('🔥').count > 0 && handleShowReactionDetails('🔥')}
           style={[
             styles.reactionButton,
             getReactionInfo('🔥').hasReacted && styles.reactionButtonActive,
@@ -490,6 +510,14 @@ export default function PostCard({
             size={20}
             color={getReactionInfo('🔥').hasReacted ? colors.warning.main : colors.text.secondary}
           />
+          {getReactionInfo('🔥').count > 0 && (
+            <Text style={[
+              styles.reactionCount,
+              getReactionInfo('🔥').hasReacted && { color: colors.warning.main }
+            ]}>
+              {getReactionInfo('🔥').count}
+            </Text>
+          )}
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -515,8 +543,14 @@ export default function PostCard({
 
       <ReactionDetailsModal
         visible={showReactionModal}
-        onClose={() => setShowReactionModal(false)}
-        reactions={detailedReactions}
+        onClose={() => {
+          setShowReactionModal(false);
+          setSelectedEmoji(null);
+        }}
+        reactions={selectedEmoji
+          ? detailedReactions.filter(r => r.emoji === selectedEmoji)
+          : detailedReactions
+        }
         loading={loadingReactionDetails}
       />
     </TouchableOpacity>
@@ -571,34 +605,6 @@ const createStyles = (colors: any) => StyleSheet.create({
   imageFallback: {
     aspectRatio: 1,
   },
-  reactionsSummary: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: spacing[2],
-    paddingHorizontal: spacing[2],
-    backgroundColor: colors.background.secondary,
-    borderRadius: borderRadius.base,
-    marginBottom: spacing[2],
-  },
-  reactionsSummaryContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing[3],
-  },
-  reactionSummaryItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing[1],
-  },
-  reactionSummaryEmoji: {
-    fontSize: typography.fontSize.base,
-  },
-  reactionSummaryCount: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.text.primary,
-  },
   commentPreviewContainer: {
     marginTop: spacing[2],
     borderTopWidth: 1,
@@ -634,12 +640,21 @@ const createStyles = (colors: any) => StyleSheet.create({
     borderTopColor: colors.border.light,
   },
   reactionButton: {
-    padding: spacing[2],
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[1],
+    paddingVertical: spacing[2],
+    paddingHorizontal: spacing[2],
     borderRadius: borderRadius.full,
     backgroundColor: 'transparent',
   },
   reactionButtonActive: {
     backgroundColor: colors.primary[50],
+  },
+  reactionCount: {
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.text.secondary,
   },
   commentButton: {
     flexDirection: 'row',
