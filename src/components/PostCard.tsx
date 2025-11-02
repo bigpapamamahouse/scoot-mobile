@@ -43,6 +43,38 @@ export default function PostCard({
 
   const imageUri = React.useMemo(() => mediaUrlFromKey(localPost.imageKey), [localPost.imageKey]);
 
+  // Helper function to parse reactions API response
+  const parseReactionsResponse = (data: any): Reaction[] => {
+    if (!data || typeof data !== 'object') {
+      return [];
+    }
+
+    // Handle { counts: { emoji: count }, my: [emoji] } format
+    if (data.counts && typeof data.counts === 'object') {
+      const myReactions = Array.isArray(data.my) ? data.my : [];
+
+      return Object.entries(data.counts)
+        .filter(([emoji, count]) => typeof count === 'number' && count > 0)
+        .map(([emoji, count]) => ({
+          emoji,
+          count: count as number,
+          userReacted: myReactions.includes(emoji),
+        }));
+    }
+
+    // Fallback: handle array format
+    if (Array.isArray(data)) {
+      return data;
+    }
+
+    // Fallback: handle nested format
+    if (data.reactions || data.items) {
+      return data.reactions || data.items || [];
+    }
+
+    return [];
+  };
+
   // Update local post when prop changes
   React.useEffect(() => {
     setLocalPost(post);
@@ -164,8 +196,8 @@ export default function PostCard({
         console.log('Post ID:', post.id);
         console.log('Raw data:', JSON.stringify(data, null, 2));
 
-        // Handle both array directly or nested in object
-        const reactionsData = Array.isArray(data) ? data : (data.reactions || data.items || []);
+        const reactionsData = parseReactionsResponse(data);
+
         console.log('Parsed reactions:', JSON.stringify(reactionsData, null, 2));
         console.log('Reactions count:', reactionsData.length);
 
@@ -189,7 +221,7 @@ export default function PostCard({
       const data = await ReactionsAPI.getReactions(post.id);
       console.log('Reloaded reactions:', JSON.stringify(data, null, 2));
 
-      const reactionsData = Array.isArray(data) ? data : (data.reactions || data.items || []);
+      const reactionsData = parseReactionsResponse(data);
       console.log('Setting reactions to:', JSON.stringify(reactionsData, null, 2));
 
       setReactions(reactionsData);
@@ -205,11 +237,36 @@ export default function PostCard({
 
     try {
       const data = await ReactionsAPI.getReactionsWho(post.id);
-      console.log('Detailed reactions data:', data);
+      console.log('=== DETAILED REACTIONS API RESPONSE ===');
+      console.log('Raw data:', JSON.stringify(data, null, 2));
 
-      // Handle different response formats
-      const reactionsData = Array.isArray(data) ? data : (data.reactions || data.items || []);
-      setDetailedReactions(reactionsData);
+      // Parse response format: { counts: { emoji: count }, my: [emoji], who: { emoji: [users] } }
+      let reactionsWithUsers: ReactionWithUsers[] = [];
+
+      if (data && typeof data === 'object') {
+        if (data.counts && typeof data.counts === 'object') {
+          const myReactions = Array.isArray(data.my) ? data.my : [];
+          const whoData = data.who && typeof data.who === 'object' ? data.who : {};
+
+          reactionsWithUsers = Object.entries(data.counts)
+            .filter(([emoji, count]) => typeof count === 'number' && count > 0)
+            .map(([emoji, count]) => ({
+              emoji,
+              count: count as number,
+              userReacted: myReactions.includes(emoji),
+              users: Array.isArray(whoData[emoji]) ? whoData[emoji] : [],
+            }));
+        } else if (Array.isArray(data)) {
+          // Fallback: handle array format
+          reactionsWithUsers = data;
+        } else if (data.reactions || data.items) {
+          // Fallback: handle nested format
+          reactionsWithUsers = data.reactions || data.items || [];
+        }
+      }
+
+      console.log('Parsed detailed reactions:', JSON.stringify(reactionsWithUsers, null, 2));
+      setDetailedReactions(reactionsWithUsers);
     } catch (e: any) {
       console.error('Failed to load reaction details:', e);
       Alert.alert('Error', 'Failed to load reaction details');
