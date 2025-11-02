@@ -396,105 +396,112 @@ export default function PostCard({
         />
       )}
 
-      {/* Reactions */}
+      {/* Reactions Summary - Shows who reacted */}
       {reactions.length > 0 && (
-        <View style={styles.reactions}>
-          {reactions.map((reaction) => (
-            <TouchableOpacity
-              key={reaction.emoji}
-              onPress={handleShowReactionDetails}
-              onLongPress={() => handleReaction(reaction.emoji)}
-              style={[
-                styles.reactionButton,
-                reaction.userReacted && styles.reactionButtonActive
-              ]}
-            >
-              <Text style={styles.reactionEmoji}>{reaction.emoji}</Text>
-              <Text style={styles.reactionCount}>{reaction.count}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+        <TouchableOpacity
+          onPress={handleShowReactionDetails}
+          style={styles.reactionsSummary}
+          activeOpacity={0.7}
+        >
+          <View style={styles.reactionsSummaryContent}>
+            {reactions.map((reaction, index) => (
+              <View key={reaction.emoji} style={styles.reactionSummaryItem}>
+                <Text style={styles.reactionSummaryEmoji}>{reaction.emoji}</Text>
+                <Text style={styles.reactionSummaryCount}>{reaction.count}</Text>
+              </View>
+            ))}
+          </View>
+          <Ionicons name="chevron-forward" size={14} color={colors.text.tertiary} />
+        </TouchableOpacity>
       )}
 
       {/* Quick Reactions */}
       <View style={styles.quickReactions}>
-        <View style={styles.reactionButtonWrapper}>
-          <IconButton
-            icon={getReactionInfo('❤️').hasReacted ? 'heart' : 'heart-outline'}
-            onPress={() => handleReaction('❤️')}
-            variant="ghost"
-            size="sm"
-            color={colors.social.like}
+        <TouchableOpacity
+          onPress={() => handleReaction('❤️')}
+          style={[
+            styles.reactionButton,
+            getReactionInfo('❤️').hasReacted && styles.reactionButtonActive,
+          ]}
+          activeOpacity={0.6}
+        >
+          <Ionicons
+            name={getReactionInfo('❤️').hasReacted ? 'heart' : 'heart-outline'}
+            size={20}
+            color={getReactionInfo('❤️').hasReacted ? colors.social.like : colors.text.secondary}
           />
-          {getReactionInfo('❤️').count > 0 && (
-            <View style={styles.quickReactionBadge}>
-              <Text style={styles.quickReactionCount}>{getReactionInfo('❤️').count}</Text>
-            </View>
-          )}
-        </View>
-        <View style={styles.reactionButtonWrapper}>
-          <IconButton
-            icon={getReactionInfo('👍').hasReacted ? 'thumbs-up' : 'thumbs-up-outline'}
-            onPress={() => handleReaction('👍')}
-            variant="ghost"
-            size="sm"
-            color={colors.primary[500]}
-          />
-          {getReactionInfo('👍').count > 0 && (
-            <View style={styles.quickReactionBadge}>
-              <Text style={styles.quickReactionCount}>{getReactionInfo('👍').count}</Text>
-            </View>
-          )}
-        </View>
-        <View style={styles.reactionButtonWrapper}>
-          <IconButton
-            icon={getReactionInfo('👏').hasReacted ? 'hand-right' : 'hand-right-outline'}
-            onPress={() => handleReaction('👏')}
-            variant="ghost"
-            size="sm"
-            color={colors.social.celebrate}
-          />
-          {getReactionInfo('👏').count > 0 && (
-            <View style={styles.quickReactionBadge}>
-              <Text style={styles.quickReactionCount}>{getReactionInfo('👏').count}</Text>
-            </View>
-          )}
-        </View>
-        <View style={styles.reactionButtonWrapper}>
-          <IconButton
-            icon={getReactionInfo('😂').hasReacted ? 'happy' : 'happy-outline'}
-            onPress={() => handleReaction('😂')}
-            variant="ghost"
-            size="sm"
-            color={colors.social.laugh}
-          />
-          {getReactionInfo('😂').count > 0 && (
-            <View style={styles.quickReactionBadge}>
-              <Text style={styles.quickReactionCount}>{getReactionInfo('😂').count}</Text>
-            </View>
-          )}
-        </View>
-        <View style={styles.reactionButtonWrapper}>
-          <IconButton
-            icon={getReactionInfo('🔥').hasReacted ? 'flame' : 'flame-outline'}
-            onPress={() => handleReaction('🔥')}
-            variant="ghost"
-            size="sm"
-            color={colors.warning.main}
-          />
-          {getReactionInfo('🔥').count > 0 && (
-            <View style={styles.quickReactionBadge}>
-              <Text style={styles.quickReactionCount}>{getReactionInfo('🔥').count}</Text>
-            </View>
-          )}
-        </View>
+        </TouchableOpacity>
 
-        {commentCount > 0 && (
-          <View style={styles.commentBadge}>
-            <Ionicons name="chatbubble-outline" size={16} color={colors.text.secondary} />
-            <Text style={styles.commentCount}>{commentCount}</Text>
-          </View>
-        )}
+        <TouchableOpacity
+          onPress={() => handleReaction('👍')}
+          style={[
+            styles.reactionButton,
+            getReactionInfo('👍').hasReacted && styles.reactionButtonActive,
+          ]}
+          activeOpacity={0.6}
+        >
+          <Ionicons
+            name={getReactionInfo('👍').hasReacted ? 'thumbs-up' : 'thumbs-up-outline'}
+            size={20}
+            color={getReactionInfo('👍').hasReacted ? colors.primary[500] : colors.text.secondary}
+          />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={() => handleReaction('👏')}
+          style={[
+            styles.reactionButton,
+            getReactionInfo('👏').hasReacted && styles.reactionButtonActive,
+          ]}
+          activeOpacity={0.6}
+        >
+          <Ionicons
+            name={getReactionInfo('👏').hasReacted ? 'hand-right' : 'hand-right-outline'}
+            size={20}
+            color={getReactionInfo('👏').hasReacted ? colors.social.celebrate : colors.text.secondary}
+          />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={() => handleReaction('😂')}
+          style={[
+            styles.reactionButton,
+            getReactionInfo('😂').hasReacted && styles.reactionButtonActive,
+          ]}
+          activeOpacity={0.6}
+        >
+          <Ionicons
+            name={getReactionInfo('😂').hasReacted ? 'happy' : 'happy-outline'}
+            size={20}
+            color={getReactionInfo('😂').hasReacted ? colors.social.laugh : colors.text.secondary}
+          />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={() => handleReaction('🔥')}
+          style={[
+            styles.reactionButton,
+            getReactionInfo('🔥').hasReacted && styles.reactionButtonActive,
+          ]}
+          activeOpacity={0.6}
+        >
+          <Ionicons
+            name={getReactionInfo('🔥').hasReacted ? 'flame' : 'flame-outline'}
+            size={20}
+            color={getReactionInfo('🔥').hasReacted ? colors.warning.main : colors.text.secondary}
+          />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={onPress}
+          style={styles.commentButton}
+          activeOpacity={0.6}
+        >
+          <Ionicons name="chatbubble-outline" size={20} color={colors.text.secondary} />
+          {commentCount > 0 && (
+            <Text style={styles.commentCountText}>{commentCount}</Text>
+          )}
+        </TouchableOpacity>
       </View>
 
       {showCommentPreview && previewComments.length > 0 && (
@@ -564,31 +571,31 @@ const createStyles = (colors: any) => StyleSheet.create({
   imageFallback: {
     aspectRatio: 1,
   },
-  reactions: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing[2],
-    marginBottom: spacing[2],
-  },
-  reactionButton: {
+  reactionsSummary: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.neutral[100],
-    borderRadius: borderRadius.base,
+    justifyContent: 'space-between',
+    paddingVertical: spacing[2],
     paddingHorizontal: spacing[2],
-    paddingVertical: spacing[1],
+    backgroundColor: colors.background.secondary,
+    borderRadius: borderRadius.base,
+    marginBottom: spacing[2],
+  },
+  reactionsSummaryContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[3],
+  },
+  reactionSummaryItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: spacing[1],
   },
-  reactionButtonActive: {
-    backgroundColor: colors.primary[50],
-    borderWidth: 1,
-    borderColor: colors.primary[500],
+  reactionSummaryEmoji: {
+    fontSize: typography.fontSize.base,
   },
-  reactionEmoji: {
+  reactionSummaryCount: {
     fontSize: typography.fontSize.sm,
-  },
-  reactionCount: {
-    fontSize: typography.fontSize.xs,
     fontWeight: typography.fontWeight.semibold,
     color: colors.text.primary,
   },
@@ -621,38 +628,27 @@ const createStyles = (colors: any) => StyleSheet.create({
   quickReactions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing[1],
+    gap: spacing[2],
     paddingTop: spacing[2],
     borderTopWidth: 1,
     borderTopColor: colors.border.light,
   },
-  reactionButtonWrapper: {
-    position: 'relative',
+  reactionButton: {
+    padding: spacing[2],
+    borderRadius: borderRadius.full,
+    backgroundColor: 'transparent',
   },
-  quickReactionBadge: {
-    position: 'absolute',
-    top: -4,
-    right: -4,
-    backgroundColor: colors.primary[500],
-    borderRadius: 10,
-    minWidth: 18,
-    height: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 4,
+  reactionButtonActive: {
+    backgroundColor: colors.primary[50],
   },
-  quickReactionCount: {
-    fontSize: 10,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.neutral[0],
-  },
-  commentBadge: {
-    marginLeft: 'auto',
+  commentButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing[1],
+    padding: spacing[2],
+    marginLeft: 'auto',
   },
-  commentCount: {
+  commentCountText: {
     fontSize: typography.fontSize.sm,
     color: colors.text.secondary,
     fontWeight: typography.fontWeight.medium,
