@@ -160,9 +160,15 @@ export default function PostCard({
   React.useEffect(() => {
     ReactionsAPI.getReactions(post.id)
       .then((data) => {
-        console.log('Reactions data for post', post.id, ':', data);
+        console.log('=== REACTIONS API RESPONSE ===');
+        console.log('Post ID:', post.id);
+        console.log('Raw data:', JSON.stringify(data, null, 2));
+
         // Handle both array directly or nested in object
         const reactionsData = Array.isArray(data) ? data : (data.reactions || data.items || []);
+        console.log('Parsed reactions:', JSON.stringify(reactionsData, null, 2));
+        console.log('Reactions count:', reactionsData.length);
+
         setReactions(reactionsData);
       })
       .catch((e) => {
@@ -172,13 +178,20 @@ export default function PostCard({
 
   const handleReaction = async (emoji: string) => {
     try {
-      console.log('Toggling reaction', emoji, 'for post', post.id);
+      console.log('=== TOGGLING REACTION ===');
+      console.log('Emoji:', emoji);
+      console.log('Post ID:', post.id);
+
       const response = await ReactionsAPI.toggleReaction(post.id, emoji);
-      console.log('Toggle reaction response:', response);
+      console.log('Toggle response:', JSON.stringify(response, null, 2));
 
       // Reload reactions
       const data = await ReactionsAPI.getReactions(post.id);
+      console.log('Reloaded reactions:', JSON.stringify(data, null, 2));
+
       const reactionsData = Array.isArray(data) ? data : (data.reactions || data.items || []);
+      console.log('Setting reactions to:', JSON.stringify(reactionsData, null, 2));
+
       setReactions(reactionsData);
     } catch (e: any) {
       console.error('Failed to toggle reaction:', e);
@@ -261,6 +274,15 @@ export default function PostCard({
     []
   );
 
+  // Helper function to get reaction info for a specific emoji
+  const getReactionInfo = (emoji: string) => {
+    const reaction = reactions.find(r => r.emoji === emoji);
+    return {
+      hasReacted: reaction?.userReacted || false,
+      count: reaction?.count || 0,
+    };
+  };
+
   const postHandle = resolveHandle(localPost);
   const displayHandle = postHandle ? `@${postHandle}` : `@${localPost.userId.slice(0, 8)}`;
   const hasMoreComments = commentCount > previewComments.length;
@@ -339,41 +361,76 @@ export default function PostCard({
 
       {/* Quick Reactions */}
       <View style={styles.quickReactions}>
-        <IconButton
-          icon="heart-outline"
-          onPress={() => handleReaction('❤️')}
-          variant="ghost"
-          size="sm"
-          color={colors.social.like}
-        />
-        <IconButton
-          icon="thumbs-up-outline"
-          onPress={() => handleReaction('👍')}
-          variant="ghost"
-          size="sm"
-          color={colors.primary[500]}
-        />
-        <IconButton
-          icon="hand-right-outline"
-          onPress={() => handleReaction('👏')}
-          variant="ghost"
-          size="sm"
-          color={colors.social.celebrate}
-        />
-        <IconButton
-          icon="happy-outline"
-          onPress={() => handleReaction('😂')}
-          variant="ghost"
-          size="sm"
-          color={colors.social.laugh}
-        />
-        <IconButton
-          icon="flame-outline"
-          onPress={() => handleReaction('🔥')}
-          variant="ghost"
-          size="sm"
-          color={colors.warning.main}
-        />
+        <View style={styles.reactionButtonWrapper}>
+          <IconButton
+            icon={getReactionInfo('❤️').hasReacted ? 'heart' : 'heart-outline'}
+            onPress={() => handleReaction('❤️')}
+            variant="ghost"
+            size="sm"
+            color={colors.social.like}
+          />
+          {getReactionInfo('❤️').count > 0 && (
+            <View style={styles.quickReactionBadge}>
+              <Text style={styles.quickReactionCount}>{getReactionInfo('❤️').count}</Text>
+            </View>
+          )}
+        </View>
+        <View style={styles.reactionButtonWrapper}>
+          <IconButton
+            icon={getReactionInfo('👍').hasReacted ? 'thumbs-up' : 'thumbs-up-outline'}
+            onPress={() => handleReaction('👍')}
+            variant="ghost"
+            size="sm"
+            color={colors.primary[500]}
+          />
+          {getReactionInfo('👍').count > 0 && (
+            <View style={styles.quickReactionBadge}>
+              <Text style={styles.quickReactionCount}>{getReactionInfo('👍').count}</Text>
+            </View>
+          )}
+        </View>
+        <View style={styles.reactionButtonWrapper}>
+          <IconButton
+            icon={getReactionInfo('👏').hasReacted ? 'hand-right' : 'hand-right-outline'}
+            onPress={() => handleReaction('👏')}
+            variant="ghost"
+            size="sm"
+            color={colors.social.celebrate}
+          />
+          {getReactionInfo('👏').count > 0 && (
+            <View style={styles.quickReactionBadge}>
+              <Text style={styles.quickReactionCount}>{getReactionInfo('👏').count}</Text>
+            </View>
+          )}
+        </View>
+        <View style={styles.reactionButtonWrapper}>
+          <IconButton
+            icon={getReactionInfo('😂').hasReacted ? 'happy' : 'happy-outline'}
+            onPress={() => handleReaction('😂')}
+            variant="ghost"
+            size="sm"
+            color={colors.social.laugh}
+          />
+          {getReactionInfo('😂').count > 0 && (
+            <View style={styles.quickReactionBadge}>
+              <Text style={styles.quickReactionCount}>{getReactionInfo('😂').count}</Text>
+            </View>
+          )}
+        </View>
+        <View style={styles.reactionButtonWrapper}>
+          <IconButton
+            icon={getReactionInfo('🔥').hasReacted ? 'flame' : 'flame-outline'}
+            onPress={() => handleReaction('🔥')}
+            variant="ghost"
+            size="sm"
+            color={colors.warning.main}
+          />
+          {getReactionInfo('🔥').count > 0 && (
+            <View style={styles.quickReactionBadge}>
+              <Text style={styles.quickReactionCount}>{getReactionInfo('🔥').count}</Text>
+            </View>
+          )}
+        </View>
 
         {commentCount > 0 && (
           <View style={styles.commentBadge}>
@@ -511,6 +568,26 @@ const createStyles = (colors: any) => StyleSheet.create({
     paddingTop: spacing[2],
     borderTopWidth: 1,
     borderTopColor: colors.border.light,
+  },
+  reactionButtonWrapper: {
+    position: 'relative',
+  },
+  quickReactionBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: colors.primary[500],
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  quickReactionCount: {
+    fontSize: 10,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.neutral[0],
   },
   commentBadge: {
     marginLeft: 'auto',
