@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Post, Reaction, Comment } from '../types';
+import { Post, Reaction, ReactionWithUsers, Comment } from '../types';
 import { mediaUrlFromKey } from '../lib/media';
 import { Avatar } from './Avatar';
 import { CommentsAPI, ReactionsAPI, PostsAPI } from '../api';
@@ -9,6 +9,7 @@ import { resolveHandle } from '../lib/resolveHandle';
 import { useCurrentUser, isOwner } from '../hooks/useCurrentUser';
 import { IconButton, Badge } from './ui';
 import { useTheme, spacing, typography, borderRadius, shadows } from '../theme';
+import { ReactionDetailsModal } from './ReactionDetailsModal';
 
 export default function PostCard({
   post,
@@ -28,6 +29,9 @@ export default function PostCard({
   const { colors } = useTheme();
   const { currentUser } = useCurrentUser();
   const [reactions, setReactions] = React.useState<Reaction[]>([]);
+  const [detailedReactions, setDetailedReactions] = React.useState<ReactionWithUsers[]>([]);
+  const [showReactionModal, setShowReactionModal] = React.useState(false);
+  const [loadingReactionDetails, setLoadingReactionDetails] = React.useState(false);
   const [commentCount, setCommentCount] = React.useState(
     post.commentCount ?? post.comments?.length ?? 0
   );
@@ -182,6 +186,25 @@ export default function PostCard({
     }
   };
 
+  const handleShowReactionDetails = async () => {
+    setShowReactionModal(true);
+    setLoadingReactionDetails(true);
+
+    try {
+      const data = await ReactionsAPI.getReactionsWho(post.id);
+      console.log('Detailed reactions data:', data);
+
+      // Handle different response formats
+      const reactionsData = Array.isArray(data) ? data : (data.reactions || data.items || []);
+      setDetailedReactions(reactionsData);
+    } catch (e: any) {
+      console.error('Failed to load reaction details:', e);
+      Alert.alert('Error', 'Failed to load reaction details');
+    } finally {
+      setLoadingReactionDetails(false);
+    }
+  };
+
   React.useEffect(() => {
     if (!showCommentPreview) {
       setPreviewComments([]);
@@ -300,7 +323,8 @@ export default function PostCard({
           {reactions.map((reaction) => (
             <TouchableOpacity
               key={reaction.emoji}
-              onPress={() => handleReaction(reaction.emoji)}
+              onPress={handleShowReactionDetails}
+              onLongPress={() => handleReaction(reaction.emoji)}
               style={[
                 styles.reactionButton,
                 reaction.userReacted && styles.reactionButtonActive
@@ -330,6 +354,13 @@ export default function PostCard({
           color={colors.primary[500]}
         />
         <IconButton
+          icon="hand-right-outline"
+          onPress={() => handleReaction('👏')}
+          variant="ghost"
+          size="sm"
+          color={colors.social.celebrate}
+        />
+        <IconButton
           icon="happy-outline"
           onPress={() => handleReaction('😂')}
           variant="ghost"
@@ -337,11 +368,11 @@ export default function PostCard({
           color={colors.social.laugh}
         />
         <IconButton
-          icon="sparkles-outline"
-          onPress={() => handleReaction('🎉')}
+          icon="flame-outline"
+          onPress={() => handleReaction('🔥')}
           variant="ghost"
           size="sm"
-          color={colors.social.celebrate}
+          color={colors.warning.main}
         />
 
         {commentCount > 0 && (
@@ -360,6 +391,13 @@ export default function PostCard({
           )}
         </View>
       )}
+
+      <ReactionDetailsModal
+        visible={showReactionModal}
+        onClose={() => setShowReactionModal(false)}
+        reactions={detailedReactions}
+        loading={loadingReactionDetails}
+      />
     </TouchableOpacity>
   );
 }

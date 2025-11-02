@@ -50,3 +50,14 @@ export interface Reaction {
   count: number;
   userReacted?: boolean;
 }
+
+export interface ReactionWithUsers {
+  emoji: string;
+  count: number;
+  userReacted?: boolean;
+  users?: Array<{
+    id: string;
+    handle?: string;
+    avatarKey?: string;
+  }>;
+}
