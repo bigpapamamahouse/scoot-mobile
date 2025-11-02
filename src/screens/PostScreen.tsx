@@ -12,11 +12,12 @@ import {
   Alert,
 } from 'react-native';
 import PostCard from '../components/PostCard';
-import { CommentsAPI, PostsAPI } from '../api';
+import { CommentsAPI, PostsAPI, UsersAPI } from '../api';
 import { Comment, Post } from '../types';
 import { Avatar } from '../components/Avatar';
 import { resolveHandle } from '../lib/resolveHandle';
 import { useCurrentUser, isOwner } from '../hooks/useCurrentUser';
+import { useTheme } from '../theme/ThemeContext';
 
 interface PostScreenRoute {
   params?: {
@@ -25,10 +26,39 @@ interface PostScreenRoute {
   };
 }
 
+// Helper function to normalize comment data and extract avatarKey from various possible fields
+const normalizeComment = (comment: any): Comment => {
+  // Log the raw comment to see what we're receiving
+  console.log('[PostScreen] Raw comment data:', JSON.stringify(comment, null, 2));
+
+  // Try to find avatarKey from various possible field names
+  const avatarKey =
+    comment.avatarKey ||
+    comment.avatar_key ||
+    comment.avatar ||
+    comment.avatarUrl ||
+    comment.avatar_url ||
+    comment.user?.avatarKey ||
+    comment.user?.avatar_key ||
+    comment.user?.avatar ||
+    comment.author?.avatarKey ||
+    comment.author?.avatar_key ||
+    comment.author?.avatar ||
+    null;
+
+  console.log('[PostScreen] Resolved avatarKey:', avatarKey);
+
+  return {
+    ...comment,
+    avatarKey: avatarKey,
+  };
+};
+
 export default function PostScreen({ route, navigation }: { route: PostScreenRoute; navigation: any }) {
   const initialPost = route?.params?.post ?? null;
   const postId = route?.params?.postId ?? initialPost?.id;
 
+  const { colors } = useTheme();
   const { currentUser } = useCurrentUser();
   const [post, setPost] = React.useState<Post | null>(initialPost);
   const [comments, setComments] = React.useState<Comment[]>([]);
@@ -102,16 +132,58 @@ export default function PostScreen({ route, navigation }: { route: PostScreenRou
     setLoading(true);
     try {
       const result = await CommentsAPI.listComments(postId);
+      console.log('[PostScreen] Raw comments API response:', JSON.stringify(result, null, 2));
+
       const dataArray = Array.isArray(result)
         ? result
         : result?.comments || result?.items || [];
+
+      // Normalize each comment to ensure avatarKey is properly extracted
+      let normalizedComments = dataArray.map(normalizeComment);
+
       const totalCount: number =
         typeof result?.count === 'number'
           ? result.count
           : typeof result?.total === 'number'
           ? result.total
           : dataArray.length;
-      setComments(dataArray);
+
+      // Fetch user avatars for comments that don't have avatarKey
+      const commentsNeedingAvatars = normalizedComments.filter(c => !c.avatarKey && c.userId);
+      if (commentsNeedingAvatars.length > 0) {
+        console.log('[PostScreen] Fetching avatars for', commentsNeedingAvatars.length, 'users');
+
+        // Get unique userIds
+        const uniqueUserIds = [...new Set(commentsNeedingAvatars.map(c => c.userId))];
+
+        // Fetch user data for each unique userId
+        const userDataPromises = uniqueUserIds.map(async (userId) => {
+          try {
+            const userData = await UsersAPI.getUserByIdentity({ userId });
+            console.log('[PostScreen] User data for', userId, ':', userData);
+            return { userId, avatarKey: userData?.avatarKey || null };
+          } catch (error) {
+            console.warn('[PostScreen] Failed to fetch user data for', userId, error);
+            return { userId, avatarKey: null };
+          }
+        });
+
+        const userAvatars = await Promise.all(userDataPromises);
+        const avatarMap = new Map(userAvatars.map(u => [u.userId, u.avatarKey]));
+
+        // Merge avatar data into comments
+        normalizedComments = normalizedComments.map(comment => {
+          if (!comment.avatarKey && comment.userId && avatarMap.has(comment.userId)) {
+            return { ...comment, avatarKey: avatarMap.get(comment.userId) || null };
+          }
+          return comment;
+        });
+
+        console.log('[PostScreen] Comments after merging avatar data:', normalizedComments);
+      }
+
+      console.log('[PostScreen] Final normalized comments:', normalizedComments.length);
+      setComments(normalizedComments);
       setPost((prev) =>
         prev ? { ...prev, commentCount: totalCount } : prev
       );
@@ -148,9 +220,22 @@ export default function PostScreen({ route, navigation }: { route: PostScreenRou
     setSubmitting(true);
     try {
       const result = await CommentsAPI.addComment(postId, trimmed);
+      console.log('[PostScreen] Add comment response:', JSON.stringify(result, null, 2));
+
       const created: Comment | null = (result && (result.comment || result.item || result.data || result)) || null;
       if (created) {
-        setComments((prev) => [...prev, created]);
+        // Normalize the newly created comment to extract avatarKey
+        let normalizedComment = normalizeComment(created);
+        console.log('[PostScreen] Normalized new comment:', normalizedComment);
+
+        // If the new comment doesn't have an avatarKey, use the current user's avatar
+        if (!normalizedComment.avatarKey && currentUser) {
+          const userAvatar = (currentUser as any).avatarKey || null;
+          console.log('[PostScreen] Using current user avatar:', userAvatar);
+          normalizedComment = { ...normalizedComment, avatarKey: userAvatar };
+        }
+
+        setComments((prev) => [...prev, normalizedComment]);
         setPost((prev) => {
           if (!prev) {
             return prev;
@@ -165,7 +250,7 @@ export default function PostScreen({ route, navigation }: { route: PostScreenRou
     } finally {
       setSubmitting(false);
     }
-  }, [newComment, postId, submitting]);
+  }, [newComment, postId, submitting, currentUser]);
 
   const handleEditComment = (comment: Comment) => {
     Alert.prompt(
@@ -238,6 +323,8 @@ export default function PostScreen({ route, navigation }: { route: PostScreenRou
       { text: 'Delete', onPress: () => handleDeleteComment(comment), style: 'destructive' },
     ]);
   };
+
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
 
   const renderComment = ({ item }: { item: Comment }) => {
     const anyComment: any = item;
@@ -332,10 +419,10 @@ export default function PostScreen({ route, navigation }: { route: PostScreenRou
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   flex: {
     flex: 1,
-    backgroundColor: '#f7f7f7',
+    backgroundColor: colors.background.tertiary,
   },
   listContent: {
     padding: 12,
@@ -351,6 +438,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
     fontSize: 16,
     fontWeight: '600',
+    color: colors.text.primary,
   },
   loadingPost: {
     padding: 24,
@@ -358,18 +446,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   loadingText: {
-    color: '#666',
+    color: colors.text.secondary,
   },
   emptyText: {
     textAlign: 'center',
-    color: '#999',
+    color: colors.text.tertiary,
     marginTop: 24,
   },
   commentRow: {
     flexDirection: 'row',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#ececec',
+    borderBottomColor: colors.border.light,
     gap: 12,
   },
   commentContent: {
@@ -384,10 +472,11 @@ const styles = StyleSheet.create({
   commentHandle: {
     fontWeight: '600',
     fontSize: 14,
+    color: colors.text.primary,
   },
   commentTimestamp: {
     fontSize: 12,
-    color: '#999',
+    color: colors.text.tertiary,
     marginLeft: 'auto',
   },
   commentOptionsButton: {
@@ -396,19 +485,19 @@ const styles = StyleSheet.create({
   commentOptionsIcon: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#666',
+    color: colors.text.secondary,
   },
   commentText: {
     fontSize: 14,
-    color: '#333',
+    color: colors.text.primary,
   },
   inputContainer: {
     flexDirection: 'row',
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
-    backgroundColor: 'white',
+    borderTopColor: colors.border.main,
+    backgroundColor: colors.background.primary,
     alignItems: 'flex-end',
     gap: 12,
   },
@@ -417,15 +506,16 @@ const styles = StyleSheet.create({
     minHeight: 40,
     maxHeight: 120,
     borderWidth: 1,
-    borderColor: '#d0d0d0',
+    borderColor: colors.border.main,
     borderRadius: 20,
     paddingHorizontal: 16,
     paddingVertical: 10,
-    backgroundColor: '#fafafa',
+    backgroundColor: colors.background.secondary,
+    color: colors.text.primary,
     fontSize: 15,
   },
   sendButton: {
-    backgroundColor: '#2196f3',
+    backgroundColor: colors.primary[500],
     borderRadius: 20,
     paddingHorizontal: 16,
     paddingVertical: 10,
@@ -433,10 +523,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   sendButtonDisabled: {
-    backgroundColor: '#a0c8f6',
+    backgroundColor: colors.primary[300],
   },
   sendButtonText: {
-    color: 'white',
+    color: colors.text.inverse,
     fontWeight: '600',
     fontSize: 14,
   },
