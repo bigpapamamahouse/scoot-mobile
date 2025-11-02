@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Post, Reaction, Comment } from '../types';
+import { Post, Reaction, ReactionWithUsers, Comment } from '../types';
 import { mediaUrlFromKey } from '../lib/media';
 import { Avatar } from './Avatar';
 import { CommentsAPI, ReactionsAPI, PostsAPI } from '../api';
@@ -9,6 +9,7 @@ import { resolveHandle } from '../lib/resolveHandle';
 import { useCurrentUser, isOwner } from '../hooks/useCurrentUser';
 import { IconButton, Badge } from './ui';
 import { useTheme, spacing, typography, borderRadius, shadows } from '../theme';
+import { ReactionDetailsModal } from './ReactionDetailsModal';
 
 export default function PostCard({
   post,
@@ -28,6 +29,10 @@ export default function PostCard({
   const { colors } = useTheme();
   const { currentUser } = useCurrentUser();
   const [reactions, setReactions] = React.useState<Reaction[]>([]);
+  const [detailedReactions, setDetailedReactions] = React.useState<ReactionWithUsers[]>([]);
+  const [showReactionModal, setShowReactionModal] = React.useState(false);
+  const [selectedEmoji, setSelectedEmoji] = React.useState<string | null>(null);
+  const [loadingReactionDetails, setLoadingReactionDetails] = React.useState(false);
   const [commentCount, setCommentCount] = React.useState(
     post.commentCount ?? post.comments?.length ?? 0
   );
@@ -38,6 +43,38 @@ export default function PostCard({
   const [localPost, setLocalPost] = React.useState<Post>(post);
 
   const imageUri = React.useMemo(() => mediaUrlFromKey(localPost.imageKey), [localPost.imageKey]);
+
+  // Helper function to parse reactions API response
+  const parseReactionsResponse = (data: any): Reaction[] => {
+    if (!data || typeof data !== 'object') {
+      return [];
+    }
+
+    // Handle { counts: { emoji: count }, my: [emoji] } format
+    if (data.counts && typeof data.counts === 'object') {
+      const myReactions = Array.isArray(data.my) ? data.my : [];
+
+      return Object.entries(data.counts)
+        .filter(([emoji, count]) => typeof count === 'number' && count > 0)
+        .map(([emoji, count]) => ({
+          emoji,
+          count: count as number,
+          userReacted: myReactions.includes(emoji),
+        }));
+    }
+
+    // Fallback: handle array format
+    if (Array.isArray(data)) {
+      return data;
+    }
+
+    // Fallback: handle nested format
+    if (data.reactions || data.items) {
+      return data.reactions || data.items || [];
+    }
+
+    return [];
+  };
 
   // Update local post when prop changes
   React.useEffect(() => {
@@ -156,9 +193,15 @@ export default function PostCard({
   React.useEffect(() => {
     ReactionsAPI.getReactions(post.id)
       .then((data) => {
-        console.log('Reactions data for post', post.id, ':', data);
-        // Handle both array directly or nested in object
-        const reactionsData = Array.isArray(data) ? data : (data.reactions || data.items || []);
+        console.log('=== REACTIONS API RESPONSE ===');
+        console.log('Post ID:', post.id);
+        console.log('Raw data:', JSON.stringify(data, null, 2));
+
+        const reactionsData = parseReactionsResponse(data);
+
+        console.log('Parsed reactions:', JSON.stringify(reactionsData, null, 2));
+        console.log('Reactions count:', reactionsData.length);
+
         setReactions(reactionsData);
       })
       .catch((e) => {
@@ -168,17 +211,69 @@ export default function PostCard({
 
   const handleReaction = async (emoji: string) => {
     try {
-      console.log('Toggling reaction', emoji, 'for post', post.id);
+      console.log('=== TOGGLING REACTION ===');
+      console.log('Emoji:', emoji);
+      console.log('Post ID:', post.id);
+
       const response = await ReactionsAPI.toggleReaction(post.id, emoji);
-      console.log('Toggle reaction response:', response);
+      console.log('Toggle response:', JSON.stringify(response, null, 2));
 
       // Reload reactions
       const data = await ReactionsAPI.getReactions(post.id);
-      const reactionsData = Array.isArray(data) ? data : (data.reactions || data.items || []);
+      console.log('Reloaded reactions:', JSON.stringify(data, null, 2));
+
+      const reactionsData = parseReactionsResponse(data);
+      console.log('Setting reactions to:', JSON.stringify(reactionsData, null, 2));
+
       setReactions(reactionsData);
     } catch (e: any) {
       console.error('Failed to toggle reaction:', e);
       console.error('Error details:', e?.message, e?.response);
+    }
+  };
+
+  const handleShowReactionDetails = async (emoji: string) => {
+    setSelectedEmoji(emoji);
+    setShowReactionModal(true);
+    setLoadingReactionDetails(true);
+
+    try {
+      const data = await ReactionsAPI.getReactionsWho(post.id);
+      console.log('=== DETAILED REACTIONS API RESPONSE ===');
+      console.log('Raw data:', JSON.stringify(data, null, 2));
+
+      // Parse response format: { counts: { emoji: count }, my: [emoji], who: { emoji: [users] } }
+      let reactionsWithUsers: ReactionWithUsers[] = [];
+
+      if (data && typeof data === 'object') {
+        if (data.counts && typeof data.counts === 'object') {
+          const myReactions = Array.isArray(data.my) ? data.my : [];
+          const whoData = data.who && typeof data.who === 'object' ? data.who : {};
+
+          reactionsWithUsers = Object.entries(data.counts)
+            .filter(([emoji, count]) => typeof count === 'number' && count > 0)
+            .map(([emoji, count]) => ({
+              emoji,
+              count: count as number,
+              userReacted: myReactions.includes(emoji),
+              users: Array.isArray(whoData[emoji]) ? whoData[emoji] : [],
+            }));
+        } else if (Array.isArray(data)) {
+          // Fallback: handle array format
+          reactionsWithUsers = data;
+        } else if (data.reactions || data.items) {
+          // Fallback: handle nested format
+          reactionsWithUsers = data.reactions || data.items || [];
+        }
+      }
+
+      console.log('Parsed detailed reactions:', JSON.stringify(reactionsWithUsers, null, 2));
+      setDetailedReactions(reactionsWithUsers);
+    } catch (e: any) {
+      console.error('Failed to load reaction details:', e);
+      Alert.alert('Error', 'Failed to load reaction details');
+    } finally {
+      setLoadingReactionDetails(false);
     }
   };
 
@@ -238,6 +333,15 @@ export default function PostCard({
     []
   );
 
+  // Helper function to get reaction info for a specific emoji
+  const getReactionInfo = (emoji: string) => {
+    const reaction = reactions.find(r => r.emoji === emoji);
+    return {
+      hasReacted: reaction?.userReacted || false,
+      count: reaction?.count || 0,
+    };
+  };
+
   const postHandle = resolveHandle(localPost);
   const displayHandle = postHandle ? `@${postHandle}` : `@${localPost.userId.slice(0, 8)}`;
   const hasMoreComments = commentCount > previewComments.length;
@@ -295,61 +399,137 @@ export default function PostCard({
       )}
 
       {/* Reactions */}
-      {reactions.length > 0 && (
-        <View style={styles.reactions}>
-          {reactions.map((reaction) => (
-            <TouchableOpacity
-              key={reaction.emoji}
-              onPress={() => handleReaction(reaction.emoji)}
-              style={[
-                styles.reactionButton,
-                reaction.userReacted && styles.reactionButtonActive
-              ]}
-            >
-              <Text style={styles.reactionEmoji}>{reaction.emoji}</Text>
-              <Text style={styles.reactionCount}>{reaction.count}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      )}
-
-      {/* Quick Reactions */}
       <View style={styles.quickReactions}>
-        <IconButton
-          icon="heart-outline"
+        <TouchableOpacity
           onPress={() => handleReaction('❤️')}
-          variant="ghost"
-          size="sm"
-          color={colors.social.like}
-        />
-        <IconButton
-          icon="thumbs-up-outline"
-          onPress={() => handleReaction('👍')}
-          variant="ghost"
-          size="sm"
-          color={colors.primary[500]}
-        />
-        <IconButton
-          icon="happy-outline"
-          onPress={() => handleReaction('😂')}
-          variant="ghost"
-          size="sm"
-          color={colors.social.laugh}
-        />
-        <IconButton
-          icon="sparkles-outline"
-          onPress={() => handleReaction('🎉')}
-          variant="ghost"
-          size="sm"
-          color={colors.social.celebrate}
-        />
+          onLongPress={() => getReactionInfo('❤️').count > 0 && handleShowReactionDetails('❤️')}
+          style={[
+            styles.reactionButton,
+            getReactionInfo('❤️').hasReacted && styles.reactionButtonActive,
+          ]}
+          activeOpacity={0.6}
+        >
+          <Ionicons
+            name={getReactionInfo('❤️').hasReacted ? 'heart' : 'heart-outline'}
+            size={20}
+            color={getReactionInfo('❤️').hasReacted ? colors.social.like : colors.text.secondary}
+          />
+          {getReactionInfo('❤️').count > 0 && (
+            <Text style={[
+              styles.reactionCount,
+              getReactionInfo('❤️').hasReacted && { color: colors.social.like }
+            ]}>
+              {getReactionInfo('❤️').count}
+            </Text>
+          )}
+        </TouchableOpacity>
 
-        {commentCount > 0 && (
-          <View style={styles.commentBadge}>
-            <Ionicons name="chatbubble-outline" size={16} color={colors.text.secondary} />
-            <Text style={styles.commentCount}>{commentCount}</Text>
-          </View>
-        )}
+        <TouchableOpacity
+          onPress={() => handleReaction('👍')}
+          onLongPress={() => getReactionInfo('👍').count > 0 && handleShowReactionDetails('👍')}
+          style={[
+            styles.reactionButton,
+            getReactionInfo('👍').hasReacted && styles.reactionButtonActive,
+          ]}
+          activeOpacity={0.6}
+        >
+          <Ionicons
+            name={getReactionInfo('👍').hasReacted ? 'thumbs-up' : 'thumbs-up-outline'}
+            size={20}
+            color={getReactionInfo('👍').hasReacted ? colors.primary[500] : colors.text.secondary}
+          />
+          {getReactionInfo('👍').count > 0 && (
+            <Text style={[
+              styles.reactionCount,
+              getReactionInfo('👍').hasReacted && { color: colors.primary[500] }
+            ]}>
+              {getReactionInfo('👍').count}
+            </Text>
+          )}
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={() => handleReaction('👏')}
+          onLongPress={() => getReactionInfo('👏').count > 0 && handleShowReactionDetails('👏')}
+          style={[
+            styles.reactionButton,
+            getReactionInfo('👏').hasReacted && styles.reactionButtonActive,
+          ]}
+          activeOpacity={0.6}
+        >
+          <Ionicons
+            name={getReactionInfo('👏').hasReacted ? 'hand-right' : 'hand-right-outline'}
+            size={20}
+            color={getReactionInfo('👏').hasReacted ? colors.social.celebrate : colors.text.secondary}
+          />
+          {getReactionInfo('👏').count > 0 && (
+            <Text style={[
+              styles.reactionCount,
+              getReactionInfo('👏').hasReacted && { color: colors.social.celebrate }
+            ]}>
+              {getReactionInfo('👏').count}
+            </Text>
+          )}
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={() => handleReaction('😂')}
+          onLongPress={() => getReactionInfo('😂').count > 0 && handleShowReactionDetails('😂')}
+          style={[
+            styles.reactionButton,
+            getReactionInfo('😂').hasReacted && styles.reactionButtonActive,
+          ]}
+          activeOpacity={0.6}
+        >
+          <Ionicons
+            name={getReactionInfo('😂').hasReacted ? 'happy' : 'happy-outline'}
+            size={20}
+            color={getReactionInfo('😂').hasReacted ? colors.social.laugh : colors.text.secondary}
+          />
+          {getReactionInfo('😂').count > 0 && (
+            <Text style={[
+              styles.reactionCount,
+              getReactionInfo('😂').hasReacted && { color: colors.social.laugh }
+            ]}>
+              {getReactionInfo('😂').count}
+            </Text>
+          )}
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={() => handleReaction('🔥')}
+          onLongPress={() => getReactionInfo('🔥').count > 0 && handleShowReactionDetails('🔥')}
+          style={[
+            styles.reactionButton,
+            getReactionInfo('🔥').hasReacted && styles.reactionButtonActive,
+          ]}
+          activeOpacity={0.6}
+        >
+          <Ionicons
+            name={getReactionInfo('🔥').hasReacted ? 'flame' : 'flame-outline'}
+            size={20}
+            color={getReactionInfo('🔥').hasReacted ? colors.warning.main : colors.text.secondary}
+          />
+          {getReactionInfo('🔥').count > 0 && (
+            <Text style={[
+              styles.reactionCount,
+              getReactionInfo('🔥').hasReacted && { color: colors.warning.main }
+            ]}>
+              {getReactionInfo('🔥').count}
+            </Text>
+          )}
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={onPress}
+          style={styles.commentButton}
+          activeOpacity={0.6}
+        >
+          <Ionicons name="chatbubble-outline" size={20} color={colors.text.secondary} />
+          {commentCount > 0 && (
+            <Text style={styles.commentCountText}>{commentCount}</Text>
+          )}
+        </TouchableOpacity>
       </View>
 
       {showCommentPreview && previewComments.length > 0 && (
@@ -360,6 +540,19 @@ export default function PostCard({
           )}
         </View>
       )}
+
+      <ReactionDetailsModal
+        visible={showReactionModal}
+        onClose={() => {
+          setShowReactionModal(false);
+          setSelectedEmoji(null);
+        }}
+        reactions={selectedEmoji
+          ? detailedReactions.filter(r => r.emoji === selectedEmoji)
+          : detailedReactions
+        }
+        loading={loadingReactionDetails}
+      />
     </TouchableOpacity>
   );
 }
@@ -412,34 +605,6 @@ const createStyles = (colors: any) => StyleSheet.create({
   imageFallback: {
     aspectRatio: 1,
   },
-  reactions: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing[2],
-    marginBottom: spacing[2],
-  },
-  reactionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.neutral[100],
-    borderRadius: borderRadius.base,
-    paddingHorizontal: spacing[2],
-    paddingVertical: spacing[1],
-    gap: spacing[1],
-  },
-  reactionButtonActive: {
-    backgroundColor: colors.primary[50],
-    borderWidth: 1,
-    borderColor: colors.primary[500],
-  },
-  reactionEmoji: {
-    fontSize: typography.fontSize.sm,
-  },
-  reactionCount: {
-    fontSize: typography.fontSize.xs,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.text.primary,
-  },
   commentPreviewContainer: {
     marginTop: spacing[2],
     borderTopWidth: 1,
@@ -469,18 +634,36 @@ const createStyles = (colors: any) => StyleSheet.create({
   quickReactions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing[1],
+    gap: spacing[2],
     paddingTop: spacing[2],
     borderTopWidth: 1,
     borderTopColor: colors.border.light,
   },
-  commentBadge: {
-    marginLeft: 'auto',
+  reactionButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing[1],
+    paddingVertical: spacing[2],
+    paddingHorizontal: spacing[2],
+    borderRadius: borderRadius.full,
+    backgroundColor: 'transparent',
   },
-  commentCount: {
+  reactionButtonActive: {
+    backgroundColor: colors.primary[50],
+  },
+  reactionCount: {
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.text.secondary,
+  },
+  commentButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[1],
+    padding: spacing[2],
+    marginLeft: 'auto',
+  },
+  commentCountText: {
     fontSize: typography.fontSize.sm,
     color: colors.text.secondary,
     fontWeight: typography.fontWeight.medium,
