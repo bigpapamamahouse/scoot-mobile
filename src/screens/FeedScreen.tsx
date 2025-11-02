@@ -1,12 +1,15 @@
 
 import React from 'react';
-import { View, Text, FlatList, RefreshControl, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, FlatList, RefreshControl, StyleSheet } from 'react-native';
 import { PostsAPI } from '../api';
 import PostCard from '../components/PostCard';
 import { Post } from '../types';
 import { resolveHandle } from '../lib/resolveHandle';
+import { IconButton } from '../components/ui';
+import { useTheme, spacing, shadows } from '../theme';
 
 export default function FeedScreen({ navigation }: any){
+  const { colors } = useTheme();
   const [items, setItems] = React.useState<Post[]>([]);
   const [refreshing, setRefreshing] = React.useState(false);
 
@@ -65,9 +68,9 @@ export default function FeedScreen({ navigation }: any){
   }, [navigation, load]);
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={{ flex: 1, backgroundColor: colors.background.secondary }}>
       <FlatList
-        style={{ padding: 12 }}
+        style={{ padding: spacing[3] }}
         data={items}
         keyExtractor={(it)=>it.id}
         renderItem={({ item }) => (
@@ -79,42 +82,35 @@ export default function FeedScreen({ navigation }: any){
             onPostDeleted={handlePostDeleted}
           />
         )}
-        ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>{ setRefreshing(true); load().finally(()=>setRefreshing(false)); }} />}
-        ListEmptyComponent={<Text style={{ textAlign: 'center', color: '#666', marginTop: 40 }}>No posts yet.</Text>}
+        ItemSeparatorComponent={() => <View style={{ height: spacing[3] }} />}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={()=>{ setRefreshing(true); load().finally(()=>setRefreshing(false)); }}
+            tintColor={colors.primary[500]}
+          />
+        }
+        ListEmptyComponent={
+          <Text style={{ textAlign: 'center', color: colors.text.secondary, marginTop: spacing[10], fontSize: 16 }}>
+            No posts yet.
+          </Text>
+        }
       />
 
-      {/* Floating Action Button */}
-      <TouchableOpacity
-        style={styles.fab}
+      {/* Floating Action Button with glass morphism */}
+      <IconButton
+        icon="add"
         onPress={() => navigation.navigate('ComposePost')}
-      >
-        <Text style={styles.fabIcon}>+</Text>
-      </TouchableOpacity>
+        variant="glass"
+        size="lg"
+        color={colors.primary[600]}
+        style={{
+          position: 'absolute',
+          right: spacing[5],
+          bottom: spacing[5],
+          ...shadows.lg,
+        }}
+      />
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  fab: {
-    position: 'absolute',
-    right: 20,
-    bottom: 20,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#2196f3',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  fabIcon: {
-    fontSize: 32,
-    color: 'white',
-    fontWeight: '300',
-  },
-});

@@ -12,16 +12,22 @@ import {
   Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { PostsAPI } from '../api';
 import { uploadMedia } from '../lib/upload';
+import { Button, IconButton } from '../components/ui';
+import { useTheme, spacing, typography, borderRadius, shadows } from '../theme';
 
 export default function ComposePostScreen({ navigation }: any) {
+  const { colors } = useTheme();
   const [text, setText] = React.useState('');
   const [imageUri, setImageUri] = React.useState<string | null>(null);
   const [imageKey, setImageKey] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(false);
   const [uploading, setUploading] = React.useState(false);
+
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
 
   const pickImage = async (fromCamera: boolean) => {
     try {
@@ -118,24 +124,21 @@ export default function ComposePostScreen({ navigation }: any) {
         style={styles.keyboardView}
       >
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()}>
-            <Text style={styles.cancelButton}>Cancel</Text>
-          </TouchableOpacity>
+          <Button
+            title="Cancel"
+            onPress={() => navigation.goBack()}
+            variant="ghost"
+            size="sm"
+          />
           <Text style={styles.title}>New Post</Text>
-          <TouchableOpacity
+          <Button
+            title="Post"
             onPress={handlePost}
             disabled={loading || uploading || (!text.trim() && !imageKey)}
-            style={[
-              styles.postButton,
-              (loading || uploading || (!text.trim() && !imageKey)) && styles.postButtonDisabled,
-            ]}
-          >
-            {loading ? (
-              <ActivityIndicator color="white" />
-            ) : (
-              <Text style={styles.postButtonText}>Post</Text>
-            )}
-          </TouchableOpacity>
+            loading={loading}
+            variant="primary"
+            size="sm"
+          />
         </View>
 
         <TextInput
@@ -156,9 +159,15 @@ export default function ComposePostScreen({ navigation }: any) {
                 <Text style={styles.uploadingText}>Uploading...</Text>
               </View>
             )}
-            <TouchableOpacity style={styles.removeImageButton} onPress={removeImage}>
-              <Text style={styles.removeImageText}>✕</Text>
-            </TouchableOpacity>
+            <IconButton
+              icon="close"
+              onPress={removeImage}
+              variant="solid"
+              size="sm"
+              style={styles.removeImageButton}
+              backgroundColor="rgba(0,0,0,0.6)"
+              color={colors.text.inverse}
+            />
           </View>
         )}
 
@@ -168,7 +177,7 @@ export default function ComposePostScreen({ navigation }: any) {
             onPress={showImageOptions}
             disabled={uploading}
           >
-            <Text style={styles.addPhotoIcon}>📷</Text>
+            <Ionicons name="camera-outline" size={24} color={colors.primary[500]} />
             <Text style={styles.addPhotoText}>Add Photo</Text>
           </TouchableOpacity>
           <Text style={styles.charCount}>
@@ -180,10 +189,10 @@ export default function ComposePostScreen({ navigation }: any) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: 'white',
+    backgroundColor: colors.background.elevated,
   },
   keyboardView: {
     flex: 1,
@@ -192,48 +201,29 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
+    padding: spacing[4],
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  cancelButton: {
-    fontSize: 16,
-    color: '#666',
+    borderBottomColor: colors.border.light,
   },
   title: {
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  postButton: {
-    backgroundColor: '#2196f3',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    minWidth: 60,
-    alignItems: 'center',
-  },
-  postButtonDisabled: {
-    backgroundColor: '#ccc',
-  },
-  postButtonText: {
-    color: 'white',
-    fontWeight: '600',
-    fontSize: 15,
+    ...typography.styles.h5,
+    color: colors.text.primary,
   },
   textInput: {
-    padding: 16,
-    fontSize: 16,
+    padding: spacing[4],
+    fontSize: typography.fontSize.base,
     textAlignVertical: 'top',
     minHeight: 120,
+    color: colors.text.primary,
   },
   imageContainer: {
-    margin: 16,
+    margin: spacing[4],
     position: 'relative',
   },
   imagePreview: {
     width: '100%',
     height: 200,
-    borderRadius: 12,
+    borderRadius: borderRadius.lg,
   },
   uploadingOverlay: {
     position: 'absolute',
@@ -241,55 +231,41 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: colors.overlay.dark,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 12,
+    borderRadius: borderRadius.lg,
   },
   uploadingText: {
-    color: 'white',
-    marginTop: 8,
-    fontSize: 14,
+    color: colors.text.inverse,
+    marginTop: spacing[2],
+    fontSize: typography.fontSize.sm,
   },
   removeImageButton: {
     position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  removeImageText: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: '600',
+    top: spacing[2],
+    right: spacing[2],
   },
   footer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
+    padding: spacing[4],
     borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
+    borderTopColor: colors.border.light,
   },
   addPhotoButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-  },
-  addPhotoIcon: {
-    fontSize: 24,
+    gap: spacing[2],
   },
   addPhotoText: {
-    color: '#2196f3',
-    fontSize: 16,
-    fontWeight: '500',
+    color: colors.primary[500],
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.medium,
   },
   charCount: {
-    color: '#999',
-    fontSize: 13,
+    color: colors.text.tertiary,
+    fontSize: typography.fontSize.sm,
   },
 });

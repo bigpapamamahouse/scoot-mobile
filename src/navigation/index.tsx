@@ -2,7 +2,7 @@
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { TouchableOpacity, Text, View } from 'react-native';
+import { View } from 'react-native';
 import FeedScreen from '../screens/FeedScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
@@ -16,50 +16,75 @@ import { SearchScreen } from '../screens/SearchScreen';
 import { UserListScreen } from '../screens/UserListScreen';
 import { useNotifications } from '../lib/notifications';
 import PostScreen from '../screens/PostScreen';
+import { IconButton, Badge } from '../components/ui';
+import { useTheme, spacing } from '../theme';
 
 const Stack = createNativeStackNavigator();
 
 function HeaderActions({ navigation }: { navigation: any }) {
+  const { colors } = useTheme();
   const { unreadCount } = useNotifications();
-  const notificationLabel = unreadCount > 9 ? '9+' : unreadCount.toString();
+
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-      <TouchableOpacity onPress={() => navigation.navigate('Search')} style={{ paddingHorizontal: 12 }}>
-        <Text style={{ fontSize: 24 }}>🔍</Text>
-      </TouchableOpacity>
-      <TouchableOpacity onPress={() => navigation.navigate('Notifications')} style={{ paddingHorizontal: 12 }}>
-        <View style={{ position: 'relative', alignItems: 'center', justifyContent: 'center' }}>
-          <Text style={{ fontSize: 24 }}>🔔</Text>
-          {unreadCount > 0 && (
-            <View
-              style={{
-                position: 'absolute',
-                top: -4,
-                right: -8,
-                minWidth: 18,
-                height: 18,
-                borderRadius: 9,
-                backgroundColor: '#e53935',
-                paddingHorizontal: 4,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <Text style={{ color: 'white', fontSize: 10, fontWeight: '700' }}>{notificationLabel}</Text>
-            </View>
-          )}
-        </View>
-      </TouchableOpacity>
-      <TouchableOpacity onPress={() => navigation.navigate('Profile')} style={{ paddingHorizontal: 12 }}>
-        <Text style={{ fontSize: 24 }}>👤</Text>
-      </TouchableOpacity>
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[1] }}>
+      <IconButton
+        icon="search-outline"
+        onPress={() => navigation.navigate('Search')}
+        variant="ghost"
+        size="md"
+        color={colors.text.primary}
+      />
+
+      <View style={{ position: 'relative' }}>
+        <IconButton
+          icon="notifications-outline"
+          onPress={() => navigation.navigate('Notifications')}
+          variant="ghost"
+          size="md"
+          color={colors.text.primary}
+        />
+        {unreadCount > 0 && (
+          <Badge
+            count={unreadCount}
+            variant="error"
+            size="sm"
+            style={{
+              position: 'absolute',
+              top: 8,
+              right: 8,
+            }}
+          />
+        )}
+      </View>
+
+      <IconButton
+        icon="person-outline"
+        onPress={() => navigation.navigate('Profile')}
+        variant="ghost"
+        size="md"
+        color={colors.text.primary}
+      />
     </View>
   );
 }
 
 export default function RootNavigator(){
+  const { colors, effectiveMode } = useTheme();
+
+  const navigationTheme = {
+    dark: effectiveMode === 'dark',
+    colors: {
+      primary: colors.primary[500],
+      background: colors.background.primary,
+      card: colors.background.elevated,
+      text: colors.text.primary,
+      border: colors.border.light,
+      notification: colors.error.main,
+    },
+  };
+
   return (
-    <NavigationContainer>
+    <NavigationContainer theme={navigationTheme}>
       <Stack.Navigator>
         <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
         <Stack.Screen name="Signup" component={SignupScreen} options={{ title: 'Sign up' }} />

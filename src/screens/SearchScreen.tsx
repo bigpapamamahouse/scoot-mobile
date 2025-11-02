@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { searchUsers } from '../api/users';
 import { Avatar } from '../components/Avatar';
 import type { User } from '../types';
+import { useTheme, spacing, typography, borderRadius } from '../theme';
 
 type RootStackParamList = {
   Search: undefined;
@@ -22,10 +23,13 @@ type RootStackParamList = {
 type Props = NativeStackScreenProps<RootStackParamList, 'Search'>;
 
 export function SearchScreen({ navigation }: Props) {
+  const { colors } = useTheme();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
 
   // Debounced search effect
   useEffect(() => {
@@ -118,7 +122,7 @@ export function SearchScreen({ navigation }: Props) {
         <TextInput
           style={styles.searchInput}
           placeholder="Search users..."
-          placeholderTextColor="#999"
+          placeholderTextColor={colors.text.tertiary}
           value={query}
           onChangeText={setQuery}
           autoFocus
@@ -129,7 +133,7 @@ export function SearchScreen({ navigation }: Props) {
 
       {loading && (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#2196f3" />
+          <ActivityIndicator size="large" color={colors.primary[500]} />
         </View>
       )}
 
@@ -144,25 +148,26 @@ export function SearchScreen({ navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.background.elevated,
   },
   searchContainer: {
-    padding: 12,
+    padding: spacing[3],
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: colors.border.light,
   },
   searchInput: {
     height: 44,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    fontSize: 16,
+    backgroundColor: colors.neutral[100],
+    borderRadius: borderRadius.base,
+    paddingHorizontal: spacing[4],
+    fontSize: typography.fontSize.base,
+    color: colors.text.primary,
   },
   loadingContainer: {
-    padding: 20,
+    padding: spacing[5],
     alignItems: 'center',
   },
   listContainer: {
@@ -171,34 +176,34 @@ const styles = StyleSheet.create({
   userItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
+    padding: spacing[3],
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: colors.border.light,
   },
   userInfo: {
-    marginLeft: 12,
+    marginLeft: spacing[3],
     flex: 1,
   },
   userName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#000',
-    marginBottom: 2,
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.text.primary,
+    marginBottom: spacing[1],
   },
   userHandle: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: typography.fontSize.sm,
+    color: colors.text.secondary,
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 40,
-    paddingHorizontal: 20,
+    paddingVertical: spacing[10],
+    paddingHorizontal: spacing[5],
   },
   emptyText: {
-    fontSize: 16,
-    color: '#999',
+    fontSize: typography.fontSize.base,
+    color: colors.text.tertiary,
     textAlign: 'center',
   },
 });
