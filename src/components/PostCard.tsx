@@ -311,7 +311,7 @@ export default function PostCard({
         </View>
       );
     },
-    []
+    [styles]
   );
 
   // Helper function to get reaction info for a specific emoji
