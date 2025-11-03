@@ -430,9 +430,15 @@ export default function ProfileScreen({ navigation, route }: any) {
           console.warn('Unrecognized user posts response shape', postsData);
         }
 
-        // Update posts state with append support
+        // Update posts state with append support and deduplication
         if (append) {
-          setPosts((prev) => [...prev, ...filteredPosts]);
+          setPosts((prev) => {
+            // Create a Set of existing post IDs for O(1) lookup
+            const existingIds = new Set(prev.map(p => p.id));
+            // Filter out any new posts that already exist
+            const uniqueNewPosts = filteredPosts.filter((post: Post) => !existingIds.has(post.id));
+            return [...prev, ...uniqueNewPosts];
+          });
         } else {
           setPosts(filteredPosts);
           // Cache the first page for instant loads

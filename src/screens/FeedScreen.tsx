@@ -63,9 +63,15 @@ export default function FeedScreen({ navigation }: any){
       });
       const newItems = f.items || f || [];
 
-      // Update state
+      // Update state with deduplication
       if (append) {
-        setItems((prev) => [...prev, ...newItems]);
+        setItems((prev) => {
+          // Create a Set of existing post IDs for O(1) lookup
+          const existingIds = new Set(prev.map(p => p.id));
+          // Filter out any new items that already exist
+          const uniqueNewItems = newItems.filter((item: Post) => !existingIds.has(item.id));
+          return [...prev, ...uniqueNewItems];
+        });
       } else {
         setItems(newItems);
         // Cache the first page for instant loads
