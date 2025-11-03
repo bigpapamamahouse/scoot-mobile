@@ -2,7 +2,7 @@
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { View } from 'react-native';
+import { View, Image } from 'react-native';
 import FeedScreen from '../screens/FeedScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
@@ -20,6 +20,21 @@ import { IconButton, Badge } from '../components/ui';
 import { useTheme, spacing } from '../theme';
 
 const Stack = createNativeStackNavigator();
+
+function HeaderLogo() {
+  const { effectiveMode } = useTheme();
+
+  return (
+    <Image
+      source={effectiveMode === 'dark'
+        ? require('../../assets/scoot_lite.png')
+        : require('../../assets/scoot.png')
+      }
+      style={{ width: 100, height: 30 }}
+      resizeMode="contain"
+    />
+  );
+}
 
 function HeaderActions({ navigation }: { navigation: any }) {
   const { colors } = useTheme();
@@ -94,7 +109,7 @@ export default function RootNavigator(){
           name="Feed"
           component={FeedScreen}
           options={({ navigation }) => ({
-            title: 'Feed',
+            headerTitle: () => <HeaderLogo />,
             headerRight: () => <HeaderActions navigation={navigation} />,
           })}
         />

@@ -385,6 +385,7 @@ export default function PostScreen({ route, navigation }: { route: PostScreenRou
         <TextInput
           style={styles.input}
           placeholder="Write a comment"
+          placeholderTextColor={colors.text.tertiary}
           value={newComment}
           onChangeText={setNewComment}
           multiline
