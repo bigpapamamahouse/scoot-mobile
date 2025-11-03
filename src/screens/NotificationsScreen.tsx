@@ -213,11 +213,10 @@ export default function NotificationsScreen(){
             <TouchableOpacity
               style={styles.postLinkContainer}
               onPress={() => handleNavigateToPost(postId)}
-              activeOpacity={0.7}
+              activeOpacity={0.6}
             >
-              <Ionicons name="document-text-outline" size={16} color={styles.postLinkIcon.color} />
+              <Ionicons name="arrow-forward-circle-outline" size={14} color={styles.postLinkIcon.color} />
               <Text style={styles.postLink}>View post</Text>
-              <Ionicons name="chevron-forward" size={16} color={styles.postLinkIcon.color} />
             </TouchableOpacity>
           )}
           {followRequest && handledAction && (
@@ -388,22 +387,14 @@ const createStyles = (colors: any) => StyleSheet.create({
   postLinkContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing[2],
-    marginTop: spacing[3],
-    paddingVertical: spacing[3],
-    paddingHorizontal: spacing[4],
-    backgroundColor: colors.primary[50] || colors.background.secondary,
-    borderRadius: borderRadius.lg,
-    borderWidth: 1,
-    borderColor: colors.primary[200] || colors.border.light,
-    ...shadows.sm,
+    alignSelf: 'flex-start',
+    gap: spacing[1],
+    marginTop: spacing[2],
   },
   postLink: {
-    color: colors.primary[600] || colors.primary[500],
-    fontWeight: '700',
-    fontSize: 14,
-    letterSpacing: 0.3,
+    color: colors.primary[500],
+    fontWeight: '600',
+    fontSize: 13,
   },
   postLinkIcon: {
     color: colors.primary[500],
