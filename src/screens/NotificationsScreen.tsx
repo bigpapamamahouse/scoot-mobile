@@ -126,12 +126,16 @@ export default function NotificationsScreen(){
   const handleNavigateToPost = React.useCallback(async (postId: string) => {
     try {
       const response = await PostsAPI.getPost(postId);
-      if (response.post) {
-        navigation.navigate('Post', { post: response.post });
+      // Handle different response formats
+      const post = response?.post || response?.item || response?.data || response;
+      if (post) {
+        navigation.navigate('Post', { post });
+      } else {
+        Alert.alert('Post', 'Unable to load this post.');
       }
     } catch (error: any) {
       console.warn('Failed to load post', error);
-      Alert.alert('Post', 'Unable to load this post.');
+      Alert.alert('Post', error?.message || 'Unable to load this post.');
     }
   }, [navigation]);
 
