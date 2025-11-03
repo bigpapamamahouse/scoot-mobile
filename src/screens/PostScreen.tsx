@@ -348,7 +348,7 @@ export default function PostScreen({ route, navigation }: { route: PostScreenRou
     <KeyboardAvoidingView
       style={styles.flex}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 120 : 0}
     >
       <FlatList
         style={styles.list}
@@ -412,7 +412,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   listContent: {
     padding: 12,
-    paddingBottom: 120,
+    paddingBottom: 140,
   },
   list: {
     flex: 1,

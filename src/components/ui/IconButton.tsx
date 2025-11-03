@@ -94,9 +94,7 @@ export const IconButton: React.FC<IconButtonProps> = ({
       disabled={disabled}
       activeOpacity={0.7}
     >
-      <View style={{ marginTop: -1 }}>
-        <Ionicons name={icon} size={sizes.icon} color={getIconColor()} />
-      </View>
+      <Ionicons name={icon} size={sizes.icon} color={getIconColor()} />
       {badge !== undefined && badge > 0 && (
         <View style={[styles.badge, { backgroundColor: colors.error.main }]}>
           <Ionicons name="ellipse" size={8} color={colors.error.main} />

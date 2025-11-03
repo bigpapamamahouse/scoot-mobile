@@ -622,7 +622,7 @@ export default function ProfileScreen({ navigation, route }: any) {
       <Button
         title="Settings"
         onPress={openSettings}
-        variant="outline"
+        variant="ghost"
         size="sm"
       />
     );
