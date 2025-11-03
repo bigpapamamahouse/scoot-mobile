@@ -480,6 +480,19 @@ export default function ProfileScreen({ navigation, route }: any) {
             // Fetch fresh user profile data to get follow status
             const profileData = await UsersAPI.getUser(userHandle);
 
+            // Update user state with complete profile data including fullName
+            if (profileData && typeof profileData === 'object') {
+              setUser(prev => ({
+                ...(prev ?? {}),
+                id: (profileData as any).id ?? prev?.id ?? null,
+                handle: (profileData as any).handle ?? prev?.handle ?? null,
+                avatarKey: (profileData as any).avatarKey ?? prev?.avatarKey ?? null,
+                email: (profileData as any).email ?? prev?.email ?? null,
+                fullName: (profileData as any).fullName ?? prev?.fullName ?? null,
+                createdAt: (profileData as any).createdAt ?? prev?.createdAt ?? null,
+              }));
+            }
+
             const followersData = await UsersAPI.listFollowers(userHandle);
             const followers = Array.isArray(followersData) ? followersData :
               (followersData?.items || followersData?.followers || []);
