@@ -800,7 +800,7 @@ export default function ProfileScreen({ navigation, route }: any) {
             {user?.fullName && (
               <Text style={styles.fullName}>{user.fullName}</Text>
             )}
-            {user?.email && (
+            {user?.email && !isViewingSelf && (
               <Text style={styles.email}>{user.email}</Text>
             )}
 

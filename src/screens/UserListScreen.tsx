@@ -80,18 +80,25 @@ export function UserListScreen({ route, navigation }: Props) {
     });
   }, [navigation]);
 
-  const renderUserItem = useCallback(({ item }: { item: User }) => (
-    <TouchableOpacity
-      style={styles.userItem}
-      onPress={() => handleUserPress(item)}
-    >
-      <Avatar avatarKey={item.avatarKey} size={48} />
-      <View style={styles.userInfo}>
-        <Text style={styles.userName}>{item.fullName || 'Unknown'}</Text>
-        <Text style={styles.userHandle}>@{item.handle || 'unknown'}</Text>
-      </View>
-    </TouchableOpacity>
-  ), [handleUserPress]);
+  const renderUserItem = useCallback(({ item }: { item: User }) => {
+    const displayName = item.fullName || `@${item.handle || 'unknown'}`;
+    const showHandle = !!item.fullName;
+
+    return (
+      <TouchableOpacity
+        style={styles.userItem}
+        onPress={() => handleUserPress(item)}
+      >
+        <Avatar avatarKey={item.avatarKey} size={48} />
+        <View style={styles.userInfo}>
+          <Text style={styles.userName}>{displayName}</Text>
+          {showHandle && (
+            <Text style={styles.userHandle}>@{item.handle || 'unknown'}</Text>
+          )}
+        </View>
+      </TouchableOpacity>
+    );
+  }, [handleUserPress]);
 
   const renderEmptyState = () => {
     if (loading) {
