@@ -125,5 +125,40 @@ export async function updatePost(id: string, text: string){
 }
 
 export async function getPost(id: string){
-  return api(`/p/${encodeURIComponent(id)}`);
+  const encodedId = encodeURIComponent(id);
+
+  // Try multiple endpoint patterns
+  const endpoints = [
+    `/p/${encodedId}`,
+    `/posts/${encodedId}`,
+    `/post/${encodedId}`,
+  ];
+
+  let lastError: unknown;
+  for (const endpoint of endpoints) {
+    try {
+      return await api(endpoint);
+    } catch (err: any) {
+      lastError = err;
+      const message = String(err?.message || '');
+      const statusMatch = message.match(/HTTP\s+(\d+)/);
+      const statusCode = statusMatch ? parseInt(statusMatch[1], 10) : undefined;
+
+      // If we get a 404, try the next endpoint
+      if (statusCode === 404 || statusCode === 405) {
+        console.warn(`Post endpoint ${endpoint} returned ${statusCode}, trying next...`);
+        continue;
+      }
+
+      // For other errors, throw immediately
+      console.warn(`Post endpoint ${endpoint} failed:`, message || err);
+      break;
+    }
+  }
+
+  if (lastError) {
+    throw lastError;
+  }
+
+  throw new Error('No post endpoints responded');
 }
