@@ -1,24 +1,61 @@
 
 import { api } from './client';
 
-export async function getFeed(){
-  return api('/feed');
+export interface PaginationOptions {
+  limit?: number;
+  offset?: number;
+  cursor?: string;
+}
+
+export async function getFeed(options?: PaginationOptions){
+  const params = new URLSearchParams();
+
+  if (options?.limit) {
+    params.append('limit', String(options.limit));
+  }
+  if (options?.offset) {
+    params.append('offset', String(options.offset));
+  }
+  if (options?.cursor) {
+    params.append('cursor', options.cursor);
+  }
+
+  const queryString = params.toString();
+  const path = queryString ? `/feed?${queryString}` : '/feed';
+
+  return api(path);
 }
 
 export interface GetUserPostsOptions {
   handle?: string | null;
   userId?: string | null;
+  limit?: number;
+  offset?: number;
+  cursor?: string;
 }
 
 export async function getUserPosts(options: GetUserPostsOptions = {}){
-  const { handle, userId } = options;
+  const { handle, userId, limit, offset, cursor } = options;
+
+  // Build pagination query string
+  const paginationParams = new URLSearchParams();
+  if (limit) paginationParams.append('limit', String(limit));
+  if (offset) paginationParams.append('offset', String(offset));
+  if (cursor) paginationParams.append('cursor', cursor);
+  const paginationQuery = paginationParams.toString();
 
   const attempts: string[] = [];
   const seen = new Set<string>();
   const push = (path: string) => {
     if (!seen.has(path)) {
       seen.add(path);
-      attempts.push(path);
+      // Add pagination params to each attempt
+      if (paginationQuery) {
+        const separator = path.includes('?') ? '&' : '?';
+        attempts.push(`${path}${separator}${paginationQuery}`);
+      } else {
+        attempts.push(path);
+      }
     }
   };
 

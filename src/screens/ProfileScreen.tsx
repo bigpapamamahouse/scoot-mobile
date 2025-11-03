@@ -16,6 +16,9 @@ import PostCard from '../components/PostCard';
 import { Avatar } from '../components/Avatar';
 import { Button } from '../components/ui';
 import { useTheme, spacing, typography, borderRadius, shadows } from '../theme';
+import { cache, CacheKeys, CacheTTL } from '../lib/cache';
+
+const POSTS_PER_PAGE = 20;
 
 type ProfileIdentity = {
   id?: string | null;
@@ -32,6 +35,9 @@ export default function ProfileScreen({ navigation, route }: any) {
   const [posts, setPosts] = React.useState<Post[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [refreshing, setRefreshing] = React.useState(false);
+  const [loadingMore, setLoadingMore] = React.useState(false);
+  const [hasMore, setHasMore] = React.useState(true);
+  const [page, setPage] = React.useState(0);
   const [viewer, setViewer] = React.useState<User | null>(null);
   const [followerCount, setFollowerCount] = React.useState(0);
   const [followingCount, setFollowingCount] = React.useState(0);
@@ -216,11 +222,14 @@ export default function ProfileScreen({ navigation, route }: any) {
   );
 
   const load = React.useCallback(
-    async (options?: { skipSpinner?: boolean }) => {
-      console.log('[ProfileScreen] load() called, skipSpinner:', options?.skipSpinner);
+    async (options?: { skipSpinner?: boolean; pageNum?: number; append?: boolean }) => {
+      console.log('[ProfileScreen] load() called, skipSpinner:', options?.skipSpinner, 'pageNum:', options?.pageNum);
       if (!options?.skipSpinner) {
         setLoading(true);
       }
+
+      const pageNum = options?.pageNum ?? 0;
+      const append = options?.append ?? false;
 
       const params = (route?.params ?? {}) as Record<string, unknown>;
       const paramHandleCandidates = [
@@ -378,9 +387,32 @@ export default function ProfileScreen({ navigation, route }: any) {
           targetUserId = targetIdentity.id.trim();
         }
 
+        // Generate cache key based on user identifier
+        const cacheIdentifier = targetUserId || targetHandle || 'unknown';
+        const cacheKey = CacheKeys.userPosts(cacheIdentifier, pageNum);
+
+        // Try to load from cache first for instant display (only for first page)
+        if (!append && pageNum === 0) {
+          const cachedPosts = cache.get<Post[]>(CacheKeys.userPosts(cacheIdentifier, 0));
+          if (cachedPosts && cachedPosts.length > 0) {
+            console.log('[ProfileScreen] Loading posts from cache:', cachedPosts.length, 'posts');
+            setPosts(cachedPosts);
+          }
+
+          // Also try to load cached user profile
+          const cachedUser = cache.get<ProfileIdentity>(CacheKeys.userProfile(cacheIdentifier));
+          if (cachedUser) {
+            console.log('[ProfileScreen] Loading user from cache');
+            setUser(cachedUser);
+          }
+        }
+
+        const offset = pageNum * POSTS_PER_PAGE;
         const postsData = await PostsAPI.getUserPosts({
           handle: targetHandle,
           userId: targetUserId,
+          limit: POSTS_PER_PAGE,
+          offset,
         });
         const normalizedPosts = resolvePosts(postsData);
         const filteredPosts = filterPostsForUser(normalizedPosts, {
@@ -397,7 +429,26 @@ export default function ProfileScreen({ navigation, route }: any) {
         if (!filteredPosts.length && postsData && !Array.isArray(postsData)) {
           console.warn('Unrecognized user posts response shape', postsData);
         }
-        setPosts(filteredPosts);
+
+        // Update posts state with append support and deduplication
+        if (append) {
+          setPosts((prev) => {
+            // Create a Set of existing post IDs for O(1) lookup
+            const existingIds = new Set(prev.map(p => p.id));
+            // Filter out any new posts that already exist
+            const uniqueNewPosts = filteredPosts.filter((post: Post) => !existingIds.has(post.id));
+            return [...prev, ...uniqueNewPosts];
+          });
+        } else {
+          setPosts(filteredPosts);
+          // Cache the first page for instant loads
+          if (pageNum === 0 && filteredPosts.length > 0) {
+            cache.set(CacheKeys.userPosts(cacheIdentifier, 0), filteredPosts, CacheTTL.userPosts);
+          }
+        }
+
+        // Check if there are more posts to load
+        setHasMore(filteredPosts.length >= POSTS_PER_PAGE);
 
         let resolvedIdentity = targetIdentity;
         const derivedIdentity = deriveIdentityFromPosts(filteredPosts);
@@ -432,10 +483,16 @@ export default function ProfileScreen({ navigation, route }: any) {
         console.log('[ProfileScreen] targetIdentity:', targetIdentity);
         setUser(finalUserToSet);
 
-        // Load follower/following counts and follow status
+        // Cache user profile (only on first page load)
+        if (pageNum === 0 && finalUserToSet) {
+          const cacheIdentifier = finalUserToSet.id || finalUserToSet.handle || 'unknown';
+          cache.set(CacheKeys.userProfile(cacheIdentifier), finalUserToSet, CacheTTL.userProfile);
+        }
+
+        // Load follower/following counts and follow status (only on first page)
         const finalIdentity = resolvedIdentity ?? targetIdentity;
         const userHandle = finalIdentity?.handle?.replace(/^@/, '').trim();
-        if (userHandle) {
+        if (userHandle && pageNum === 0) {
           try {
             // Fetch fresh user profile data to get follow status
             console.log('[Profile] Fetching user profile for follow status:', userHandle);
@@ -526,9 +583,22 @@ export default function ProfileScreen({ navigation, route }: any) {
     return unsubscribe;
   }, [navigation, load]);
 
+  const loadMore = React.useCallback(async () => {
+    if (loadingMore || !hasMore) return;
+
+    console.log('[ProfileScreen] Loading more posts, page:', page + 1);
+    setLoadingMore(true);
+    const nextPage = page + 1;
+    await load({ skipSpinner: true, pageNum: nextPage, append: true });
+    setPage(nextPage);
+    setLoadingMore(false);
+  }, [loadingMore, hasMore, page, load]);
+
   const onRefresh = React.useCallback(() => {
     setRefreshing(true);
-    load({ skipSpinner: true }).finally(() => setRefreshing(false));
+    setPage(0);
+    setHasMore(true);
+    load({ skipSpinner: true, pageNum: 0, append: false }).finally(() => setRefreshing(false));
   }, [load]);
 
   const handlePostUpdated = React.useCallback((updatedPost: Post) => {
@@ -764,6 +834,15 @@ export default function ProfileScreen({ navigation, route }: any) {
         keyExtractor={(item) => item.id}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={
+          loadingMore ? (
+            <View style={{ paddingVertical: spacing[4], alignItems: 'center' }}>
+              <ActivityIndicator size="small" color={colors.primary[500]} />
+            </View>
+          ) : null
         }
         ListHeaderComponent={
           <View style={styles.header}>
