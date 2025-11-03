@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NotificationsAPI, PostsAPI } from '../api';
 import { Notification } from '../types';
@@ -212,8 +213,11 @@ export default function NotificationsScreen(){
             <TouchableOpacity
               style={styles.postLinkContainer}
               onPress={() => handleNavigateToPost(postId)}
+              activeOpacity={0.7}
             >
-              <Text style={styles.postLink}>View post →</Text>
+              <Ionicons name="document-text-outline" size={16} color={styles.postLinkIcon.color} />
+              <Text style={styles.postLink}>View post</Text>
+              <Ionicons name="chevron-forward" size={16} color={styles.postLinkIcon.color} />
             </TouchableOpacity>
           )}
           {followRequest && handledAction && (
@@ -382,18 +386,27 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontWeight: '600',
   },
   postLinkContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing[2],
     marginTop: spacing[3],
-    paddingVertical: spacing[2],
-    paddingHorizontal: spacing[3],
-    backgroundColor: colors.background.secondary,
-    borderRadius: borderRadius.base,
-    borderLeftWidth: 3,
-    borderLeftColor: colors.primary[500],
+    paddingVertical: spacing[3],
+    paddingHorizontal: spacing[4],
+    backgroundColor: colors.primary[50] || colors.background.secondary,
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: colors.primary[200] || colors.border.light,
+    ...shadows.sm,
   },
   postLink: {
-    color: colors.primary[500],
-    fontWeight: '600',
+    color: colors.primary[600] || colors.primary[500],
+    fontWeight: '700',
     fontSize: 14,
+    letterSpacing: 0.3,
+  },
+  postLinkIcon: {
+    color: colors.primary[500],
   },
   loadingMore: {
     paddingVertical: spacing[4],
