@@ -10,18 +10,22 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
-import { NotificationsAPI } from '../api';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { NotificationsAPI, PostsAPI } from '../api';
 import { Notification } from '../types';
 import { isFollowRequestNotification, useNotifications } from '../lib/notifications';
 import { useTheme, spacing, borderRadius, shadows } from '../theme';
 
 type NotificationListItem = Notification & { handledAction?: 'accept' | 'decline' };
 
+const INITIAL_LOAD_COUNT = 20;
+
 export default function NotificationsScreen(){
+  const navigation = useNavigation<any>();
   const { colors } = useTheme();
   const { markAllRead, recordSeen, refresh } = useNotifications();
-  const [items, setItems] = React.useState<NotificationListItem[]>([]);
+  const [allItems, setAllItems] = React.useState<NotificationListItem[]>([]);
+  const [displayedItems, setDisplayedItems] = React.useState<NotificationListItem[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [refreshing, setRefreshing] = React.useState(false);
   const [actionLoading, setActionLoading] = React.useState<string | null>(null);
@@ -39,7 +43,9 @@ export default function NotificationsScreen(){
       const nextItems = ((response.items || []) as Notification[]).map(
         (item) => ({ ...item } as NotificationListItem),
       );
-      setItems(nextItems);
+      setAllItems(nextItems);
+      // Initially show only the first INITIAL_LOAD_COUNT items
+      setDisplayedItems(nextItems.slice(0, INITIAL_LOAD_COUNT));
       await recordSeen(nextItems);
       markAllRead();
     } catch (error: any) {
@@ -66,6 +72,13 @@ export default function NotificationsScreen(){
     });
   }, [load, refresh]);
 
+  const loadMoreNotifications = React.useCallback(() => {
+    if (displayedItems.length < allItems.length) {
+      const nextCount = displayedItems.length + INITIAL_LOAD_COUNT;
+      setDisplayedItems(allItems.slice(0, nextCount));
+    }
+  }, [allItems, displayedItems]);
+
   const handleFollowAction = React.useCallback(
     async (notification: NotificationListItem, action: 'accept' | 'decline') => {
       const userId = notification.relatedUserId || notification.fromUserId;
@@ -80,13 +93,15 @@ export default function NotificationsScreen(){
         } else {
           await NotificationsAPI.declineFollow(userId);
         }
-        setItems((prev) =>
+        // Update both all items and displayed items
+        const updateItems = (prev: NotificationListItem[]) =>
           prev.map((item) =>
             item.id === notification.id
               ? { ...item, handledAction: action }
               : item,
-          ),
-        );
+          );
+        setAllItems(updateItems);
+        setDisplayedItems(updateItems);
         refresh();
       } catch (error: any) {
         console.warn('Unable to update follow request', error);
@@ -100,6 +115,50 @@ export default function NotificationsScreen(){
     },
     [refresh],
   );
+
+  const handleNavigateToProfile = React.useCallback((userId: string, userHandle?: string) => {
+    navigation.push('Profile', {
+      userId,
+      userHandle,
+    });
+  }, [navigation]);
+
+  const handleNavigateToPost = React.useCallback(async (postId: string) => {
+    try {
+      const response = await PostsAPI.getPost(postId);
+      if (response.post) {
+        navigation.navigate('Post', { post: response.post });
+      }
+    } catch (error: any) {
+      console.warn('Failed to load post', error);
+      Alert.alert('Post', 'Unable to load this post.');
+    }
+  }, [navigation]);
+
+  const renderClickableMessage = React.useCallback((message: string) => {
+    // Parse message for @mentions and make them clickable
+    const parts = message.split(/(@\w+)/g);
+
+    return (
+      <Text style={styles.message}>
+        {parts.map((part, index) => {
+          if (part.startsWith('@')) {
+            const handle = part.substring(1);
+            return (
+              <Text
+                key={index}
+                style={styles.mention}
+                onPress={() => handleNavigateToProfile('', handle)}
+              >
+                {part}
+              </Text>
+            );
+          }
+          return <Text key={index}>{part}</Text>;
+        })}
+      </Text>
+    );
+  }, [handleNavigateToProfile, styles]);
 
   const renderEmpty = React.useMemo(() => {
     if (loading) {
@@ -126,18 +185,31 @@ export default function NotificationsScreen(){
       const declineBusy = actionLoading === declineKey;
       const timestamp = item.createdAt ? new Date(item.createdAt) : null;
       const sender = item.fromHandle || item.fromUserId?.slice(0, 8) || 'unknown';
+      const hasRelatedPost = !!item.relatedPostId;
 
       return (
         <View style={styles.card}>
           <View style={styles.cardHeader}>
-            <Text style={styles.sender}>@{sender}</Text>
+            <TouchableOpacity
+              onPress={() => handleNavigateToProfile(item.fromUserId, item.fromHandle)}
+            >
+              <Text style={styles.sender}>@{sender}</Text>
+            </TouchableOpacity>
             {followRequest && !handledAction && (
               <View style={styles.requestBadge}>
                 <Text style={styles.requestBadgeText}>Request</Text>
               </View>
             )}
           </View>
-          <Text style={styles.message}>{item.message || 'Notification'}</Text>
+          {renderClickableMessage(item.message || 'Notification')}
+          {hasRelatedPost && (
+            <TouchableOpacity
+              style={styles.postLinkContainer}
+              onPress={() => handleNavigateToPost(item.relatedPostId!)}
+            >
+              <Text style={styles.postLink}>View post →</Text>
+            </TouchableOpacity>
+          )}
           {followRequest && handledAction && (
             <Text
               style={[
@@ -182,14 +254,14 @@ export default function NotificationsScreen(){
         </View>
       );
     },
-    [actionLoading, handleFollowAction],
+    [actionLoading, handleFollowAction, handleNavigateToProfile, handleNavigateToPost, renderClickableMessage, styles],
   );
 
   return (
     <View style={styles.container}>
       <FlatList
         contentContainerStyle={styles.listContent}
-        data={items}
+        data={displayedItems}
         keyExtractor={(it) => it.id}
         renderItem={renderItem}
         refreshControl={
@@ -197,6 +269,15 @@ export default function NotificationsScreen(){
         }
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         ListEmptyComponent={renderEmpty}
+        onEndReached={loadMoreNotifications}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={
+          displayedItems.length < allItems.length ? (
+            <View style={styles.loadingMore}>
+              <ActivityIndicator size="small" />
+            </View>
+          ) : null
+        }
       />
     </View>
   );
@@ -289,5 +370,27 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   separator: {
     height: spacing[3],
+  },
+  mention: {
+    color: colors.primary[500],
+    fontWeight: '600',
+  },
+  postLinkContainer: {
+    marginTop: spacing[3],
+    paddingVertical: spacing[2],
+    paddingHorizontal: spacing[3],
+    backgroundColor: colors.background.secondary,
+    borderRadius: borderRadius.base,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.primary[500],
+  },
+  postLink: {
+    color: colors.primary[500],
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  loadingMore: {
+    paddingVertical: spacing[4],
+    alignItems: 'center',
   },
 });
