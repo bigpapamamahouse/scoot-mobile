@@ -31,8 +31,12 @@ export interface Notification {
   createdAt: string;
   relatedUserId?: string;
   relatedPostId?: string;
+  postId?: string | null;
+  postUrl?: string;
+  userUrl?: string;
   fromHandle?: string;
   fromUserId: string;
+  avatarKey?: string;
 }
 
 export interface Comment {

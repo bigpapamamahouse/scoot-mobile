@@ -43,12 +43,6 @@ export default function NotificationsScreen(){
       const nextItems = ((response.items || []) as Notification[]).map(
         (item) => ({ ...item } as NotificationListItem),
       );
-
-      // Debug: Log a sample notification to see its structure
-      if (nextItems.length > 0) {
-        console.log('Sample notification:', JSON.stringify(nextItems[0], null, 2));
-      }
-
       setAllItems(nextItems);
       // Initially show only the first INITIAL_LOAD_COUNT items
       setDisplayedItems(nextItems.slice(0, INITIAL_LOAD_COUNT));
@@ -191,16 +185,9 @@ export default function NotificationsScreen(){
       const declineBusy = actionLoading === declineKey;
       const timestamp = item.createdAt ? new Date(item.createdAt) : null;
       const sender = item.fromHandle || item.fromUserId?.slice(0, 8) || 'unknown';
-      const hasRelatedPost = !!item.relatedPostId;
-
-      // Debug: Log notification details
-      console.log(`Notification ${item.id}:`, {
-        type: item.type,
-        message: item.message,
-        relatedPostId: item.relatedPostId,
-        hasRelatedPost,
-        fullItem: item,
-      });
+      // Check for both postId and relatedPostId (backend uses postId)
+      const hasRelatedPost = !!(item.postId || item.relatedPostId);
+      const postId = item.postId || item.relatedPostId;
 
       return (
         <View style={styles.card}>
@@ -217,10 +204,10 @@ export default function NotificationsScreen(){
             )}
           </View>
           {renderClickableMessage(item.message || 'Notification')}
-          {hasRelatedPost && (
+          {hasRelatedPost && postId && (
             <TouchableOpacity
               style={styles.postLinkContainer}
-              onPress={() => handleNavigateToPost(item.relatedPostId!)}
+              onPress={() => handleNavigateToPost(postId)}
             >
               <Text style={styles.postLink}>View post →</Text>
             </TouchableOpacity>
