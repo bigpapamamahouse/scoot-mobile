@@ -256,11 +256,7 @@ const applyAvatarDetails = (target: Record<string, unknown>, candidates: string[
 };
 
 export async function me(){
-  console.log('[API] me() called');
   const result = await api('/me');
-  console.log('[API] me() response:', result);
-  console.log('[API] me() result.id:', (result as any)?.id);
-  console.log('[API] me() result.userId:', (result as any)?.userId);
 
   if (!isRecord(result)) {
     return result;
@@ -397,7 +393,6 @@ export async function updateMe(payload: { fullName?: string | null; avatarKey?: 
 }
 
 export async function updateAvatar(avatarKey: string | null) {
-  console.log('[API] updateAvatar called with key:', avatarKey);
   const body: Record<string, unknown> = {
     key: avatarKey ?? null,
   };
@@ -406,9 +401,7 @@ export async function updateAvatar(avatarKey: string | null) {
 }
 
 export async function getUser(handle: string){
-  console.log('[API] getUser called with handle:', handle);
   const result = await api(`/u/${encodeURIComponent(handle)}`);
-  console.log('[API] getUser response:', result);
   return result;
 }
 
@@ -528,13 +521,9 @@ export async function getUserByIdentity(options: UserIdentityOptions = {}): Prom
   let lastError: unknown;
   for (const path of attempts) {
     try {
-      console.log('[getUserByIdentity] Trying path:', path);
       const payload = await api(path);
-      console.log('[getUserByIdentity] Payload from', path, ':', payload);
       const user = extractUserFromPayload(payload);
-      console.log('[getUserByIdentity] Extracted user:', user);
       if (user) {
-        console.log('[getUserByIdentity] Success! Returning user with ID:', user.id);
         return user;
       }
       console.warn(`User lookup ${path} returned unrecognized shape`, payload);
@@ -593,27 +582,17 @@ export async function searchUsers(query: string): Promise<User[]> {
 }
 
 export async function followUser(handle: string) {
-  console.log('[API] followUser called with handle:', handle);
   const requestBody = { handle };
-  console.log('[API] followUser request body:', JSON.stringify(requestBody));
 
   const result = await api('/follow-request', {
     method: 'POST',
     body: JSON.stringify(requestBody)
   });
 
-  console.log('[API] followUser response:', result);
-  console.log('[API] followUser response type:', typeof result);
-  console.log('[API] followUser response JSON:', JSON.stringify(result, null, 2));
-  if (result && typeof result === 'object') {
-    console.log('[API] followUser response keys:', Object.keys(result));
-  }
   return result;
 }
 
 export async function unfollowUser(handle: string) {
-  console.log('[API] unfollowUser called with handle:', handle);
-
   // Try different unfollow endpoint patterns
   const attempts = [
     { method: 'POST', path: '/unfollow', body: JSON.stringify({ handle }) },
@@ -625,18 +604,15 @@ export async function unfollowUser(handle: string) {
   let lastError: any;
   for (const attempt of attempts) {
     try {
-      console.log(`[API] Trying unfollow: ${attempt.method} ${attempt.path}`);
       const result = await api(attempt.path, {
         method: attempt.method,
         body: attempt.body
       });
-      console.log('[API] unfollowUser success with:', attempt.path, result);
       return result;
     } catch (err: any) {
       lastError = err;
       const message = String(err?.message || '');
       if (message.includes('404')) {
-        console.log(`[API] ${attempt.path} returned 404, trying next...`);
         continue;
       }
       // If it's not a 404, throw immediately

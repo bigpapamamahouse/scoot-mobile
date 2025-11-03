@@ -223,7 +223,6 @@ export default function ProfileScreen({ navigation, route }: any) {
 
   const load = React.useCallback(
     async (options?: { skipSpinner?: boolean; pageNum?: number; append?: boolean }) => {
-      console.log('[ProfileScreen] load() called, skipSpinner:', options?.skipSpinner, 'pageNum:', options?.pageNum);
       if (!options?.skipSpinner) {
         setLoading(true);
       }
@@ -269,10 +268,6 @@ export default function ProfileScreen({ navigation, route }: any) {
         let currentUser: User | null = null;
         try {
           currentUser = await UsersAPI.me();
-          console.log('[ProfileScreen] currentUser from me():', currentUser);
-          console.log('[ProfileScreen] currentUser avatarKey:', currentUser?.avatarKey);
-          console.log('[ProfileScreen] currentUser?.id:', currentUser?.id);
-          console.log('[ProfileScreen] currentUser?.userId:', (currentUser as any)?.userId);
         } catch (viewerError: any) {
           console.warn(
             'Failed to load signed-in user profile:',
@@ -296,7 +291,6 @@ export default function ProfileScreen({ navigation, route }: any) {
           }
           return null;
         })();
-        console.log('[Profile] viewerId after me():', viewerId);
 
         const isSelfRequest = (() => {
           if (!targetHandle && !targetUserId) {
@@ -337,12 +331,10 @@ export default function ProfileScreen({ navigation, route }: any) {
 
         if (!targetIdentity && (targetHandle || targetUserId)) {
           try {
-            console.log('[Profile] Fetching user by identity:', { handle: targetHandle, userId: targetUserId });
             const fetched = await UsersAPI.getUserByIdentity({
               handle: targetHandle,
               userId: targetUserId,
             });
-            console.log('[Profile] getUserByIdentity returned:', fetched);
             if (fetched) {
               targetIdentity = {
                 id: fetched.id ?? null,
@@ -352,13 +344,11 @@ export default function ProfileScreen({ navigation, route }: any) {
                 fullName: fetched.fullName ?? null,
                 createdAt: fetched.createdAt ?? null,
               };
-              console.log('[Profile] Created targetIdentity:', targetIdentity);
               if (fetched.handle) {
                 targetHandle = fetched.handle.replace(/^@/, '').trim() || targetHandle;
               }
               if (fetched.id) {
                 targetUserId = fetched.id;
-                console.log('[Profile] Set targetUserId:', targetUserId);
               } else {
                 console.warn('[Profile] Fetched user has no ID!');
               }
@@ -395,14 +385,12 @@ export default function ProfileScreen({ navigation, route }: any) {
         if (!append && pageNum === 0) {
           const cachedPosts = cache.get<Post[]>(CacheKeys.userPosts(cacheIdentifier, 0));
           if (cachedPosts && cachedPosts.length > 0) {
-            console.log('[ProfileScreen] Loading posts from cache:', cachedPosts.length, 'posts');
             setPosts(cachedPosts);
           }
 
           // Also try to load cached user profile
           const cachedUser = cache.get<ProfileIdentity>(CacheKeys.userProfile(cacheIdentifier));
           if (cachedUser) {
-            console.log('[ProfileScreen] Loading user from cache');
             setUser(cachedUser);
           }
         }
@@ -473,14 +461,9 @@ export default function ProfileScreen({ navigation, route }: any) {
 
         if (!resolvedIdentity && filteredPosts.length) {
           resolvedIdentity = deriveIdentityFromPosts(filteredPosts);
-          console.log('[Profile] Derived identity from posts:', resolvedIdentity);
         }
 
         const finalUserToSet = resolvedIdentity ?? targetIdentity ?? null;
-        console.log('[ProfileScreen] Setting user state:', finalUserToSet);
-        console.log('[ProfileScreen] User avatarKey being set:', finalUserToSet?.avatarKey);
-        console.log('[ProfileScreen] resolvedIdentity:', resolvedIdentity);
-        console.log('[ProfileScreen] targetIdentity:', targetIdentity);
         setUser(finalUserToSet);
 
         // Cache user profile (only on first page load)
@@ -495,9 +478,7 @@ export default function ProfileScreen({ navigation, route }: any) {
         if (userHandle && pageNum === 0) {
           try {
             // Fetch fresh user profile data to get follow status
-            console.log('[Profile] Fetching user profile for follow status:', userHandle);
             const profileData = await UsersAPI.getUser(userHandle);
-            console.log('[Profile] Profile data:', profileData);
 
             const followersData = await UsersAPI.listFollowers(userHandle);
             const followers = Array.isArray(followersData) ? followersData :
@@ -511,49 +492,36 @@ export default function ProfileScreen({ navigation, route }: any) {
 
             // Check follow status from profile data
             // Use viewerId from earlier in the function (it's in the same scope)
-            console.log('[Profile] Checking follow status - isSelfRequest:', isSelfRequest, 'viewerId:', viewerId);
             if (!isSelfRequest) {
-              console.log('[Profile] Entered follow status check block');
               // Use followStatus and isFollowPending from API if available
               if (profileData && typeof profileData === 'object') {
-                console.log('[Profile] profileData is valid object');
                 if ('isFollowPending' in profileData && profileData.isFollowPending === true) {
-                  console.log('[Profile] Follow status: pending (from API)');
                   setFollowStatus('pending');
                 } else if ('followStatus' in profileData) {
                   const status = profileData.followStatus;
-                  console.log('[Profile] followStatus field found:', status);
                   if (status === 'pending' || status === 'requested') {
-                    console.log('[Profile] Follow status: pending (from followStatus)');
                     setFollowStatus('pending');
                   } else if (status === 'following' || status === 'accepted') {
-                    console.log('[Profile] Follow status: following (from followStatus)');
                     setFollowStatus('following');
                   } else {
-                    console.log('[Profile] Follow status: none (from followStatus)');
                     setFollowStatus('none');
                   }
                 } else if ('isFollowing' in profileData && profileData.isFollowing === true) {
-                  console.log('[Profile] Follow status: following (from isFollowing)');
                   setFollowStatus('following');
                 } else {
                   // Fallback: check if in followers list (requires viewerId)
                   const isUserFollowing = viewerId
                     ? followers.some((f: any) => f.id === viewerId)
                     : false;
-                  console.log('[Profile] Follow status: fallback check -', isUserFollowing ? 'following' : 'none');
                   setFollowStatus(isUserFollowing ? 'following' : 'none');
                 }
               } else {
-                console.log('[Profile] profileData is not a valid object');
                 // Fallback: check if in followers list (requires viewerId)
                 const isUserFollowing = viewerId
                   ? followers.some((f: any) => f.id === viewerId)
                   : false;
                 setFollowStatus(isUserFollowing ? 'following' : 'none');
               }
-            } else {
-              console.log('[Profile] Skipped follow status check - isSelfRequest:', isSelfRequest, 'viewerId:', viewerId);
             }
           } catch (err) {
             console.warn('Failed to load follower/following counts:', err);
@@ -586,7 +554,6 @@ export default function ProfileScreen({ navigation, route }: any) {
   const loadMore = React.useCallback(async () => {
     if (loadingMore || !hasMore) return;
 
-    console.log('[ProfileScreen] Loading more posts, page:', page + 1);
     setLoadingMore(true);
     const nextPage = page + 1;
     await load({ skipSpinner: true, pageNum: nextPage, append: true });
@@ -696,21 +663,13 @@ export default function ProfileScreen({ navigation, route }: any) {
   }, [isViewingSelf, user?.fullName, user?.handle, user?.id]);
 
   const handleFollowPress = React.useCallback(async () => {
-    console.log('[Follow] Button pressed');
-    console.log('[Follow] User:', user);
-    console.log('[Follow] User handle:', user?.handle);
-    console.log('[Follow] Follow status:', followStatus);
-    console.log('[Follow] Follow loading:', followLoading);
-
     const userHandle = user?.handle?.replace(/^@/, '');
     if (!userHandle || followLoading) {
-      console.log('[Follow] Blocked - userHandle:', userHandle, 'followLoading:', followLoading);
       return;
     }
 
     // If already following, show confirmation dialog
     if (followStatus === 'following') {
-      console.log('[Follow] Already following, showing unfollow dialog');
       Alert.alert(
         'Unfollow',
         `Are you sure you want to unfollow @${userHandle}?`,
@@ -723,11 +682,9 @@ export default function ProfileScreen({ navigation, route }: any) {
             text: 'Unfollow',
             style: 'destructive',
             onPress: async () => {
-              console.log('[Follow] Unfollowing user:', userHandle);
               setFollowLoading(true);
               try {
                 await UsersAPI.unfollowUser(userHandle);
-                console.log('[Follow] Unfollow successful');
                 setFollowStatus('none');
                 setFollowerCount(prev => Math.max(0, prev - 1));
               } catch (err: any) {
@@ -744,15 +701,9 @@ export default function ProfileScreen({ navigation, route }: any) {
     }
 
     // Send follow request
-    console.log('[Follow] Sending follow request to user:', userHandle);
     setFollowLoading(true);
     try {
       const response = await UsersAPI.followUser(userHandle);
-      console.log('[Follow] Follow response:', response);
-      console.log('[Follow] Follow response type:', typeof response);
-      if (response && typeof response === 'object') {
-        console.log('[Follow] Follow response keys:', Object.keys(response));
-      }
 
       // Check if response indicates a pending request or immediate follow
       // Look for various possible response formats
@@ -783,11 +734,9 @@ export default function ProfileScreen({ navigation, route }: any) {
       }
 
       if (isImmediate) {
-        console.log('[Follow] Status: following (immediate/auto-accepted)');
         setFollowStatus('following');
         setFollowerCount(prev => prev + 1);
       } else {
-        console.log('[Follow] Status: pending (requires approval)');
         setFollowStatus('pending');
         // Don't increment follower count yet since it's pending
       }

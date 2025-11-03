@@ -23,9 +23,7 @@ const resolveAvatarUri = (value?: string | null): string | null => {
 export function Avatar({ avatarKey, size = 32 }: { avatarKey?: string | null; size?: number }){
   const { colors } = useTheme();
   const uri = resolveAvatarUri(avatarKey);
-  console.log('[Avatar] avatarKey:', avatarKey, 'resolved uri:', uri);
   if (!uri) {
-    console.log('[Avatar] No URI, showing placeholder');
     return <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: colors.neutral[300] }} />;
   }
   return (
@@ -33,7 +31,6 @@ export function Avatar({ avatarKey, size = 32 }: { avatarKey?: string | null; si
       source={{ uri }}
       style={{ width: size, height: size, borderRadius: size / 2 }}
       onError={(error) => console.error('[Avatar] Image load error:', error.nativeEvent)}
-      onLoad={() => console.log('[Avatar] Image loaded successfully:', uri)}
     />
   );
 }

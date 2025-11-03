@@ -114,14 +114,12 @@ export default function SettingsScreen({ navigation }: any) {
         normalizedInviteCode = await ensureInviteCode(normalizedId);
       }
 
-      console.log('[SettingsScreen loadViewer] Setting state - avatarKey:', normalizedAvatarKey);
       setFullName(normalizedFullName);
       setInitialFullName(normalizedFullName);
       setAvatarKey(normalizedAvatarKey);
       setInitialAvatarKey(normalizedAvatarKey);
       setInviteCode(normalizedInviteCode);
       setAvatarPreviewUri(null);
-      console.log('[SettingsScreen loadViewer] Avatar preview URI cleared');
 
       if (normalizedInviteCode && normalizedId) {
         await writeStoredInviteCode(normalizedId, normalizedInviteCode);
@@ -151,12 +149,9 @@ export default function SettingsScreen({ navigation }: any) {
     async (uri: string) => {
       setUploading(true);
       try {
-        console.log('[SettingsScreen] Starting avatar upload...');
         const key = await uploadMedia({ uri, intent: 'avatar-image' });
-        console.log('[SettingsScreen] Upload complete, key:', key);
         setAvatarKey(key);
         const remotePreview = mediaUrlFromKey(key);
-        console.log('[SettingsScreen] Remote preview URL:', remotePreview);
         setAvatarPreviewUri(remotePreview ?? uri);
       } catch (error: any) {
         console.error('[SettingsScreen] Failed to upload avatar:', error);
