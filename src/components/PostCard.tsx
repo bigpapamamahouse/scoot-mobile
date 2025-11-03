@@ -193,15 +193,7 @@ export default function PostCard({
   React.useEffect(() => {
     ReactionsAPI.getReactions(post.id)
       .then((data) => {
-        console.log('=== REACTIONS API RESPONSE ===');
-        console.log('Post ID:', post.id);
-        console.log('Raw data:', JSON.stringify(data, null, 2));
-
         const reactionsData = parseReactionsResponse(data);
-
-        console.log('Parsed reactions:', JSON.stringify(reactionsData, null, 2));
-        console.log('Reactions count:', reactionsData.length);
-
         setReactions(reactionsData);
       })
       .catch((e) => {
@@ -211,24 +203,16 @@ export default function PostCard({
 
   const handleReaction = async (emoji: string) => {
     try {
-      console.log('=== TOGGLING REACTION ===');
-      console.log('Emoji:', emoji);
-      console.log('Post ID:', post.id);
-
       const response = await ReactionsAPI.toggleReaction(post.id, emoji);
-      console.log('Toggle response:', JSON.stringify(response, null, 2));
 
       // Reload reactions
       const data = await ReactionsAPI.getReactions(post.id);
-      console.log('Reloaded reactions:', JSON.stringify(data, null, 2));
 
       const reactionsData = parseReactionsResponse(data);
-      console.log('Setting reactions to:', JSON.stringify(reactionsData, null, 2));
 
       setReactions(reactionsData);
     } catch (e: any) {
       console.error('Failed to toggle reaction:', e);
-      console.error('Error details:', e?.message, e?.response);
     }
   };
 
@@ -239,8 +223,6 @@ export default function PostCard({
 
     try {
       const data = await ReactionsAPI.getReactionsWho(post.id);
-      console.log('=== DETAILED REACTIONS API RESPONSE ===');
-      console.log('Raw data:', JSON.stringify(data, null, 2));
 
       // Parse response format: { counts: { emoji: count }, my: [emoji], who: { emoji: [users] } }
       let reactionsWithUsers: ReactionWithUsers[] = [];
@@ -267,7 +249,6 @@ export default function PostCard({
         }
       }
 
-      console.log('Parsed detailed reactions:', JSON.stringify(reactionsWithUsers, null, 2));
       setDetailedReactions(reactionsWithUsers);
     } catch (e: any) {
       console.error('Failed to load reaction details:', e);

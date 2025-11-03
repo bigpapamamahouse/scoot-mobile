@@ -28,14 +28,9 @@ export async function checkAuthStatus(): Promise<boolean> {
 
 export async function signInFn(username: string, password: string): Promise<SignInResult> {
   try {
-    console.log('=== signIn attempt ===');
-    console.log('Username:', username);
-    console.log('Password length:', password?.length || 0);
-
     // Check if user is already signed in
     const isSignedIn = await checkAuthStatus();
     if (isSignedIn) {
-      console.log('User already signed in, signing out first...');
       await signOut();
       await clearAuth();
     }
@@ -50,13 +45,7 @@ export async function signInFn(username: string, password: string): Promise<Sign
       },
     };
 
-    console.log('SignIn input:', { ...signInInput, password: '***', options: signInInput.options });
-
     const out: SignInOutput = await signIn(signInInput);
-
-    // Debug the full output
-    console.log('signIn output:', JSON.stringify(out, null, 2));
-    console.log('signIn nextStep:', JSON.stringify(out?.nextStep, null, 2));
 
     switch (out?.nextStep?.signInStep) {
       case 'CONFIRM_SIGN_UP':
@@ -69,12 +58,7 @@ export async function signInFn(username: string, password: string): Promise<Sign
       case 'DONE':
       default: {
         // We're signed in, fetch tokens
-        console.log('Fetching auth session...');
         const session = await fetchAuthSession();
-        console.log('Session obtained:', {
-          hasTokens: !!session.tokens,
-          hasIdToken: !!session.tokens?.idToken
-        });
         const idToken = session.tokens?.idToken?.toString() || '';
         if (!idToken) throw new Error('No ID token in session');
         await writeIdToken(idToken);
@@ -82,21 +66,7 @@ export async function signInFn(username: string, password: string): Promise<Sign
       }
     }
   } catch (e: any) {
-    console.error('=== signIn ERROR ===');
-    console.error('Error object:', e);
-    console.error('Error name:', e?.name);
-    console.error('Error message:', e?.message);
-    console.error('Error stack:', e?.stack);
-    console.error('Error code:', e?.code);
-    console.error('Error underlyingError:', e?.underlyingError);
-    console.error('Error stringified:', JSON.stringify(e, null, 2));
-    console.error('Full error keys:', Object.keys(e || {}));
-
-    // Try to extract more info from underlyingError
-    if (e?.underlyingError) {
-      console.error('Underlying error details:', JSON.stringify(e.underlyingError, null, 2));
-      console.error('Underlying error keys:', Object.keys(e.underlyingError || {}));
-    }
+    console.error('Sign in error:', e?.name || 'UnknownError', '-', e?.message || e?.toString());
 
     // Common Cognito errors include UserNotConfirmedException, NotAuthorizedException, UserNotFoundException, etc.
     const errorName = e?.name || 'UnknownError';

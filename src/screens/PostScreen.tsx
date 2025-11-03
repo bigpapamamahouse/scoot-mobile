@@ -28,9 +28,6 @@ interface PostScreenRoute {
 
 // Helper function to normalize comment data and extract avatarKey from various possible fields
 const normalizeComment = (comment: any): Comment => {
-  // Log the raw comment to see what we're receiving
-  console.log('[PostScreen] Raw comment data:', JSON.stringify(comment, null, 2));
-
   // Try to find avatarKey from various possible field names
   const avatarKey =
     comment.avatarKey ||
@@ -45,8 +42,6 @@ const normalizeComment = (comment: any): Comment => {
     comment.author?.avatar_key ||
     comment.author?.avatar ||
     null;
-
-  console.log('[PostScreen] Resolved avatarKey:', avatarKey);
 
   return {
     ...comment,
@@ -132,7 +127,6 @@ export default function PostScreen({ route, navigation }: { route: PostScreenRou
     setLoading(true);
     try {
       const result = await CommentsAPI.listComments(postId);
-      console.log('[PostScreen] Raw comments API response:', JSON.stringify(result, null, 2));
 
       const dataArray = Array.isArray(result)
         ? result
@@ -151,8 +145,6 @@ export default function PostScreen({ route, navigation }: { route: PostScreenRou
       // Fetch user avatars for comments that don't have avatarKey
       const commentsNeedingAvatars = normalizedComments.filter(c => !c.avatarKey && c.userId);
       if (commentsNeedingAvatars.length > 0) {
-        console.log('[PostScreen] Fetching avatars for', commentsNeedingAvatars.length, 'users');
-
         // Get unique userIds
         const uniqueUserIds = [...new Set(commentsNeedingAvatars.map(c => c.userId))];
 
@@ -160,7 +152,6 @@ export default function PostScreen({ route, navigation }: { route: PostScreenRou
         const userDataPromises = uniqueUserIds.map(async (userId) => {
           try {
             const userData = await UsersAPI.getUserByIdentity({ userId });
-            console.log('[PostScreen] User data for', userId, ':', userData);
             return { userId, avatarKey: userData?.avatarKey || null };
           } catch (error) {
             console.warn('[PostScreen] Failed to fetch user data for', userId, error);
@@ -178,11 +169,8 @@ export default function PostScreen({ route, navigation }: { route: PostScreenRou
           }
           return comment;
         });
-
-        console.log('[PostScreen] Comments after merging avatar data:', normalizedComments);
       }
 
-      console.log('[PostScreen] Final normalized comments:', normalizedComments.length);
       setComments(normalizedComments);
       setPost((prev) =>
         prev ? { ...prev, commentCount: totalCount } : prev
@@ -220,18 +208,15 @@ export default function PostScreen({ route, navigation }: { route: PostScreenRou
     setSubmitting(true);
     try {
       const result = await CommentsAPI.addComment(postId, trimmed);
-      console.log('[PostScreen] Add comment response:', JSON.stringify(result, null, 2));
 
       const created: Comment | null = (result && (result.comment || result.item || result.data || result)) || null;
       if (created) {
         // Normalize the newly created comment to extract avatarKey
         let normalizedComment = normalizeComment(created);
-        console.log('[PostScreen] Normalized new comment:', normalizedComment);
 
         // If the new comment doesn't have an avatarKey, use the current user's avatar
         if (!normalizedComment.avatarKey && currentUser) {
           const userAvatar = (currentUser as any).avatarKey || null;
-          console.log('[PostScreen] Using current user avatar:', userAvatar);
           normalizedComment = { ...normalizedComment, avatarKey: userAvatar };
         }
 
