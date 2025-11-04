@@ -139,6 +139,12 @@ export default function FeedScreen({ navigation }: any){
             post={item}
             onPress={() => navigation.navigate('Post', { post: item })}
             onPressAuthor={() => openProfile(item)}
+            onPressUser={(userId, userHandle) => {
+              navigation.push('Profile', {
+                userHandle: userHandle,
+                userId: userId,
+              });
+            }}
             onPostUpdated={handlePostUpdated}
             onPostDeleted={handlePostDeleted}
           />

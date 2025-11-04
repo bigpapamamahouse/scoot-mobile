@@ -365,6 +365,12 @@ export default function PostScreen({ route, navigation }: { route: PostScreenRou
               <PostCard
                 post={post}
                 onPressAuthor={() => openProfile(post)}
+                onPressUser={(userId, userHandle) => {
+                  navigation.push('Profile', {
+                    userHandle: userHandle,
+                    userId: userId,
+                  });
+                }}
                 showCommentPreview={false}
               />
               <Text style={styles.commentHeaderLabel}>Comments</Text>

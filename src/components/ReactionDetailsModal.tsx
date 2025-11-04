@@ -4,6 +4,7 @@ import {
   View,
   Text,
   TouchableOpacity,
+  Pressable,
   FlatList,
   StyleSheet,
   ActivityIndicator,
@@ -19,6 +20,7 @@ interface ReactionDetailsModalProps {
   onClose: () => void;
   reactions: ReactionWithUsers[];
   loading?: boolean;
+  onUserPress?: (userId: string, userHandle?: string) => void;
 }
 
 export function ReactionDetailsModal({
@@ -26,9 +28,24 @@ export function ReactionDetailsModal({
   onClose,
   reactions,
   loading = false,
+  onUserPress,
 }: ReactionDetailsModalProps) {
   const { colors } = useTheme();
   const styles = React.useMemo(() => createStyles(colors), [colors]);
+
+  // Debug logging
+  React.useEffect(() => {
+    if (visible) {
+      console.log('[ReactionDetailsModal] Modal opened, onUserPress available:', !!onUserPress);
+      console.log('[ReactionDetailsModal] Reactions count:', reactions.length);
+      reactions.forEach((r, i) => {
+        console.log(`[ReactionDetailsModal] Reaction ${i}: ${r.emoji}, users:`, r.users?.length || 0);
+        r.users?.forEach((u, j) => {
+          console.log(`  User ${j}: id=${u.id}, handle=${u.handle}`);
+        });
+      });
+    }
+  }, [visible, onUserPress, reactions]);
 
   const renderReactionSection = ({ item: reaction }: { item: ReactionWithUsers }) => {
     if (!reaction.users || reaction.users.length === 0) {
@@ -36,21 +53,52 @@ export function ReactionDetailsModal({
     }
 
     return (
-      <View style={styles.reactionSection}>
+      <View style={styles.reactionSection} pointerEvents="box-none">
         <View style={styles.reactionHeader}>
           <Text style={styles.reactionEmoji}>{reaction.emoji}</Text>
           <Text style={styles.reactionCount}>{reaction.count}</Text>
         </View>
-        <View style={styles.usersList}>
+        <View style={styles.usersList} pointerEvents="box-none">
           {reaction.users.map((user, index) => {
             const handle = resolveHandle(user);
             const userId = user.id || `user-${index}`;
             const displayHandle = handle ? `@${handle}` : `@${userId.slice(0, 8)}`;
+
+            const handlePress = () => {
+              console.log('[ReactionDetailsModal] User pressed:', {
+                userId: user.id,
+                handle,
+                hasOnUserPress: !!onUserPress,
+                canNavigate: !!(onUserPress && user.id)
+              });
+              if (onUserPress && user.id) {
+                console.log('[ReactionDetailsModal] Navigating to profile...');
+                onClose(); // Close modal before navigating
+                onUserPress(user.id, handle);
+              } else {
+                console.log('[ReactionDetailsModal] Cannot navigate - missing callback or userId');
+              }
+            };
+
+            const canPress = onUserPress && user.id;
+
             return (
-              <View key={`${reaction.emoji}-${userId}-${index}`} style={styles.userRow}>
+              <Pressable
+                key={`${reaction.emoji}-${userId}-${index}`}
+                style={({ pressed }) => [
+                  styles.userRow,
+                  canPress && styles.userRowClickable,
+                  pressed && canPress && styles.userRowPressed
+                ]}
+                onPress={handlePress}
+                disabled={!canPress}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
                 <Avatar avatarKey={user.avatarKey} size={32} />
-                <Text style={styles.userHandle}>{displayHandle}</Text>
-              </View>
+                <Text style={[styles.userHandle, canPress && styles.userHandleClickable]}>
+                  {displayHandle}
+                </Text>
+              </Pressable>
             );
           })}
         </View>
@@ -155,11 +203,23 @@ const createStyles = (colors: any) =>
       flexDirection: 'row',
       alignItems: 'center',
       gap: spacing[2],
-      paddingVertical: spacing[1],
+      paddingVertical: spacing[2],
+      paddingHorizontal: spacing[2],
+      borderRadius: borderRadius.md,
+    },
+    userRowClickable: {
+      backgroundColor: colors.background.primary,
+    },
+    userRowPressed: {
+      backgroundColor: colors.neutral[100],
+      opacity: 0.8,
     },
     userHandle: {
       ...typography.styles.body,
       color: colors.text.primary,
+    },
+    userHandleClickable: {
+      color: colors.primary[500],
     },
     loadingContainer: {
       padding: spacing[8],

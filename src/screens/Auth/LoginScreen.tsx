@@ -2,7 +2,6 @@ import React from 'react';
 import { View, Text, TextInput, Button, Alert, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { signInFn, checkAuthStatus } from '../../api/auth';
-import { directCognitoAuth } from '../../api/directCognitoAuth';
 
 export default function LoginScreen({ navigation }: any) {
   const [user, setUser] = React.useState('');
@@ -31,27 +30,6 @@ export default function LoginScreen({ navigation }: any) {
       </SafeAreaView>
     );
   }
-
-  const onDirectLogin = async () => {
-    if (!user || user.trim().length === 0) {
-      Alert.alert('Error', 'Please enter a username');
-      return;
-    }
-
-    if (!pass || pass.length === 0) {
-      Alert.alert('Error', 'Please enter a password');
-      return;
-    }
-
-    console.log('=== Using Direct Cognito Auth (Bypass Amplify) ===');
-    const result = await directCognitoAuth(user.trim(), pass);
-
-    if (result.success) {
-      Alert.alert('Direct Auth Success!', 'Check console for details. Amplify may have a configuration issue.');
-    } else {
-      Alert.alert('Direct Auth Failed', `Check console for details. Error: ${result.error?.__type || result.error || 'Unknown'}`);
-    }
-  };
 
   const onLogin = async () => {
     const r = await signInFn(user.trim(), pass);
@@ -99,8 +77,6 @@ export default function LoginScreen({ navigation }: any) {
               style={{ borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 12 }}
             />
             <Button title="Log in" onPress={onLogin} />
-            <View style={{ height: 8 }} />
-            <Button title="Test Direct Cognito Auth" onPress={onDirectLogin} color="#666" />
             <View style={{ height: 8 }} />
             <Button title="Need an account? Sign up" onPress={() => navigation.navigate('Signup')} />
           </View>

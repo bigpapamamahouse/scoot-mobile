@@ -144,10 +144,12 @@ export default function ComposePostScreen({ navigation }: any) {
         <TextInput
           style={styles.textInput}
           placeholder="What's on your mind?"
+          placeholderTextColor={colors.text.tertiary}
           value={text}
           onChangeText={setText}
           multiline
           maxLength={500}
+          autoFocus
         />
 
         {imageUri && (

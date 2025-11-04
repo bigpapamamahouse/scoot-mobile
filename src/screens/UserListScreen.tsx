@@ -13,6 +13,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { listFollowers, listFollowing } from '../api/users';
 import { Avatar } from '../components/Avatar';
 import type { User } from '../types';
+import { useTheme, spacing, typography } from '../theme';
 
 type RootStackParamList = {
   UserList: { handle: string; type: 'followers' | 'following' };
@@ -23,10 +24,13 @@ type Props = NativeStackScreenProps<RootStackParamList, 'UserList'>;
 
 export function UserListScreen({ route, navigation }: Props) {
   const { handle, type } = route.params;
+  const { colors } = useTheme();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
 
   const fetchUsers = useCallback(async (showLoading = true) => {
     if (showLoading) {
@@ -126,7 +130,7 @@ export function UserListScreen({ route, navigation }: Props) {
     <SafeAreaView style={styles.container}>
       {loading && !refreshing && (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#2196f3" />
+          <ActivityIndicator size="large" color={colors.primary[500]} />
         </View>
       )}
 
@@ -144,10 +148,10 @@ export function UserListScreen({ route, navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.background.primary,
   },
   loadingContainer: {
     padding: 20,
@@ -161,7 +165,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: colors.border.light,
   },
   userInfo: {
     marginLeft: 12,
@@ -170,12 +174,12 @@ const styles = StyleSheet.create({
   userName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#000',
+    color: colors.text.primary,
     marginBottom: 2,
   },
   userHandle: {
     fontSize: 14,
-    color: '#666',
+    color: colors.text.secondary,
   },
   emptyContainer: {
     flex: 1,
@@ -186,7 +190,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    color: '#999',
+    color: colors.text.tertiary,
     textAlign: 'center',
   },
 });
