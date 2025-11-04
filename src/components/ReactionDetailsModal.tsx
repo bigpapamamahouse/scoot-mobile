@@ -69,18 +69,18 @@ export function ReactionDetailsModal({
                 userId: user.id,
                 handle,
                 hasOnUserPress: !!onUserPress,
-                canNavigate: !!(onUserPress && user.id)
+                canNavigate: !!(onUserPress && (user.id || handle))
               });
-              if (onUserPress && user.id) {
+              if (onUserPress && (user.id || handle)) {
                 console.log('[ReactionDetailsModal] Navigating to profile...');
                 onClose(); // Close modal before navigating
-                onUserPress(user.id, handle);
+                onUserPress(user.id || '', handle);
               } else {
-                console.log('[ReactionDetailsModal] Cannot navigate - missing callback or userId');
+                console.log('[ReactionDetailsModal] Cannot navigate - missing callback, userId, and handle');
               }
             };
 
-            const canPress = onUserPress && user.id;
+            const canPress = onUserPress && (user.id || handle);
 
             return (
               <Pressable
