@@ -68,7 +68,7 @@ export default function LoginScreen({ navigation }: any) {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background.primary }} edges={[]}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.select({ ios: 'padding', android: undefined })}>
-        <ScrollView contentContainerStyle={{ minHeight: '100%', justifyContent: 'center', paddingVertical: 48 }}>
+        <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', paddingVertical: 24 }}>
           <View style={{ padding: 24, gap: 12, maxWidth: 400, width: '100%', alignSelf: 'center' }}>
             <Text style={{ fontSize: 24, fontWeight: '700', textAlign: 'center', marginBottom: 16, color: colors.text.primary }}>
               Welcome to ScooterBooter
