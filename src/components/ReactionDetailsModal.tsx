@@ -51,19 +51,26 @@ export function ReactionDetailsModal({
 
             const handlePress = () => {
               if (onUserPress && user.id) {
+                onClose(); // Close modal before navigating
                 onUserPress(user.id, handle);
               }
             };
 
+            const canPress = onUserPress && user.id;
+
             return (
               <TouchableOpacity
                 key={`${reaction.emoji}-${userId}-${index}`}
-                style={styles.userRow}
+                style={[styles.userRow, canPress && styles.userRowClickable]}
                 onPress={handlePress}
-                disabled={!onUserPress || !user.id}
+                disabled={!canPress}
+                activeOpacity={0.7}
+                hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
               >
                 <Avatar avatarKey={user.avatarKey} size={32} />
-                <Text style={styles.userHandle}>{displayHandle}</Text>
+                <Text style={[styles.userHandle, canPress && styles.userHandleClickable]}>
+                  {displayHandle}
+                </Text>
               </TouchableOpacity>
             );
           })}
@@ -169,11 +176,19 @@ const createStyles = (colors: any) =>
       flexDirection: 'row',
       alignItems: 'center',
       gap: spacing[2],
-      paddingVertical: spacing[1],
+      paddingVertical: spacing[2],
+      paddingHorizontal: spacing[2],
+      borderRadius: borderRadius.md,
+    },
+    userRowClickable: {
+      backgroundColor: colors.background.primary,
     },
     userHandle: {
       ...typography.styles.body,
       color: colors.text.primary,
+    },
+    userHandleClickable: {
+      color: colors.primary[500],
     },
     loadingContainer: {
       padding: spacing[8],
