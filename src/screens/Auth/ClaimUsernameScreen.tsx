@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '../../theme/ThemeContext';
 import { signInFn } from '../../api/auth';
-import { updateMe } from '../../api/users';
+import { updateMe, updateAvatar } from '../../api/users';
 import { uploadMedia } from '../../lib/upload';
 
 export default function ClaimUsernameScreen({ route, navigation }: any) {
@@ -66,31 +66,40 @@ export default function ClaimUsernameScreen({ route, navigation }: any) {
         throw new Error('Failed to sign in after confirmation');
       }
 
-      // Upload avatar if provided
-      let avatarKey: string | null = null;
-      if (avatarUri) {
-        try {
-          avatarKey = await uploadMedia({
-            uri: avatarUri,
-            intent: 'avatar-image',
-          });
-          console.log('Avatar uploaded:', avatarKey);
-        } catch (uploadError) {
-          console.warn('Failed to upload avatar:', uploadError);
-          // Continue without avatar if upload fails
-        }
-      }
-
-      // Update profile with handle, full name, and avatar
+      // Update profile with handle and full name
       try {
+        console.log('[ClaimUsername] Updating profile with:', {
+          handle: username.trim(),
+          fullName: fullName.trim(),
+        });
         await updateMe({
           handle: username.trim(),
           fullName: fullName.trim(),
-          ...(avatarKey && { avatarKey })
         });
+        console.log('[ClaimUsername] Profile updated successfully');
       } catch (updateError) {
-        console.warn('Failed to update profile:', updateError);
+        console.error('[ClaimUsername] Failed to update profile:', updateError);
+        Alert.alert('Warning', 'Failed to update profile information');
         // Continue anyway since they're signed in
+      }
+
+      // Upload and set avatar if provided
+      if (avatarUri) {
+        try {
+          console.log('[ClaimUsername] Uploading avatar...');
+          const avatarKey = await uploadMedia({
+            uri: avatarUri,
+            intent: 'avatar-image',
+          });
+          console.log('[ClaimUsername] Avatar uploaded:', avatarKey);
+
+          await updateAvatar(avatarKey);
+          console.log('[ClaimUsername] Avatar set successfully');
+        } catch (uploadError) {
+          console.error('[ClaimUsername] Failed to upload/set avatar:', uploadError);
+          Alert.alert('Warning', 'Failed to upload profile picture');
+          // Continue without avatar if upload fails
+        }
       }
 
       // Navigate to the main app
