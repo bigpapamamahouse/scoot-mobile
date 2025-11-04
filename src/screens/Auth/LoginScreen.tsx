@@ -26,7 +26,7 @@ export default function LoginScreen({ navigation }: any) {
 
   if (checking) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background.primary, justifyContent: 'center', alignItems: 'center' }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background.primary, justifyContent: 'center', alignItems: 'center' }} edges={['bottom']}>
         <ActivityIndicator size="large" color={colors.primary[500]} />
         <Text style={{ marginTop: 16, color: colors.text.secondary }}>Checking authentication...</Text>
       </SafeAreaView>
@@ -66,10 +66,10 @@ export default function LoginScreen({ navigation }: any) {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background.primary }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background.primary }} edges={['bottom']}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.select({ ios: 'padding', android: undefined })}>
-        <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
-          <View style={{ flex: 1, padding: 16, justifyContent: 'center', gap: 12 }}>
+        <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}>
+          <View style={{ padding: 16, gap: 12 }}>
             <Text style={{ fontSize: 22, fontWeight: '700', textAlign: 'center', marginBottom: 12, color: colors.text.primary }}>
               Welcome to ScooterBooter
             </Text>
