@@ -80,7 +80,6 @@ export function ReactionDetailsModal({
             };
 
             const canPress = onUserPress && user.id;
-            console.log('[ReactionDetailsModal] Rendering user:', displayHandle, 'canPress:', canPress);
 
             return (
               <TouchableOpacity
