@@ -32,6 +32,20 @@ export function ReactionDetailsModal({
   const { colors } = useTheme();
   const styles = React.useMemo(() => createStyles(colors), [colors]);
 
+  // Debug logging
+  React.useEffect(() => {
+    if (visible) {
+      console.log('[ReactionDetailsModal] Modal opened, onUserPress available:', !!onUserPress);
+      console.log('[ReactionDetailsModal] Reactions count:', reactions.length);
+      reactions.forEach((r, i) => {
+        console.log(`[ReactionDetailsModal] Reaction ${i}: ${r.emoji}, users:`, r.users?.length || 0);
+        r.users?.forEach((u, j) => {
+          console.log(`  User ${j}: id=${u.id}, handle=${u.handle}`);
+        });
+      });
+    }
+  }, [visible, onUserPress, reactions]);
+
   const renderReactionSection = ({ item: reaction }: { item: ReactionWithUsers }) => {
     if (!reaction.users || reaction.users.length === 0) {
       return null;
@@ -50,13 +64,23 @@ export function ReactionDetailsModal({
             const displayHandle = handle ? `@${handle}` : `@${userId.slice(0, 8)}`;
 
             const handlePress = () => {
+              console.log('[ReactionDetailsModal] User pressed:', {
+                userId: user.id,
+                handle,
+                hasOnUserPress: !!onUserPress,
+                canNavigate: !!(onUserPress && user.id)
+              });
               if (onUserPress && user.id) {
+                console.log('[ReactionDetailsModal] Navigating to profile...');
                 onClose(); // Close modal before navigating
                 onUserPress(user.id, handle);
+              } else {
+                console.log('[ReactionDetailsModal] Cannot navigate - missing callback or userId');
               }
             };
 
             const canPress = onUserPress && user.id;
+            console.log('[ReactionDetailsModal] Rendering user:', displayHandle, 'canPress:', canPress);
 
             return (
               <TouchableOpacity
