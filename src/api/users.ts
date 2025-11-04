@@ -297,7 +297,7 @@ export async function me(){
   return normalized;
 }
 
-export async function updateMe(payload: { fullName?: string | null; avatarKey?: string | null }){
+export async function updateMe(payload: { fullName?: string | null; avatarKey?: string | null; handle?: string | null }){
   const body: Record<string, unknown> = {};
 
   if ('fullName' in payload) {
@@ -305,6 +305,12 @@ export async function updateMe(payload: { fullName?: string | null; avatarKey?: 
     if (!('full_name' in body)) {
       body.full_name = payload.fullName === undefined ? undefined : payload.fullName;
     }
+  }
+
+  if ('handle' in payload) {
+    // Send handle in multiple formats for backend compatibility
+    body.handle = payload.handle === undefined ? undefined : payload.handle;
+    body.username = payload.handle === undefined ? undefined : payload.handle;
   }
 
   // Don't include avatarKey in PATCH /me - use updateAvatar() instead
