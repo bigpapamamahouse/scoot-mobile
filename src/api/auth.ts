@@ -78,23 +78,33 @@ export async function signInFn(username: string, password: string): Promise<Sign
 
 export async function signUpFn(username: string, password: string, email?: string, inviteCode?: string) {
   const userAttributes: Record<string, string> = {};
+  const validationData: Record<string, string> = {};
 
   if (email) {
     userAttributes.email = email;
   }
 
   if (inviteCode) {
-    // Pass invite code as a custom attribute
+    // Pass invite code in validationData for PreSignUp Lambda trigger
+    validationData['invite_code'] = inviteCode;
+    validationData['inviteCode'] = inviteCode;
+
+    // Also try in userAttributes as backup
     userAttributes['custom:invite_code'] = inviteCode;
-    // Also try without custom: prefix in case backend expects it directly
-    userAttributes['invite_code'] = inviteCode;
-    userAttributes['inviteCode'] = inviteCode;
+  }
+
+  const options: any = {};
+  if (Object.keys(userAttributes).length > 0) {
+    options.userAttributes = userAttributes;
+  }
+  if (Object.keys(validationData).length > 0) {
+    options.validationData = validationData;
   }
 
   return signUp({
     username,
     password,
-    options: Object.keys(userAttributes).length > 0 ? { userAttributes } : undefined
+    options: Object.keys(options).length > 0 ? options : undefined
   });
 }
 
