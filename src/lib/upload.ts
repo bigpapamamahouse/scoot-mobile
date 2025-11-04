@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import * as FileSystem from 'expo-file-system/legacy';
 import { ENV } from '../lib/env';
 import { readIdToken } from '../lib/storage';
 
@@ -184,11 +185,25 @@ async function performDescriptorUpload(
 
     finalKey = finalKey || descriptor.fields?.key;
   } else {
-    const fileResponse = await fetch(uri);
-    if (!fileResponse.ok) {
-      throw new Error('Failed to read image data for upload');
+    console.log('[performDescriptorUpload] Reading file from:', uri);
+
+    // Use expo-file-system to read the file (works with local URIs in React Native)
+    const fileInfo = await FileSystem.getInfoAsync(uri);
+    if (!fileInfo.exists) {
+      throw new Error('File does not exist at URI: ' + uri);
     }
-    const blob = await fileResponse.blob();
+    console.log('[performDescriptorUpload] File exists, size:', fileInfo.size);
+
+    // Read file as base64 and convert to blob
+    const base64 = await FileSystem.readAsStringAsync(uri, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+    console.log('[performDescriptorUpload] File read as base64, length:', base64.length);
+
+    // Convert base64 to blob
+    const blob = await fetch(`data:${type};base64,${base64}`).then(r => r.blob());
+    console.log('[performDescriptorUpload] Blob created, size:', blob.size);
+
     const uploadHeaders: Record<string, string> = {
       ...(descriptor.headers || {}),
     };
@@ -197,11 +212,20 @@ async function performDescriptorUpload(
       uploadHeaders['Content-Type'] = type;
     }
 
+    console.log('[performDescriptorUpload] Uploading to S3:', {
+      url: descriptor.uploadUrl.substring(0, 100) + '...',
+      method: descriptor.method || 'PUT',
+      headers: uploadHeaders,
+      blobSize: blob.size,
+    });
+
     const uploadResponse = await fetch(descriptor.uploadUrl, {
       method: descriptor.method || 'PUT',
       headers: uploadHeaders,
       body: blob,
     });
+
+    console.log('[performDescriptorUpload] S3 upload response:', uploadResponse.status, uploadResponse.statusText);
 
     if (!uploadResponse.ok) {
       const text = await uploadResponse.text().catch(() => '');

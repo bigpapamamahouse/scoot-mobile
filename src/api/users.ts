@@ -297,7 +297,7 @@ export async function me(){
   return normalized;
 }
 
-export async function updateMe(payload: { fullName?: string | null; avatarKey?: string | null }){
+export async function updateMe(payload: { fullName?: string | null; avatarKey?: string | null; handle?: string | null }){
   const body: Record<string, unknown> = {};
 
   if ('fullName' in payload) {
@@ -307,13 +307,22 @@ export async function updateMe(payload: { fullName?: string | null; avatarKey?: 
     }
   }
 
+  if ('handle' in payload) {
+    // Send handle in multiple formats for backend compatibility
+    body.handle = payload.handle === undefined ? undefined : payload.handle;
+    body.username = payload.handle === undefined ? undefined : payload.handle;
+    // Also try snake_case versions
+    body.user_handle = payload.handle === undefined ? undefined : payload.handle;
+    body.user_name = payload.handle === undefined ? undefined : payload.handle;
+  }
+
   // Don't include avatarKey in PATCH /me - use updateAvatar() instead
-  if ('avatarKey' in payload && !('fullName' in payload)) {
+  if ('avatarKey' in payload && !('fullName' in payload) && !('handle' in payload)) {
     // If only updating avatar, use the dedicated endpoint
     console.warn('[updateMe] avatarKey should be updated via updateAvatar() instead');
   }
 
-  if ('avatarKey' in payload && 'fullName' in payload) {
+  if ('avatarKey' in payload && ('fullName' in payload || 'handle' in payload)) {
     // Legacy support: If updating both, include avatar in PATCH /me
     const details = resolveAvatarDetails(payload.avatarKey);
     const keyValue =
@@ -389,15 +398,23 @@ export async function updateMe(payload: { fullName?: string | null; avatarKey?: 
     }
   }
 
-  return api('/me', { method: 'PATCH', body: JSON.stringify(body) });
+  console.log('[updateMe] Sending PATCH /me with body:', body);
+  const result = await api('/me', { method: 'PATCH', body: JSON.stringify(body) });
+  console.log('[updateMe] Response:', result);
+  return result;
 }
 
 export async function updateAvatar(avatarKey: string | null) {
   const body: Record<string, unknown> = {
     key: avatarKey ?? null,
+    avatarKey: avatarKey ?? null,
+    avatar_key: avatarKey ?? null,
   };
 
-  return api('/me/avatar', { method: 'POST', body: JSON.stringify(body) });
+  console.log('[updateAvatar] Sending POST /me/avatar with body:', body);
+  const result = await api('/me/avatar', { method: 'POST', body: JSON.stringify(body) });
+  console.log('[updateAvatar] Response:', result);
+  return result;
 }
 
 export async function getUser(handle: string){

@@ -76,8 +76,23 @@ export async function signInFn(username: string, password: string): Promise<Sign
   }
 }
 
-export async function signUpFn(username: string, password: string, email?: string) {
-  return signUp({ username, password, options: email ? { userAttributes: { email } } : undefined });
+export async function signUpFn(username: string, password: string, email?: string, inviteCode?: string) {
+  const userAttributes: Record<string, string> = {};
+
+  if (email) {
+    userAttributes.email = email;
+  }
+
+  if (inviteCode) {
+    // Pass invite code as custom:invite attribute (expected by PreSignUp Lambda)
+    userAttributes['custom:invite'] = inviteCode;
+  }
+
+  return signUp({
+    username,
+    password,
+    options: Object.keys(userAttributes).length > 0 ? { userAttributes } : undefined
+  });
 }
 
 export async function confirmSignUpFn(username: string, code: string) {
