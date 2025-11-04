@@ -4,6 +4,7 @@ import {
   View,
   Text,
   TouchableOpacity,
+  Pressable,
   FlatList,
   StyleSheet,
   ActivityIndicator,
@@ -52,12 +53,12 @@ export function ReactionDetailsModal({
     }
 
     return (
-      <View style={styles.reactionSection}>
+      <View style={styles.reactionSection} pointerEvents="box-none">
         <View style={styles.reactionHeader}>
           <Text style={styles.reactionEmoji}>{reaction.emoji}</Text>
           <Text style={styles.reactionCount}>{reaction.count}</Text>
         </View>
-        <View style={styles.usersList}>
+        <View style={styles.usersList} pointerEvents="box-none">
           {reaction.users.map((user, index) => {
             const handle = resolveHandle(user);
             const userId = user.id || `user-${index}`;
@@ -82,19 +83,22 @@ export function ReactionDetailsModal({
             const canPress = onUserPress && user.id;
 
             return (
-              <TouchableOpacity
+              <Pressable
                 key={`${reaction.emoji}-${userId}-${index}`}
-                style={[styles.userRow, canPress && styles.userRowClickable]}
+                style={({ pressed }) => [
+                  styles.userRow,
+                  canPress && styles.userRowClickable,
+                  pressed && canPress && styles.userRowPressed
+                ]}
                 onPress={handlePress}
                 disabled={!canPress}
-                activeOpacity={0.7}
-                hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
                 <Avatar avatarKey={user.avatarKey} size={32} />
                 <Text style={[styles.userHandle, canPress && styles.userHandleClickable]}>
                   {displayHandle}
                 </Text>
-              </TouchableOpacity>
+              </Pressable>
             );
           })}
         </View>
@@ -205,6 +209,10 @@ const createStyles = (colors: any) =>
     },
     userRowClickable: {
       backgroundColor: colors.background.primary,
+    },
+    userRowPressed: {
+      backgroundColor: colors.neutral[100],
+      opacity: 0.8,
     },
     userHandle: {
       ...typography.styles.body,
