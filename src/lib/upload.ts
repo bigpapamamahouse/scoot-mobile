@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import * as FileSystem from 'expo-file-system';
 import { ENV } from '../lib/env';
 import { readIdToken } from '../lib/storage';
 
@@ -185,12 +186,23 @@ async function performDescriptorUpload(
     finalKey = finalKey || descriptor.fields?.key;
   } else {
     console.log('[performDescriptorUpload] Reading file from:', uri);
-    const fileResponse = await fetch(uri);
-    if (!fileResponse.ok) {
-      throw new Error(`Failed to read image data for upload: ${fileResponse.status} ${fileResponse.statusText}`);
+
+    // Use expo-file-system to read the file (works with local URIs in React Native)
+    const fileInfo = await FileSystem.getInfoAsync(uri);
+    if (!fileInfo.exists) {
+      throw new Error('File does not exist at URI: ' + uri);
     }
-    const blob = await fileResponse.blob();
-    console.log('[performDescriptorUpload] File read successfully, blob size:', blob.size);
+    console.log('[performDescriptorUpload] File exists, size:', fileInfo.size);
+
+    // Read file as base64 and convert to blob
+    const base64 = await FileSystem.readAsStringAsync(uri, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+    console.log('[performDescriptorUpload] File read as base64, length:', base64.length);
+
+    // Convert base64 to blob
+    const blob = await fetch(`data:${type};base64,${base64}`).then(r => r.blob());
+    console.log('[performDescriptorUpload] Blob created, size:', blob.size);
 
     const uploadHeaders: Record<string, string> = {
       ...(descriptor.headers || {}),
@@ -201,7 +213,7 @@ async function performDescriptorUpload(
     }
 
     console.log('[performDescriptorUpload] Uploading to S3:', {
-      url: descriptor.uploadUrl,
+      url: descriptor.uploadUrl.substring(0, 100) + '...',
       method: descriptor.method || 'PUT',
       headers: uploadHeaders,
       blobSize: blob.size,
