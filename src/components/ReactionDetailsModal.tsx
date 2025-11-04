@@ -19,6 +19,7 @@ interface ReactionDetailsModalProps {
   onClose: () => void;
   reactions: ReactionWithUsers[];
   loading?: boolean;
+  onUserPress?: (userId: string, userHandle?: string) => void;
 }
 
 export function ReactionDetailsModal({
@@ -26,6 +27,7 @@ export function ReactionDetailsModal({
   onClose,
   reactions,
   loading = false,
+  onUserPress,
 }: ReactionDetailsModalProps) {
   const { colors } = useTheme();
   const styles = React.useMemo(() => createStyles(colors), [colors]);
@@ -46,11 +48,23 @@ export function ReactionDetailsModal({
             const handle = resolveHandle(user);
             const userId = user.id || `user-${index}`;
             const displayHandle = handle ? `@${handle}` : `@${userId.slice(0, 8)}`;
+
+            const handlePress = () => {
+              if (onUserPress && user.id) {
+                onUserPress(user.id, handle);
+              }
+            };
+
             return (
-              <View key={`${reaction.emoji}-${userId}-${index}`} style={styles.userRow}>
+              <TouchableOpacity
+                key={`${reaction.emoji}-${userId}-${index}`}
+                style={styles.userRow}
+                onPress={handlePress}
+                disabled={!onUserPress || !user.id}
+              >
                 <Avatar avatarKey={user.avatarKey} size={32} />
                 <Text style={styles.userHandle}>{displayHandle}</Text>
-              </View>
+              </TouchableOpacity>
             );
           })}
         </View>

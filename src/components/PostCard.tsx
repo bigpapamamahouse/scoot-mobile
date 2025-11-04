@@ -15,6 +15,7 @@ export default function PostCard({
   post,
   onPress,
   onPressAuthor,
+  onPressUser,
   showCommentPreview = true,
   onPostUpdated,
   onPostDeleted,
@@ -22,6 +23,7 @@ export default function PostCard({
   post: Post;
   onPress?: () => void;
   onPressAuthor?: () => void;
+  onPressUser?: (userId: string, userHandle?: string) => void;
   showCommentPreview?: boolean;
   onPostUpdated?: (updatedPost: Post) => void;
   onPostDeleted?: (postId: string) => void;
@@ -530,6 +532,7 @@ export default function PostCard({
           : detailedReactions
         }
         loading={loadingReactionDetails}
+        onUserPress={onPressUser}
       />
     </TouchableOpacity>
   );
