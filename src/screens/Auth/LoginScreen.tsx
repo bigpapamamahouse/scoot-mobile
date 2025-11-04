@@ -2,8 +2,10 @@ import React from 'react';
 import { View, Text, TextInput, Button, Alert, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { signInFn, checkAuthStatus } from '../../api/auth';
+import { useTheme } from '../../theme/ThemeContext';
 
 export default function LoginScreen({ navigation }: any) {
+  const { colors } = useTheme();
   const [user, setUser] = React.useState('');
   const [pass, setPass] = React.useState('');
   const [checking, setChecking] = React.useState(true);
@@ -24,9 +26,9 @@ export default function LoginScreen({ navigation }: any) {
 
   if (checking) {
     return (
-      <SafeAreaView style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#2196f3" />
-        <Text style={{ marginTop: 16, color: '#666' }}>Checking authentication...</Text>
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background.primary, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color={colors.primary[500]} />
+        <Text style={{ marginTop: 16, color: colors.text.secondary }}>Checking authentication...</Text>
       </SafeAreaView>
     );
   }
@@ -54,27 +56,38 @@ export default function LoginScreen({ navigation }: any) {
     }
   };
 
+  const inputStyle = {
+    borderWidth: 1,
+    borderColor: colors.border.main,
+    borderRadius: 8,
+    padding: 12,
+    color: colors.text.primary,
+    backgroundColor: colors.background.primary,
+  };
+
   return (
-    <SafeAreaView style={{ flex: 1 }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background.primary }}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.select({ ios: 'padding', android: undefined })}>
         <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
           <View style={{ flex: 1, padding: 16, justifyContent: 'center', gap: 12 }}>
-            <Text style={{ fontSize: 22, fontWeight: '700', textAlign: 'center', marginBottom: 12 }}>
+            <Text style={{ fontSize: 22, fontWeight: '700', textAlign: 'center', marginBottom: 12, color: colors.text.primary }}>
               Welcome to ScooterBooter
             </Text>
             <TextInput
               placeholder="Username or email"
+              placeholderTextColor={colors.text.tertiary}
               autoCapitalize="none"
               value={user}
               onChangeText={setUser}
-              style={{ borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 12 }}
+              style={inputStyle}
             />
             <TextInput
               placeholder="Password"
+              placeholderTextColor={colors.text.tertiary}
               secureTextEntry
               value={pass}
               onChangeText={setPass}
-              style={{ borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 12 }}
+              style={inputStyle}
             />
             <Button title="Log in" onPress={onLogin} />
             <View style={{ height: 8 }} />

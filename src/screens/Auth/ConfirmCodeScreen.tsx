@@ -2,29 +2,57 @@ import React from 'react';
 import { View, Text, TextInput, Button, Alert, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { confirmSignUpFn } from '../../api/auth';
+import { useTheme } from '../../theme/ThemeContext';
 
 export default function ConfirmCodeScreen({ route, navigation }: any) {
-  const username = route?.params?.username || '';
+  const { colors } = useTheme();
+  const email = route?.params?.email || '';
+  const password = route?.params?.password || '';
   const [code, setCode] = React.useState('');
 
   const onConfirm = async () => {
+    if (!code) {
+      Alert.alert('Missing code', 'Please enter the verification code');
+      return;
+    }
+
     try {
-      await confirmSignUpFn(username, code);
-      Alert.alert('Confirmed', 'Your account is confirmed');
-      navigation.navigate('Login');
+      await confirmSignUpFn(email, code);
+      // Navigate to ClaimUsername screen instead of Login
+      navigation.navigate('ClaimUsername', { email, password });
     } catch (e: any) {
       Alert.alert('Confirm failed', e?.message || String(e));
     }
   };
 
+  const inputStyle = {
+    borderWidth: 1,
+    borderColor: colors.border.main,
+    borderRadius: 8,
+    padding: 12,
+    color: colors.text.primary,
+    backgroundColor: colors.background.primary,
+  };
+
   return (
-    <SafeAreaView style={{ flex: 1 }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background.primary }}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.select({ ios: 'padding', android: undefined })}>
         <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
           <View style={{ flex: 1, padding: 16, justifyContent: 'center', gap: 12 }}>
-            <Text style={{ fontSize: 22, fontWeight: '700', textAlign: 'center', marginBottom: 12 }}>Confirm your code</Text>
-            <TextInput placeholder="Code" value={code} onChangeText={setCode} keyboardType="number-pad"
-              style={{ borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 12 }} />
+            <Text style={{ fontSize: 22, fontWeight: '700', textAlign: 'center', marginBottom: 12, color: colors.text.primary }}>
+              Confirm your code
+            </Text>
+            <Text style={{ fontSize: 14, textAlign: 'center', marginBottom: 12, color: colors.text.secondary }}>
+              We sent a verification code to {email}
+            </Text>
+            <TextInput
+              placeholder="Verification Code"
+              placeholderTextColor={colors.text.tertiary}
+              value={code}
+              onChangeText={setCode}
+              keyboardType="number-pad"
+              style={inputStyle}
+            />
             <Button title="Confirm" onPress={onConfirm} />
           </View>
         </ScrollView>

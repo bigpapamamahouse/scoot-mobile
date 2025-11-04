@@ -2,33 +2,74 @@ import React from 'react';
 import { View, Text, TextInput, Button, Alert, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { signUpFn } from '../../api/auth';
+import { useTheme } from '../../theme/ThemeContext';
 
 export default function SignupScreen({ navigation }: any) {
-  const [user, setUser] = React.useState('');
+  const { colors } = useTheme();
   const [email, setEmail] = React.useState('');
   const [pass, setPass] = React.useState('');
+  const [inviteCode, setInviteCode] = React.useState('');
 
   const onSignup = async () => {
+    if (!email || !pass || !inviteCode) {
+      Alert.alert('Missing fields', 'Please fill in all fields');
+      return;
+    }
+
+    // TODO: Validate invite code here before proceeding
+    // For now, we'll just check it's not empty
+
     try {
-      await signUpFn(user, pass, email);
-      navigation.navigate('ConfirmCode', { username: user });
+      // Use email as the Cognito username
+      await signUpFn(email, pass, email);
+      navigation.navigate('ConfirmCode', { email, password: pass });
     } catch (e: any) {
       Alert.alert('Sign up failed', e?.message || String(e));
     }
   };
 
+  const inputStyle = {
+    borderWidth: 1,
+    borderColor: colors.border.main,
+    borderRadius: 8,
+    padding: 12,
+    color: colors.text.primary,
+    backgroundColor: colors.background.primary,
+  };
+
   return (
-    <SafeAreaView style={{ flex: 1 }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background.primary }}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.select({ ios: 'padding', android: undefined })}>
         <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
           <View style={{ flex: 1, padding: 16, justifyContent: 'center', gap: 12 }}>
-            <Text style={{ fontSize: 22, fontWeight: '700', textAlign: 'center', marginBottom: 12 }}>Create account</Text>
-            <TextInput placeholder="Username" autoCapitalize="none" value={user} onChangeText={setUser}
-              style={{ borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 12 }} />
-            <TextInput placeholder="Email" keyboardType="email-address" autoCapitalize="none" value={email} onChangeText={setEmail}
-              style={{ borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 12 }} />
-            <TextInput placeholder="Password" secureTextEntry value={pass} onChangeText={setPass}
-              style={{ borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 12 }} />
+            <Text style={{ fontSize: 22, fontWeight: '700', textAlign: 'center', marginBottom: 12, color: colors.text.primary }}>
+              Create account
+            </Text>
+            <TextInput
+              placeholder="Email"
+              placeholderTextColor={colors.text.tertiary}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              value={email}
+              onChangeText={setEmail}
+              style={inputStyle}
+            />
+            <TextInput
+              placeholder="Password"
+              placeholderTextColor={colors.text.tertiary}
+              secureTextEntry
+              value={pass}
+              onChangeText={setPass}
+              style={inputStyle}
+            />
+            <TextInput
+              placeholder="Invite Code"
+              placeholderTextColor={colors.text.tertiary}
+              autoCapitalize="characters"
+              value={inviteCode}
+              onChangeText={setInviteCode}
+              style={inputStyle}
+            />
             <Button title="Sign up" onPress={onSignup} />
           </View>
         </ScrollView>
