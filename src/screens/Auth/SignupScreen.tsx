@@ -16,12 +16,9 @@ export default function SignupScreen({ navigation }: any) {
       return;
     }
 
-    // TODO: Validate invite code here before proceeding
-    // For now, we'll just check it's not empty
-
     try {
-      // Use email as the Cognito username
-      await signUpFn(email, pass, email);
+      // Use email as the Cognito username and pass the invite code
+      await signUpFn(email, pass, email, inviteCode.trim());
       navigation.navigate('ConfirmCode', { email, password: pass });
     } catch (e: any) {
       Alert.alert('Sign up failed', e?.message || String(e));
