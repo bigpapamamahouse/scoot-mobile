@@ -184,11 +184,14 @@ async function performDescriptorUpload(
 
     finalKey = finalKey || descriptor.fields?.key;
   } else {
+    console.log('[performDescriptorUpload] Reading file from:', uri);
     const fileResponse = await fetch(uri);
     if (!fileResponse.ok) {
-      throw new Error('Failed to read image data for upload');
+      throw new Error(`Failed to read image data for upload: ${fileResponse.status} ${fileResponse.statusText}`);
     }
     const blob = await fileResponse.blob();
+    console.log('[performDescriptorUpload] File read successfully, blob size:', blob.size);
+
     const uploadHeaders: Record<string, string> = {
       ...(descriptor.headers || {}),
     };
@@ -197,11 +200,20 @@ async function performDescriptorUpload(
       uploadHeaders['Content-Type'] = type;
     }
 
+    console.log('[performDescriptorUpload] Uploading to S3:', {
+      url: descriptor.uploadUrl,
+      method: descriptor.method || 'PUT',
+      headers: uploadHeaders,
+      blobSize: blob.size,
+    });
+
     const uploadResponse = await fetch(descriptor.uploadUrl, {
       method: descriptor.method || 'PUT',
       headers: uploadHeaders,
       body: blob,
     });
+
+    console.log('[performDescriptorUpload] S3 upload response:', uploadResponse.status, uploadResponse.statusText);
 
     if (!uploadResponse.ok) {
       const text = await uploadResponse.text().catch(() => '');
