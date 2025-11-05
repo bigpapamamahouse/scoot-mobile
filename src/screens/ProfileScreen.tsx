@@ -44,6 +44,10 @@ export default function ProfileScreen({ navigation, route }: any) {
   const [followStatus, setFollowStatus] = React.useState<'none' | 'pending' | 'following'>('none');
   const [followLoading, setFollowLoading] = React.useState(false);
 
+  // Extract route params to stable values to prevent unnecessary re-renders
+  const routeUserHandle = route?.params?.userHandle || route?.params?.handle || route?.params?.username;
+  const routeUserId = route?.params?.userId || route?.params?.id || route?.params?.profileId;
+
   const resolvePosts = React.useCallback((payload: unknown): Post[] => {
     if (!payload) return [];
 
@@ -230,14 +234,6 @@ export default function ProfileScreen({ navigation, route }: any) {
       const pageNum = options?.pageNum ?? 0;
       const append = options?.append ?? false;
 
-      const params = (route?.params ?? {}) as Record<string, unknown>;
-      const paramHandleCandidates = [
-        params.userHandle,
-        params.handle,
-        params.username,
-      ];
-      const paramUserIdCandidates = [params.userId, params.id, params.profileId];
-
       const normalizeHandle = (value: unknown): string | null => {
         if (typeof value !== 'string') return null;
         const trimmed = value.replace(/^@/, '').trim();
@@ -250,17 +246,8 @@ export default function ProfileScreen({ navigation, route }: any) {
         return trimmed || null;
       };
 
-      let requestedHandle: string | null = null;
-      for (const candidate of paramHandleCandidates) {
-        requestedHandle = normalizeHandle(candidate);
-        if (requestedHandle) break;
-      }
-
-      let requestedUserId: string | null = null;
-      for (const candidate of paramUserIdCandidates) {
-        requestedUserId = normalizeId(candidate);
-        if (requestedUserId) break;
-      }
+      const requestedHandle = normalizeHandle(routeUserHandle);
+      const requestedUserId = normalizeId(routeUserId);
 
       let targetIdentity: ProfileIdentity | null = null;
 
@@ -550,7 +537,7 @@ export default function ProfileScreen({ navigation, route }: any) {
         setLoading(false);
       }
     },
-    [deriveIdentityFromPosts, filterPostsForUser, resolvePosts, route?.params]
+    [deriveIdentityFromPosts, filterPostsForUser, resolvePosts, routeUserHandle, routeUserId]
   );
 
   React.useEffect(() => {
@@ -559,10 +546,19 @@ export default function ProfileScreen({ navigation, route }: any) {
 
   React.useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
-      load();
+      // Check if cache is stale before reloading
+      const cacheIdentifier = routeUserId || routeUserHandle || 'unknown';
+      const cachedPosts = cache.get<Post[]>(CacheKeys.userPosts(cacheIdentifier, 0));
+      const cachedUser = cache.get<ProfileIdentity>(CacheKeys.userProfile(cacheIdentifier));
+
+      // Only reload if we don't have cached data (cache is stale or missing)
+      if (!cachedPosts || !cachedUser) {
+        load();
+      }
+      // If cache exists, user can manually refresh with pull-to-refresh
     });
     return unsubscribe;
-  }, [navigation, load]);
+  }, [navigation, load, routeUserId, routeUserHandle]);
 
   const loadMore = React.useCallback(async () => {
     if (loadingMore || !hasMore) return;
