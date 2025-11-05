@@ -199,7 +199,8 @@ export default function PostCard({
         setReactions(reactionsData);
       })
       .catch((e) => {
-        console.warn('Failed to load reactions for post', post.id, ':', e);
+        // Silently fail - reactions are not critical for viewing posts
+        // Avoid logging 503 errors which are temporary service issues
       });
   }, [post.id]);
 
@@ -290,7 +291,8 @@ export default function PostCard({
         setCommentCount((prev) => Math.max(prev, totalCount));
       })
       .catch((err) => {
-        console.warn('Failed to load preview comments for post', post.id, err);
+        // Silently fail - preview comments are not critical for viewing posts
+        // Avoid logging 503 errors which are temporary service issues
       });
 
     return () => {

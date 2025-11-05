@@ -38,7 +38,8 @@ export function useCurrentUser() {
         }
       } catch (error) {
         if (cancelled) return;
-        console.warn('Failed to fetch current user:', error);
+        // Silently fail - this hook is used by many components
+        // Logging would create excessive console noise for temporary API issues
         setCurrentUser(null);
       } finally {
         if (!cancelled) {

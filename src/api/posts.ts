@@ -96,11 +96,11 @@ export async function getUserPosts(options: GetUserPostsOptions = {}){
       const message = String(err?.message || '');
       const statusMatch = message.match(/HTTP\s+(\d+)/);
       const statusCode = statusMatch ? parseInt(statusMatch[1], 10) : undefined;
+      // Silently try next endpoint if we get 404/405 (expected during endpoint discovery)
       if (statusCode === 404 || statusCode === 405) {
-        console.warn(`User posts endpoint ${path} returned ${statusCode}: ${message}`);
         continue;
       }
-      console.warn(`User posts endpoint ${path} failed:`, message || err);
+      // For other errors, stop trying and throw
       break;
     }
   }
@@ -144,14 +144,12 @@ export async function getPost(id: string){
       const statusMatch = message.match(/HTTP\s+(\d+)/);
       const statusCode = statusMatch ? parseInt(statusMatch[1], 10) : undefined;
 
-      // If we get a 404, try the next endpoint
+      // Silently try next endpoint if we get 404/405 (expected during endpoint discovery)
       if (statusCode === 404 || statusCode === 405) {
-        console.warn(`Post endpoint ${endpoint} returned ${statusCode}, trying next...`);
         continue;
       }
 
-      // For other errors, throw immediately
-      console.warn(`Post endpoint ${endpoint} failed:`, message || err);
+      // For other errors, stop trying and throw
       break;
     }
   }
