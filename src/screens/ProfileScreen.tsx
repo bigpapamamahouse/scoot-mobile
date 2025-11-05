@@ -394,13 +394,7 @@ export default function ProfileScreen({ navigation, route }: any) {
           id: targetUserId,
           handle: targetHandle,
         });
-        if (filteredPosts.length !== normalizedPosts.length) {
-          console.debug(
-            'Filtered profile posts to target user',
-            normalizedPosts.length - filteredPosts.length,
-            'items removed'
-          );
-        }
+        // Silently filter posts - no need to log this routine operation
         if (!filteredPosts.length && postsData && !Array.isArray(postsData)) {
           console.warn('Unrecognized user posts response shape', postsData);
         }
