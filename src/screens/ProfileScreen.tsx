@@ -249,6 +249,31 @@ export default function ProfileScreen({ navigation, route }: any) {
       const requestedHandle = normalizeHandle(routeUserHandle);
       const requestedUserId = normalizeId(routeUserId);
 
+      // OPTIMIZATION: Check cache FIRST for instant display (before any API calls)
+      let hasValidCache = false;
+      if (!append && pageNum === 0) {
+        const cacheIdentifier = requestedUserId || requestedHandle || 'unknown';
+        const cachedPosts = cache.get<Post[]>(CacheKeys.userPosts(cacheIdentifier, 0));
+        const cachedUser = cache.get<ProfileIdentity>(CacheKeys.userProfile(cacheIdentifier));
+
+        if (cachedPosts && cachedPosts.length > 0) {
+          console.log('[ProfileScreen] Loading from cache:', cachedPosts.length, 'posts');
+          setPosts(cachedPosts);
+          hasValidCache = true;
+        }
+
+        if (cachedUser) {
+          console.log('[ProfileScreen] Loading user from cache:', cachedUser.handle || cachedUser.id);
+          setUser(cachedUser);
+          hasValidCache = true;
+        }
+
+        // If we have valid cache, hide loading spinner immediately
+        if (hasValidCache && !options?.skipSpinner) {
+          setLoading(false);
+        }
+      }
+
       let targetIdentity: ProfileIdentity | null = null;
 
       try {
@@ -396,13 +421,7 @@ export default function ProfileScreen({ navigation, route }: any) {
           id: targetUserId,
           handle: targetHandle,
         });
-        if (filteredPosts.length !== normalizedPosts.length) {
-          console.debug(
-            'Filtered profile posts to target user',
-            normalizedPosts.length - filteredPosts.length,
-            'items removed'
-          );
-        }
+        // Silently filter posts - no need to log this routine operation
         if (!filteredPosts.length && postsData && !Array.isArray(postsData)) {
           console.warn('Unrecognized user posts response shape', postsData);
         }
@@ -466,8 +485,12 @@ export default function ProfileScreen({ navigation, route }: any) {
         const userHandle = finalIdentity?.handle?.replace(/^@/, '').trim();
         if (userHandle && pageNum === 0) {
           try {
-            // Fetch fresh user profile data to get follow status
-            const profileData = await UsersAPI.getUser(userHandle);
+            // OPTIMIZATION: Parallelize independent API calls for better performance
+            const [profileData, followersData, followingData] = await Promise.all([
+              UsersAPI.getUser(userHandle),
+              UsersAPI.listFollowers(userHandle),
+              UsersAPI.listFollowing(userHandle),
+            ]);
 
             // Update user state with complete profile data including fullName
             if (profileData && typeof profileData === 'object') {
@@ -482,12 +505,10 @@ export default function ProfileScreen({ navigation, route }: any) {
               }));
             }
 
-            const followersData = await UsersAPI.listFollowers(userHandle);
             const followers = Array.isArray(followersData) ? followersData :
               (followersData?.items || followersData?.followers || []);
             setFollowerCount(followers.length);
 
-            const followingData = await UsersAPI.listFollowing(userHandle);
             const following = Array.isArray(followingData) ? followingData :
               (followingData?.items || followingData?.following || []);
             setFollowingCount(following.length);
