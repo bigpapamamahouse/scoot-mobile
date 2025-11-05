@@ -808,14 +808,18 @@ export default function ProfileScreen({ navigation, route }: any) {
         }
         ListHeaderComponent={
           <View style={styles.header}>
-            <Avatar avatarKey={user?.avatarKey} size={80} />
-            <Text style={styles.handle}>{displayHandle}</Text>
-            {user?.fullName && (
-              <Text style={styles.fullName}>{user.fullName}</Text>
-            )}
-            {user?.email && !isViewingSelf && (
-              <Text style={styles.email}>{user.email}</Text>
-            )}
+            <View style={styles.profileInfoRow}>
+              <Avatar avatarKey={user?.avatarKey} size={56} />
+              <View style={styles.profileTextContainer}>
+                <Text style={styles.handle}>{displayHandle}</Text>
+                {user?.fullName && (
+                  <Text style={styles.fullName}>{user.fullName}</Text>
+                )}
+                {user?.email && !isViewingSelf && (
+                  <Text style={styles.email}>{user.email}</Text>
+                )}
+              </View>
+            </View>
 
             <View style={styles.statsRow}>
               <View style={styles.stat}>
@@ -911,33 +915,40 @@ const createStyles = (colors: any) => StyleSheet.create({
     padding: spacing[3],
   },
   header: {
-    alignItems: 'center',
-    paddingVertical: spacing[5],
     backgroundColor: colors.background.elevated,
     borderRadius: borderRadius.lg,
     marginBottom: spacing[4],
-    padding: spacing[4],
+    padding: spacing[3],
     ...shadows.base,
+  },
+  profileInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[3],
+  },
+  profileTextContainer: {
+    flex: 1,
+    justifyContent: 'center',
   },
   handle: {
     ...typography.styles.h4,
-    marginTop: spacing[3],
     color: colors.text.primary,
   },
   fullName: {
     fontSize: typography.fontSize.base,
     color: colors.text.secondary,
-    marginTop: spacing[1],
+    marginTop: spacing[0.5],
   },
   email: {
     fontSize: typography.fontSize.sm,
     color: colors.text.tertiary,
-    marginTop: spacing[1],
+    marginTop: spacing[0.5],
   },
   statsRow: {
     flexDirection: 'row',
-    marginTop: spacing[5],
-    gap: spacing[8],
+    justifyContent: 'space-around',
+    marginTop: spacing[3],
+    gap: spacing[4],
   },
   stat: {
     alignItems: 'center',
@@ -977,17 +988,19 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: typography.fontSize.sm,
   },
   followButton: {
-    marginTop: spacing[4],
+    marginTop: spacing[3],
     paddingHorizontal: spacing[6],
     paddingVertical: spacing[2],
     borderRadius: borderRadius.full,
     backgroundColor: colors.primary[500],
+    alignSelf: 'stretch',
     ...shadows.sm,
   },
   followButtonText: {
     color: colors.text.inverse,
     fontWeight: typography.fontWeight.semibold,
     fontSize: typography.fontSize.base,
+    textAlign: 'center',
   },
   followingButton: {
     backgroundColor: colors.background.elevated,
@@ -1007,7 +1020,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   sectionTitle: {
     ...typography.styles.h5,
-    marginTop: spacing[6],
+    marginTop: spacing[3],
     marginBottom: spacing[2],
     alignSelf: 'flex-start',
     color: colors.text.primary,
