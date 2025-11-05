@@ -11,7 +11,7 @@ import { IconButton, Badge } from './ui';
 import { useTheme, spacing, typography, borderRadius, shadows } from '../theme';
 import { ReactionDetailsModal } from './ReactionDetailsModal';
 
-export default function PostCard({
+function PostCard({
   post,
   onPress,
   onPressAuthor,
@@ -19,6 +19,8 @@ export default function PostCard({
   showCommentPreview = true,
   onPostUpdated,
   onPostDeleted,
+  initialReactions,
+  onReactionsUpdated,
 }: {
   post: Post;
   onPress?: () => void;
@@ -27,6 +29,8 @@ export default function PostCard({
   showCommentPreview?: boolean;
   onPostUpdated?: (updatedPost: Post) => void;
   onPostDeleted?: (postId: string) => void;
+  initialReactions?: any;
+  onReactionsUpdated?: (reactions: any) => void;
 }) {
   const { colors } = useTheme();
   const { currentUser } = useCurrentUser();
@@ -191,8 +195,16 @@ export default function PostCard({
     }
   }, [post.commentCount, post.comments]);
 
-  // Load reactions
+  // Load reactions - use initialReactions if provided to prevent N+1 queries
   React.useEffect(() => {
+    if (initialReactions !== undefined) {
+      // Use batched reactions from parent
+      const reactionsData = parseReactionsResponse(initialReactions);
+      setReactions(reactionsData);
+      return;
+    }
+
+    // Fallback: fetch individually if not batched (e.g., PostScreen)
     ReactionsAPI.getReactions(post.id)
       .then((data) => {
         const reactionsData = parseReactionsResponse(data);
@@ -202,7 +214,7 @@ export default function PostCard({
         // Silently fail - reactions are not critical for viewing posts
         // Avoid logging 503 errors which are temporary service issues
       });
-  }, [post.id]);
+  }, [post.id, initialReactions]);
 
   const handleReaction = async (emoji: string) => {
     try {
@@ -214,6 +226,9 @@ export default function PostCard({
       const reactionsData = parseReactionsResponse(data);
 
       setReactions(reactionsData);
+
+      // Notify parent component of reaction update
+      onReactionsUpdated?.(data);
     } catch (e: any) {
       console.error('Failed to toggle reaction:', e);
     }
@@ -651,4 +666,16 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.text.secondary,
     fontWeight: typography.fontWeight.medium,
   },
+});
+
+// Memoize PostCard to prevent unnecessary re-renders when parent updates
+// Only re-render if post.id changes or callbacks change
+export default React.memo(PostCard, (prevProps, nextProps) => {
+  return (
+    prevProps.post.id === nextProps.post.id &&
+    prevProps.post.text === nextProps.post.text &&
+    prevProps.post.imageKey === nextProps.post.imageKey &&
+    prevProps.showCommentPreview === nextProps.showCommentPreview &&
+    prevProps.initialReactions === nextProps.initialReactions
+  );
 });

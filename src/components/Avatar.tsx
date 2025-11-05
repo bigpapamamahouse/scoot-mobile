@@ -20,7 +20,7 @@ const resolveAvatarUri = (value?: string | null): string | null => {
   return mediaUrlFromKey(trimmed);
 };
 
-export function Avatar({ avatarKey, size = 32 }: { avatarKey?: string | null; size?: number }){
+const AvatarComponent = ({ avatarKey, size = 32 }: { avatarKey?: string | null; size?: number }) => {
   const { colors } = useTheme();
   const uri = resolveAvatarUri(avatarKey);
   if (!uri) {
@@ -33,4 +33,9 @@ export function Avatar({ avatarKey, size = 32 }: { avatarKey?: string | null; si
       onError={(error) => console.error('[Avatar] Image load error:', error.nativeEvent)}
     />
   );
-}
+};
+
+// Memoize Avatar to prevent unnecessary re-renders
+export const Avatar = React.memo(AvatarComponent, (prevProps, nextProps) => {
+  return prevProps.avatarKey === nextProps.avatarKey && prevProps.size === nextProps.size;
+});

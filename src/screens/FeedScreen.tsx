@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { View, Text, FlatList, RefreshControl, StyleSheet, ActivityIndicator } from 'react-native';
-import { PostsAPI } from '../api';
+import { PostsAPI, ReactionsAPI } from '../api';
 import PostCard from '../components/PostCard';
 import { Post } from '../types';
 import { resolveHandle } from '../lib/resolveHandle';
@@ -18,6 +18,7 @@ export default function FeedScreen({ navigation }: any){
   const [loadingMore, setLoadingMore] = React.useState(false);
   const [hasMore, setHasMore] = React.useState(true);
   const [page, setPage] = React.useState(0);
+  const [reactionsMap, setReactionsMap] = React.useState<Map<string, any>>(new Map());
 
   const openProfile = React.useCallback(
     (post: Post) => {
@@ -63,6 +64,24 @@ export default function FeedScreen({ navigation }: any){
       });
       const newItems = f.items || f || [];
 
+      // Batch load reactions for all posts (prevents N+1 problem)
+      if (newItems.length > 0) {
+        const postIds = newItems.map((post: Post) => post.id);
+        try {
+          const batchedReactions = await ReactionsAPI.getBatchedReactions(postIds);
+          setReactionsMap((prev) => {
+            const updated = new Map(prev);
+            batchedReactions.forEach((reactions, postId) => {
+              updated.set(postId, reactions);
+            });
+            return updated;
+          });
+        } catch (reactionsError) {
+          console.warn('[FeedScreen] Failed to load batched reactions:', reactionsError);
+          // Continue without reactions - PostCard will handle missing data
+        }
+      }
+
       // Update state with deduplication
       if (append) {
         setItems((prev) => {
@@ -95,6 +114,14 @@ export default function FeedScreen({ navigation }: any){
 
   const handlePostDeleted = React.useCallback((postId: string) => {
     setItems((prev) => prev.filter((p) => p.id !== postId));
+  }, []);
+
+  const handleReactionsUpdated = React.useCallback((postId: string, reactions: any) => {
+    setReactionsMap((prev) => {
+      const updated = new Map(prev);
+      updated.set(postId, reactions);
+      return updated;
+    });
   }, []);
 
   const loadMore = React.useCallback(async () => {
@@ -134,6 +161,11 @@ export default function FeedScreen({ navigation }: any){
         style={{ padding: spacing[3] }}
         data={items}
         keyExtractor={(it)=>it.id}
+        maxToRenderPerBatch={10}
+        updateCellsBatchingPeriod={50}
+        initialNumToRender={10}
+        windowSize={10}
+        removeClippedSubviews={true}
         renderItem={({ item }) => (
           <PostCard
             post={item}
@@ -147,6 +179,8 @@ export default function FeedScreen({ navigation }: any){
             }}
             onPostUpdated={handlePostUpdated}
             onPostDeleted={handlePostDeleted}
+            initialReactions={reactionsMap.get(item.id)}
+            onReactionsUpdated={(reactions) => handleReactionsUpdated(item.id, reactions)}
           />
         )}
         ItemSeparatorComponent={() => <View style={{ height: spacing[3] }} />}
