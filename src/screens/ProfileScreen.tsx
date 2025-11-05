@@ -391,6 +391,23 @@ export default function ProfileScreen({ navigation, route }: any) {
 
         // Generate cache key based on user identifier
         const cacheIdentifier = targetUserId || targetHandle || 'unknown';
+        const cacheKey = CacheKeys.userPosts(cacheIdentifier, pageNum);
+
+        // Try to load from cache first for instant display (only for first page)
+        if (!append && pageNum === 0) {
+          const cachedPosts = cache.get<Post[]>(CacheKeys.userPosts(cacheIdentifier, 0));
+          if (cachedPosts && cachedPosts.length > 0) {
+            console.log('[ProfileScreen] Loading posts from cache:', cachedPosts.length, 'posts');
+            setPosts(cachedPosts);
+          }
+
+          // Also try to load cached user profile
+          const cachedUser = cache.get<ProfileIdentity>(CacheKeys.userProfile(cacheIdentifier));
+          if (cachedUser) {
+            console.log('[ProfileScreen] Loading profile from cache:', cachedUser.handle);
+            setUser(cachedUser);
+          }
+        }
 
         const offset = pageNum * POSTS_PER_PAGE;
         const postsData = await PostsAPI.getUserPosts({
