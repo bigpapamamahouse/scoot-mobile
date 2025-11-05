@@ -17,6 +17,7 @@ import { Avatar } from '../components/Avatar';
 import { Button } from '../components/ui';
 import { useTheme, spacing, typography, borderRadius, shadows } from '../theme';
 import { cache, CacheKeys, CacheTTL } from '../lib/cache';
+import { useCurrentUser } from '../hooks/useCurrentUser';
 
 const POSTS_PER_PAGE = 20;
 
@@ -31,6 +32,7 @@ type ProfileIdentity = {
 
 export default function ProfileScreen({ navigation, route }: any) {
   const { colors } = useTheme();
+  const { currentUser } = useCurrentUser(); // Use global context instead of fetching
   const [user, setUser] = React.useState<ProfileIdentity | null>(null);
   const [posts, setPosts] = React.useState<Post[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -38,7 +40,6 @@ export default function ProfileScreen({ navigation, route }: any) {
   const [loadingMore, setLoadingMore] = React.useState(false);
   const [hasMore, setHasMore] = React.useState(true);
   const [page, setPage] = React.useState(0);
-  const [viewer, setViewer] = React.useState<User | null>(null);
   const [followerCount, setFollowerCount] = React.useState(0);
   const [followingCount, setFollowingCount] = React.useState(0);
   const [followStatus, setFollowStatus] = React.useState<'none' | 'pending' | 'following'>('none');
@@ -277,16 +278,7 @@ export default function ProfileScreen({ navigation, route }: any) {
       let targetIdentity: ProfileIdentity | null = null;
 
       try {
-        let currentUser: User | null = null;
-        try {
-          currentUser = await UsersAPI.me();
-        } catch (viewerError: any) {
-          console.warn(
-            'Failed to load signed-in user profile:',
-            viewerError?.message || String(viewerError)
-          );
-        }
-        setViewer(currentUser);
+        // Use currentUser from global context (already loaded) - no need for API call
 
         let targetHandle = requestedHandle;
         let targetUserId = requestedUserId;

@@ -1,5 +1,5 @@
 /**
- * Cache utility with TTL (Time-To-Live) support
+ * Cache utility with TTL (Time-To-Live) support and LRU eviction
  * Provides in-memory caching for posts, users, and other data
  */
 
@@ -7,10 +7,61 @@ interface CacheEntry<T> {
   data: T;
   timestamp: number;
   ttl: number; // Time to live in milliseconds
+  lastAccessed: number; // For LRU tracking
 }
 
 class CacheManager {
   private cache: Map<string, CacheEntry<any>> = new Map();
+  private maxEntries: number = 200; // Maximum cache entries (prevents memory issues)
+  private maxMemoryBytes: number = 50 * 1024 * 1024; // 50MB max cache size
+
+  /**
+   * Estimate memory size of data (rough approximation)
+   */
+  private estimateSize(data: any): number {
+    try {
+      return JSON.stringify(data).length * 2; // Rough estimate: 2 bytes per char
+    } catch {
+      return 1000; // Default estimate if stringify fails
+    }
+  }
+
+  /**
+   * Get current total cache size estimate
+   */
+  private getTotalSize(): number {
+    let total = 0;
+    for (const entry of this.cache.values()) {
+      total += this.estimateSize(entry.data);
+    }
+    return total;
+  }
+
+  /**
+   * Evict least recently used entries until cache is within limits
+   */
+  private evictLRU(): void {
+    // Only evict if we're over the max entries limit
+    if (this.cache.size <= this.maxEntries) {
+      const totalSize = this.getTotalSize();
+      // Also check memory limit
+      if (totalSize <= this.maxMemoryBytes) {
+        return;
+      }
+    }
+
+    // Sort entries by lastAccessed (oldest first)
+    const entries = Array.from(this.cache.entries());
+    entries.sort((a, b) => a[1].lastAccessed - b[1].lastAccessed);
+
+    // Remove oldest 20% of entries
+    const toRemove = Math.ceil(entries.length * 0.2);
+    for (let i = 0; i < toRemove && entries[i]; i++) {
+      this.cache.delete(entries[i][0]);
+    }
+
+    console.log(`[Cache] LRU eviction: removed ${toRemove} entries, ${this.cache.size} remaining`);
+  }
 
   /**
    * Set a value in the cache with a TTL
@@ -19,10 +70,17 @@ class CacheManager {
    * @param ttl - Time to live in milliseconds (default: 5 minutes)
    */
   set<T>(key: string, data: T, ttl: number = 5 * 60 * 1000): void {
+    // Evict old entries if cache is too large
+    if (this.cache.size >= this.maxEntries) {
+      this.evictLRU();
+    }
+
+    const now = Date.now();
     this.cache.set(key, {
       data,
-      timestamp: Date.now(),
+      timestamp: now,
       ttl,
+      lastAccessed: now,
     });
   }
 
@@ -46,6 +104,9 @@ class CacheManager {
       this.cache.delete(key);
       return null;
     }
+
+    // Update last accessed time for LRU tracking
+    entry.lastAccessed = now;
 
     return entry.data as T;
   }

@@ -10,6 +10,7 @@ import { useCurrentUser, isOwner } from '../hooks/useCurrentUser';
 import { IconButton, Badge } from './ui';
 import { useTheme, spacing, typography, borderRadius, shadows } from '../theme';
 import { ReactionDetailsModal } from './ReactionDetailsModal';
+import { imageDimensionCache } from '../lib/imageCache';
 
 function PostCard({
   post,
@@ -154,6 +155,7 @@ function PostCard({
     ]);
   };
 
+  // Load image dimensions with caching to prevent repeated S3 lookups
   React.useEffect(() => {
     if (!imageUri) {
       setImageAspectRatio(null);
@@ -162,26 +164,12 @@ function PostCard({
 
     let cancelled = false;
 
-    Image.getSize(
-      imageUri,
-      (width, height) => {
-        if (cancelled) {
-          return;
-        }
-        if (width > 0 && height > 0) {
-          setImageAspectRatio(width / height);
-        } else {
-          setImageAspectRatio(null);
-        }
-      },
-      (error) => {
-        if (cancelled) {
-          return;
-        }
-        console.warn('Failed to get image dimensions for', imageUri, error);
-        setImageAspectRatio(null);
+    // Use cached dimensions if available
+    imageDimensionCache.fetch(imageUri).then((dimensions) => {
+      if (!cancelled) {
+        setImageAspectRatio(dimensions.aspectRatio);
       }
-    );
+    });
 
     return () => {
       cancelled = true;
@@ -276,44 +264,24 @@ function PostCard({
     }
   };
 
+  // Lazy load comment previews - only if already provided by post data
+  // Prevents N+1 query problem by not fetching comments for every post in feed
   React.useEffect(() => {
     if (!showCommentPreview) {
       setPreviewComments([]);
       return;
     }
+
+    // Only use comments if already provided with the post (e.g., from backend)
+    // Don't fetch separately to avoid N+1 queries
     if (post.comments && post.comments.length) {
-      return;
+      setPreviewComments(post.comments.slice(0, 3));
+    } else {
+      // Don't load - comment previews are not critical for feed display
+      // Users can tap the post to see full comments
+      setPreviewComments([]);
     }
-
-    let cancelled = false;
-
-    CommentsAPI.listComments(post.id)
-      .then((result) => {
-        if (cancelled) {
-          return;
-        }
-        const dataArray: Comment[] = Array.isArray(result)
-          ? result
-          : result?.comments || result?.items || [];
-        const preview = dataArray.slice(0, 3);
-        setPreviewComments(preview);
-        const totalCount: number =
-          typeof result?.count === 'number'
-            ? result.count
-            : typeof result?.total === 'number'
-            ? result.total
-            : dataArray.length;
-        setCommentCount((prev) => Math.max(prev, totalCount));
-      })
-      .catch((err) => {
-        // Silently fail - preview comments are not critical for viewing posts
-        // Avoid logging 503 errors which are temporary service issues
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [post.comments, post.id, showCommentPreview]);
+  }, [post.comments, showCommentPreview]);
 
   const renderCommentPreview = (comment: Comment) => {
     const handle = resolveHandle(comment);
