@@ -808,7 +808,7 @@ export default function ProfileScreen({ navigation, route }: any) {
         }
         ListHeaderComponent={
           <View style={styles.header}>
-            <Avatar avatarKey={user?.avatarKey} size={80} />
+            <Avatar avatarKey={user?.avatarKey} size={64} />
             <Text style={styles.handle}>{displayHandle}</Text>
             {user?.fullName && (
               <Text style={styles.fullName}>{user.fullName}</Text>
@@ -912,16 +912,16 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    paddingVertical: spacing[5],
+    paddingVertical: spacing[4],
     backgroundColor: colors.background.elevated,
     borderRadius: borderRadius.lg,
     marginBottom: spacing[4],
-    padding: spacing[4],
+    padding: spacing[3],
     ...shadows.base,
   },
   handle: {
     ...typography.styles.h4,
-    marginTop: spacing[3],
+    marginTop: spacing[2],
     color: colors.text.primary,
   },
   fullName: {
@@ -936,8 +936,8 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   statsRow: {
     flexDirection: 'row',
-    marginTop: spacing[5],
-    gap: spacing[8],
+    marginTop: spacing[4],
+    gap: spacing[6],
   },
   stat: {
     alignItems: 'center',
@@ -1007,7 +1007,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   sectionTitle: {
     ...typography.styles.h5,
-    marginTop: spacing[6],
+    marginTop: spacing[4],
     marginBottom: spacing[2],
     alignSelf: 'flex-start',
     color: colors.text.primary,
