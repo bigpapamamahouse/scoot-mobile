@@ -1,8 +1,20 @@
 
 import { api } from './client';
 
-export async function listComments(postId: string){
-  return api(`/comments/${encodeURIComponent(postId)}`);
+export async function listComments(
+  postId: string,
+  options?: { limit?: number; offset?: number }
+){
+  const params = new URLSearchParams();
+  if (options?.limit !== undefined) {
+    params.append('limit', String(options.limit));
+  }
+  if (options?.offset !== undefined) {
+    params.append('offset', String(options.offset));
+  }
+  const queryString = params.toString();
+  const url = `/comments/${encodeURIComponent(postId)}${queryString ? `?${queryString}` : ''}`;
+  return api(url);
 }
 
 export async function addComment(postId: string, text: string){

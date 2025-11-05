@@ -34,6 +34,9 @@ export interface GetUserPostsOptions {
   cursor?: string;
 }
 
+// Cache successful endpoint patterns to avoid repeated discovery
+const endpointCache: Map<string, string> = new Map();
+
 export async function getUserPosts(options: GetUserPostsOptions = {}){
   const { handle, userId, limit, offset, cursor } = options;
 
@@ -43,6 +46,32 @@ export async function getUserPosts(options: GetUserPostsOptions = {}){
   if (offset) paginationParams.append('offset', String(offset));
   if (cursor) paginationParams.append('cursor', cursor);
   const paginationQuery = paginationParams.toString();
+
+  // Try cached endpoint first
+  const cacheKey = handle || userId || 'me';
+  const cachedEndpoint = endpointCache.get(cacheKey);
+  if (cachedEndpoint) {
+    try {
+      const fullPath = paginationQuery
+        ? `${cachedEndpoint}${cachedEndpoint.includes('?') ? '&' : '?'}${paginationQuery}`
+        : cachedEndpoint;
+      const result = await api(fullPath);
+      // Cache hit! Return immediately
+      return result;
+    } catch (err: any) {
+      // Cache miss or endpoint changed, fall through to discovery
+      const message = String(err?.message || '');
+      const statusMatch = message.match(/HTTP\s+(\d+)/);
+      const statusCode = statusMatch ? parseInt(statusMatch[1], 10) : undefined;
+      // Only invalidate cache for 404/405 (endpoint no longer exists)
+      if (statusCode === 404 || statusCode === 405) {
+        endpointCache.delete(cacheKey);
+      } else {
+        // For other errors (500, network issues), throw immediately
+        throw err;
+      }
+    }
+  }
 
   const attempts: string[] = [];
   const seen = new Set<string>();
@@ -90,7 +119,20 @@ export async function getUserPosts(options: GetUserPostsOptions = {}){
   let lastError: unknown;
   for (const path of attempts) {
     try {
-      return await api(path);
+      const result = await api(path);
+      // Success! Cache this endpoint pattern for future requests
+      // Extract the base path without pagination params
+      const basePath = path.split('?')[0];
+      const basePattern = basePath
+        .replace(/\/[^/]+$/, (match) => {
+          // If the last segment looks like a specific value, keep it as pattern
+          if (handle && match.includes(handle)) return `/:handle`;
+          if (userId && match.includes(userId)) return `/:userId`;
+          return match;
+        });
+      endpointCache.set(cacheKey, basePath); // Cache the actual working path
+      console.log(`[API] Cached endpoint for ${cacheKey}: ${basePath}`);
+      return result;
     } catch (err: any) {
       lastError = err;
       const message = String(err?.message || '');

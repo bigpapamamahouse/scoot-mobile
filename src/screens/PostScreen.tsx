@@ -49,6 +49,8 @@ const normalizeComment = (comment: any): Comment => {
   };
 };
 
+const COMMENTS_PER_PAGE = 30;
+
 export default function PostScreen({ route, navigation }: { route: PostScreenRoute; navigation: any }) {
   const initialPost = route?.params?.post ?? null;
   const postId = route?.params?.postId ?? initialPost?.id;
@@ -58,6 +60,9 @@ export default function PostScreen({ route, navigation }: { route: PostScreenRou
   const [post, setPost] = React.useState<Post | null>(initialPost);
   const [comments, setComments] = React.useState<Comment[]>([]);
   const [loading, setLoading] = React.useState(false);
+  const [loadingMore, setLoadingMore] = React.useState(false);
+  const [hasMore, setHasMore] = React.useState(true);
+  const [page, setPage] = React.useState(0);
   const [newComment, setNewComment] = React.useState('');
   const [submitting, setSubmitting] = React.useState(false);
 
@@ -120,13 +125,21 @@ export default function PostScreen({ route, navigation }: { route: PostScreenRou
     }
   }, [postId, resolvePost]);
 
-  const loadComments = React.useCallback(async () => {
+  const loadComments = React.useCallback(async (pageNum: number = 0, append: boolean = false) => {
     if (!postId) {
       return;
     }
-    setLoading(true);
+    if (append) {
+      setLoadingMore(true);
+    } else {
+      setLoading(true);
+    }
     try {
-      const result = await CommentsAPI.listComments(postId);
+      const offset = pageNum * COMMENTS_PER_PAGE;
+      const result = await CommentsAPI.listComments(postId, {
+        limit: COMMENTS_PER_PAGE,
+        offset
+      });
 
       const dataArray = Array.isArray(result)
         ? result
@@ -171,7 +184,17 @@ export default function PostScreen({ route, navigation }: { route: PostScreenRou
         });
       }
 
-      setComments(normalizedComments);
+      if (append) {
+        setComments((prev) => {
+          const existingIds = new Set(prev.map(c => c.id));
+          const uniqueNewComments = normalizedComments.filter(c => !existingIds.has(c.id));
+          return [...prev, ...uniqueNewComments];
+        });
+      } else {
+        setComments(normalizedComments);
+      }
+
+      setHasMore(normalizedComments.length >= COMMENTS_PER_PAGE);
       setPost((prev) =>
         prev ? { ...prev, commentCount: totalCount } : prev
       );
@@ -179,6 +202,7 @@ export default function PostScreen({ route, navigation }: { route: PostScreenRou
       console.warn('Failed to load comments', err);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   }, [postId]);
 
@@ -309,6 +333,14 @@ export default function PostScreen({ route, navigation }: { route: PostScreenRou
     ]);
   };
 
+  const loadMore = React.useCallback(async () => {
+    if (loadingMore || !hasMore) return;
+
+    const nextPage = page + 1;
+    setPage(nextPage);
+    await loadComments(nextPage, true);
+  }, [loadingMore, hasMore, page, loadComments]);
+
   const styles = React.useMemo(() => createStyles(colors), [colors]);
 
   const renderComment = ({ item }: { item: Comment }) => {
@@ -357,8 +389,10 @@ export default function PostScreen({ route, navigation }: { route: PostScreenRou
         renderItem={renderComment}
         keyboardShouldPersistTaps="handled"
         refreshControl={
-          <RefreshControl refreshing={loading} onRefresh={loadComments} />
+          <RefreshControl refreshing={loading} onRefresh={() => { setPage(0); setHasMore(true); loadComments(0, false); }} />
         }
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.5}
         ListHeaderComponent={
           post ? (
             <View style={styles.postContainer}>
@@ -376,7 +410,7 @@ export default function PostScreen({ route, navigation }: { route: PostScreenRou
               <Text style={styles.commentHeaderLabel}>Comments</Text>
             </View>
           ) : (
-            <View style={styles.loadingPost}> 
+            <View style={styles.loadingPost}>
               <Text style={styles.loadingText}>Loading post...</Text>
             </View>
           )
@@ -384,6 +418,13 @@ export default function PostScreen({ route, navigation }: { route: PostScreenRou
         ListEmptyComponent={!loading ? (
           <Text style={styles.emptyText}>No comments yet. Be the first to add one!</Text>
         ) : null}
+        ListFooterComponent={
+          loadingMore ? (
+            <View style={styles.loadingMore}>
+              <Text style={styles.loadingText}>Loading more comments...</Text>
+            </View>
+          ) : null
+        }
         contentContainerStyle={styles.listContent}
       />
 
@@ -434,6 +475,11 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   loadingPost: {
     padding: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingMore: {
+    padding: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
