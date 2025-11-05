@@ -21,6 +21,7 @@ export interface User {
   email?: string;
   createdAt: string;
   fullName?: string;
+  hasMutualConnection?: boolean; // Set to true if user has mutual followers/following with current user
 }
 
 export interface Notification {

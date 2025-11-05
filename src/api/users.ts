@@ -598,6 +598,127 @@ export async function searchUsers(query: string): Promise<User[]> {
   return [];
 }
 
+// Cache for follower/following data to avoid repeated API calls
+let followerCache: {
+  followers: Set<string>;
+  following: Set<string>;
+  timestamp: number;
+  currentUserHandle: string | null;
+} | null = null;
+
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * Enhanced search that prioritizes users with mutual follower/following connections
+ */
+export async function searchUsersWithMutuals(query: string): Promise<User[]> {
+  // Get basic search results
+  const results = await searchUsers(query);
+
+  if (results.length === 0) {
+    return results;
+  }
+
+  try {
+    // Get current user to fetch their followers/following
+    const currentUser = await me();
+    const currentUserHandle = currentUser?.handle;
+
+    if (!currentUserHandle) {
+      // If we can't get current user, return unsorted results
+      return results;
+    }
+
+    // Check if cache is valid
+    const now = Date.now();
+    const isCacheValid =
+      followerCache &&
+      followerCache.currentUserHandle === currentUserHandle &&
+      (now - followerCache.timestamp) < CACHE_DURATION;
+
+    if (!isCacheValid) {
+      // Fetch fresh follower/following data
+      const [followersResponse, followingResponse] = await Promise.all([
+        listFollowers(currentUserHandle),
+        listFollowing(currentUserHandle)
+      ]);
+
+      // Extract handles from responses
+      const followers = new Set<string>();
+      const following = new Set<string>();
+
+      // Handle followers response (could be array or wrapped object)
+      const followersList = Array.isArray(followersResponse)
+        ? followersResponse
+        : followersResponse?.items || followersResponse?.users || [];
+
+      followersList.forEach((user: any) => {
+        if (user?.handle) followers.add(user.handle);
+      });
+
+      // Handle following response
+      const followingList = Array.isArray(followingResponse)
+        ? followingResponse
+        : followingResponse?.items || followingResponse?.users || [];
+
+      followingList.forEach((user: any) => {
+        if (user?.handle) following.add(user.handle);
+      });
+
+      // Update cache
+      followerCache = {
+        followers,
+        following,
+        timestamp: now,
+        currentUserHandle
+      };
+    }
+
+    // Mark users with mutual connections
+    const enrichedResults = results.map(user => {
+      const userHandle = user.handle;
+      if (!userHandle || !followerCache) {
+        return user;
+      }
+
+      // Check if this user is in our followers OR following
+      const hasMutualConnection =
+        followerCache.followers.has(userHandle) ||
+        followerCache.following.has(userHandle);
+
+      return {
+        ...user,
+        hasMutualConnection
+      };
+    });
+
+    // Sort: mutuals first, then alphabetically by name
+    enrichedResults.sort((a, b) => {
+      // Prioritize mutual connections
+      if (a.hasMutualConnection && !b.hasMutualConnection) return -1;
+      if (!a.hasMutualConnection && b.hasMutualConnection) return 1;
+
+      // If both have or don't have mutual connections, sort by name
+      const nameA = a.fullName || a.handle || '';
+      const nameB = b.fullName || b.handle || '';
+      return nameA.localeCompare(nameB);
+    });
+
+    return enrichedResults;
+  } catch (error) {
+    console.error('Error enriching search results with mutuals:', error);
+    // On error, return unsorted results
+    return results;
+  }
+}
+
+/**
+ * Clear the follower/following cache. Useful when user follows/unfollows someone.
+ */
+export function clearFollowerCache() {
+  followerCache = null;
+}
+
 export async function followUser(handle: string) {
   const requestBody = { handle };
 

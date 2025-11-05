@@ -10,7 +10,7 @@ import {
   SafeAreaView,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { searchUsers } from '../api/users';
+import { searchUsersWithMutuals } from '../api/users';
 import { Avatar } from '../components/Avatar';
 import type { User } from '../types';
 import { useTheme, spacing, typography, borderRadius } from '../theme';
@@ -46,7 +46,7 @@ export function SearchScreen({ navigation }: Props) {
       setError(null);
 
       try {
-        const searchResults = await searchUsers(trimmedQuery);
+        const searchResults = await searchUsersWithMutuals(trimmedQuery);
         setResults(searchResults);
       } catch (err) {
         console.error('Search error:', err);
@@ -74,11 +74,18 @@ export function SearchScreen({ navigation }: Props) {
     >
       <Avatar avatarKey={item.avatarKey} size={48} />
       <View style={styles.userInfo}>
-        <Text style={styles.userName}>{item.fullName || 'Unknown'}</Text>
+        <View style={styles.nameRow}>
+          <Text style={styles.userName}>{item.fullName || 'Unknown'}</Text>
+          {item.hasMutualConnection && (
+            <View style={styles.mutualBadge}>
+              <Text style={styles.mutualBadgeText}>Mutual</Text>
+            </View>
+          )}
+        </View>
         <Text style={styles.userHandle}>@{item.handle || 'unknown'}</Text>
       </View>
     </TouchableOpacity>
-  ), [handleUserPress]);
+  ), [handleUserPress, styles]);
 
   const renderEmptyState = () => {
     if (loading) {
@@ -184,11 +191,27 @@ const createStyles = (colors: any) => StyleSheet.create({
     marginLeft: spacing[3],
     flex: 1,
   },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing[1],
+  },
   userName: {
     fontSize: typography.fontSize.base,
     fontWeight: typography.fontWeight.semibold,
     color: colors.text.primary,
-    marginBottom: spacing[1],
+  },
+  mutualBadge: {
+    marginLeft: spacing[2],
+    paddingHorizontal: spacing[2],
+    paddingVertical: 2,
+    backgroundColor: colors.primary[100] || colors.primary[500] + '20',
+    borderRadius: borderRadius.sm,
+  },
+  mutualBadgeText: {
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.medium,
+    color: colors.primary[700] || colors.primary[500],
   },
   userHandle: {
     fontSize: typography.fontSize.sm,
