@@ -1,9 +1,9 @@
 import React from 'react';
-import { AppState, Platform } from 'react-native';
+import { AppState, Platform, Alert } from 'react-native';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
-import { NotificationsAPI } from '../api';
+import { NotificationsAPI, PostsAPI } from '../api';
 import { Notification } from '../types';
 import {
   readPushToken,
@@ -11,6 +11,7 @@ import {
   readSeenNotificationIds,
   writeSeenNotificationIds,
 } from './storage';
+import { navigationRef } from '../navigation';
 
 type NotificationsContextValue = {
   unreadCount: number;
@@ -181,7 +182,11 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
             content: {
               title: titleForNotification(notification),
               body: bodyForNotification(notification),
-              data: { notificationId: notification.id },
+              data: {
+                notificationId: notification.id,
+                postId: notification.postId || notification.relatedPostId,
+                userId: notification.relatedUserId || notification.fromUserId,
+              },
             },
             trigger: null,
           }),
@@ -226,6 +231,38 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     const subscription = Notifications.addNotificationReceivedListener(() => {
       refresh();
     });
+
+    // Handle notification taps for deep linking to posts
+    const responseSubscription = Notifications.addNotificationResponseReceivedListener(
+      async (response) => {
+        const data = response.notification.request.content.data;
+        const postId = data?.postId;
+
+        // If notification has a postId, navigate to that post
+        if (postId && navigationRef.isReady()) {
+          try {
+            const postResponse = await PostsAPI.getPost(postId as string);
+            const post = postResponse?.post || postResponse?.item || postResponse?.data || postResponse;
+
+            if (post) {
+              // Navigate to the post screen
+              navigationRef.navigate('Post' as never, { post } as never);
+            } else {
+              // Fallback to notifications screen if post not found
+              navigationRef.navigate('Notifications' as never);
+            }
+          } catch (error) {
+            console.warn('Failed to load post from notification', error);
+            // Fallback to notifications screen on error
+            navigationRef.navigate('Notifications' as never);
+          }
+        } else if (navigationRef.isReady()) {
+          // No postId, navigate to notifications screen
+          navigationRef.navigate('Notifications' as never);
+        }
+      }
+    );
+
     const appStateSubscription = AppState.addEventListener('change', (nextState) => {
       if (nextState === 'active') {
         ensurePushTokenRegistered().then(({ granted }) => {
@@ -237,6 +274,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     return () => {
       clearInterval(interval);
       subscription.remove();
+      responseSubscription.remove();
       appStateSubscription.remove();
     };
   }, [refresh]);
