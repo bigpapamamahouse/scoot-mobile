@@ -297,8 +297,15 @@ export default function ProfileScreen({ navigation, route }: any) {
         })();
 
         const isSelfRequest = (() => {
+          // Only treat as self-request if BOTH:
+          // 1. No route params were provided at all (not even empty/null values)
+          // 2. No target was resolved
+          const hasRouteParams = routeUserHandle !== undefined || routeUserId !== undefined;
           if (!targetHandle && !targetUserId) {
-            return true;
+            // If route params were explicitly provided but resolved to nothing,
+            // this is NOT a self-request (it's an invalid/missing user)
+            // Only treat as self-request if no params were provided at all
+            return !hasRouteParams;
           }
           if (targetHandle && viewerHandle) {
             if (targetHandle.toLowerCase() === viewerHandle) {
@@ -552,7 +559,7 @@ export default function ProfileScreen({ navigation, route }: any) {
         setLoading(false);
       }
     },
-    [deriveIdentityFromPosts, filterPostsForUser, resolvePosts, routeUserHandle, routeUserId]
+    [deriveIdentityFromPosts, filterPostsForUser, resolvePosts, routeUserHandle, routeUserId, currentUser]
   );
 
   React.useEffect(() => {
@@ -603,6 +610,8 @@ export default function ProfileScreen({ navigation, route }: any) {
   }, []);
 
   const isViewingSelf = React.useMemo(() => {
+    // If either user is not loaded yet, show follow button (return false)
+    // This ensures the button appears while loading and for other users
     if (!currentUser || !user) return false;
 
     const normalizeId = (value: unknown): string | null => {
