@@ -603,7 +603,7 @@ export default function ProfileScreen({ navigation, route }: any) {
   }, []);
 
   const isViewingSelf = React.useMemo(() => {
-    if (!viewer || !user) return false;
+    if (!currentUser || !user) return false;
 
     const normalizeId = (value: unknown): string | null => {
       if (typeof value !== 'string') return null;
@@ -617,14 +617,14 @@ export default function ProfileScreen({ navigation, route }: any) {
       return trimmed.length > 0 ? trimmed : null;
     };
 
-    const viewerId = normalizeId((viewer as any)?.id) || normalizeId((viewer as any)?.userId);
+    const viewerId = normalizeId((currentUser as any)?.id) || normalizeId((currentUser as any)?.userId);
     const userId = normalizeId((user as any)?.id) || normalizeId((user as any)?.userId);
 
     if (viewerId && userId && viewerId === userId) {
       return true;
     }
 
-    const viewerHandle = normalizeHandle((viewer as any)?.handle);
+    const viewerHandle = normalizeHandle((currentUser as any)?.handle);
     const userHandle = normalizeHandle((user as any)?.handle);
 
     if (viewerHandle && userHandle && viewerHandle === userHandle) {
@@ -632,7 +632,7 @@ export default function ProfileScreen({ navigation, route }: any) {
     }
 
     return false;
-  }, [user, viewer]);
+  }, [user, currentUser]);
 
   const openSettings = React.useCallback(() => {
     navigation.navigate('Settings');
