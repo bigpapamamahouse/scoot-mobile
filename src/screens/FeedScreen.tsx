@@ -207,13 +207,12 @@ export default function FeedScreen({ navigation }: any){
         }
       />
 
-      {/* Floating Action Button with glass morphism */}
+      {/* Floating Action Button */}
       <IconButton
         icon="add"
         onPress={() => navigation.navigate('ComposePost')}
-        variant="glass"
+        variant="solid"
         size="lg"
-        color={colors.primary[600]}
         style={{
           position: 'absolute',
           right: spacing[5],

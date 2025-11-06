@@ -67,9 +67,9 @@ export const IconButton: React.FC<IconButtonProps> = ({
       case 'glass':
         return {
           ...baseStyle,
-          backgroundColor: 'rgba(255, 255, 255, 0.7)',
+          backgroundColor: backgroundColor || colors.background.elevated,
           borderWidth: 1,
-          borderColor: 'rgba(255, 255, 255, 0.3)',
+          borderColor: colors.border.light,
           ...shadows.sm,
         };
       case 'ghost':
