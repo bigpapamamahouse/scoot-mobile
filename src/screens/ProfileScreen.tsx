@@ -371,14 +371,17 @@ export default function ProfileScreen({ navigation, route }: any) {
               } else {
                 console.warn('[Profile] Fetched user has no ID!');
               }
-            } else {
-              console.warn('[Profile] getUserByIdentity returned null/undefined');
             }
+            // Silently handle case where user doesn't exist (getUserByIdentity logs this)
           } catch (err: any) {
-            console.warn(
-              'Failed to load requested profile:',
-              err?.message || String(err)
-            );
+            // Only log non-404 errors - 404s are already handled by getUserByIdentity
+            const message = String(err?.message || '');
+            if (!message.includes('404') && !message.includes('Not Found')) {
+              console.warn(
+                'Failed to load requested profile:',
+                err?.message || String(err)
+              );
+            }
           }
         }
 
