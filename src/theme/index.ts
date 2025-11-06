@@ -8,6 +8,7 @@ export { typography } from './typography';
 export { spacing, borderRadius, iconSizes } from './spacing';
 export { shadows, glassEffect } from './shadows';
 export { ThemeProvider, useTheme } from './ThemeContext';
+export { getLiquidGlassTokens } from './liquidGlass';
 
 // Re-export types
 export type { ColorPalette } from './colors';

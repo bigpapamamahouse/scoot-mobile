@@ -6,7 +6,9 @@
 import React from 'react';
 import { TouchableOpacity, StyleSheet, ViewStyle, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useTheme, spacing, borderRadius, shadows } from '../../theme';
+import { BlurView } from 'expo-blur';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useTheme, borderRadius, shadows, getLiquidGlassTokens } from '../../theme';
 
 export type IconButtonVariant = 'solid' | 'ghost' | 'glass';
 export type IconButtonSize = 'sm' | 'md' | 'lg';
@@ -34,7 +36,9 @@ export const IconButton: React.FC<IconButtonProps> = ({
   badge,
   style,
 }) => {
-  const { colors } = useTheme();
+  const { colors, effectiveMode } = useTheme();
+  const tokens = React.useMemo(() => getLiquidGlassTokens(effectiveMode), [effectiveMode]);
+
   const getSize = () => {
     switch (size) {
       case 'sm':
@@ -43,6 +47,8 @@ export const IconButton: React.FC<IconButtonProps> = ({
         return { container: 44, icon: 24 };
       case 'lg':
         return { container: 56, icon: 32 };
+      default:
+        return { container: 44, icon: 24 };
     }
   };
 
@@ -67,9 +73,10 @@ export const IconButton: React.FC<IconButtonProps> = ({
       case 'glass':
         return {
           ...baseStyle,
-          backgroundColor: 'rgba(255, 255, 255, 0.7)',
-          borderWidth: 1,
-          borderColor: 'rgba(255, 255, 255, 0.3)',
+          backgroundColor: 'transparent',
+          overflow: 'hidden',
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: tokens.outlineColor,
           ...shadows.sm,
         };
       case 'ghost':
@@ -87,13 +94,36 @@ export const IconButton: React.FC<IconButtonProps> = ({
     return colors.text.primary;
   };
 
+  const renderBackground = variant === 'glass';
+
   return (
     <TouchableOpacity
       style={[getButtonStyle(), style]}
       onPress={onPress}
       disabled={disabled}
-      activeOpacity={0.7}
+      activeOpacity={0.72}
     >
+      {renderBackground && (
+        <>
+          <BlurView
+            intensity={tokens.blurIntensity}
+            tint={effectiveMode}
+            style={[StyleSheet.absoluteFill, { borderRadius: sizes.container / 2 }]}
+          />
+          <LinearGradient
+            colors={tokens.surfaceGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[StyleSheet.absoluteFill, { borderRadius: sizes.container / 2 }]}
+          />
+          <LinearGradient
+            colors={tokens.specularGradient}
+            start={{ x: 0.2, y: 0 }}
+            end={{ x: 0.8, y: 1 }}
+            style={[StyleSheet.absoluteFill, { borderRadius: sizes.container / 2 }]}
+          />
+        </>
+      )}
       <View style={{ marginTop: -5 }}>
         <Ionicons name={icon} size={sizes.icon} color={getIconColor()} />
       </View>

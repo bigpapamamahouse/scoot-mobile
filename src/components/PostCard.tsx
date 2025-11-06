@@ -8,7 +8,8 @@ import { CommentsAPI, ReactionsAPI, PostsAPI } from '../api';
 import { resolveHandle } from '../lib/resolveHandle';
 import { useCurrentUser, isOwner } from '../hooks/useCurrentUser';
 import { IconButton, Badge } from './ui';
-import { useTheme, spacing, typography, borderRadius, shadows } from '../theme';
+import { useTheme, spacing, typography, borderRadius } from '../theme';
+import { LiquidGlassSurface } from './layout';
 import { ReactionDetailsModal } from './ReactionDetailsModal';
 import { imageDimensionCache } from '../lib/imageCache';
 
@@ -33,7 +34,7 @@ function PostCard({
   initialReactions?: any;
   onReactionsUpdated?: (reactions: any) => void;
 }) {
-  const { colors } = useTheme();
+  const { colors, effectiveMode } = useTheme();
   const { currentUser } = useCurrentUser();
   const [reactions, setReactions] = React.useState<Reaction[]>([]);
   const [detailedReactions, setDetailedReactions] = React.useState<ReactionWithUsers[]>([]);
@@ -311,14 +312,20 @@ function PostCard({
   const displayHandle = postHandle ? `@${postHandle}` : `@${localPost.userId.slice(0, 8)}`;
   const hasMoreComments = commentCount > previewComments.length;
 
-  const styles = React.useMemo(() => createStyles(colors), [colors]);
+  const styles = React.useMemo(() => createStyles(colors, effectiveMode), [colors, effectiveMode]);
 
   return (
-    <TouchableOpacity
-      onPress={onPress}
-      style={styles.card}
-      activeOpacity={onPress ? 0.7 : 1}
+    <LiquidGlassSurface
+      style={styles.surface}
+      contentStyle={styles.surfaceContent}
+      padding={spacing[1]}
+      borderRadius={borderRadius['3xl']}
     >
+      <TouchableOpacity
+        onPress={onPress}
+        style={styles.card}
+        activeOpacity={onPress ? 0.82 : 1}
+      >
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
@@ -519,122 +526,140 @@ function PostCard({
         loading={loadingReactionDetails}
         onUserPress={onPressUser}
       />
-    </TouchableOpacity>
+      </TouchableOpacity>
+    </LiquidGlassSurface>
   );
 }
 
-const createStyles = (colors: any) => StyleSheet.create({
-  card: {
-    backgroundColor: colors.background.elevated,
-    borderRadius: borderRadius.lg,
-    padding: spacing[3],
-    ...shadows.base,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing[2],
-    justifyContent: 'space-between',
-  },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing[1],
-  },
-  author: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexShrink: 1,
-    marginRight: spacing[3],
-  },
-  handle: {
-    ...typography.styles.label,
-    marginLeft: spacing[2],
-    flexShrink: 1,
-    color: colors.text.primary,
-  },
-  timestamp: {
-    ...typography.styles.caption,
-    color: colors.text.secondary,
-  },
-  text: {
-    ...typography.styles.body,
-    marginBottom: spacing[2],
-    color: colors.text.primary,
-  },
-  image: {
-    width: '100%',
-    borderRadius: borderRadius.base,
-    marginBottom: spacing[2],
-    backgroundColor: colors.neutral[100],
-  },
-  imageFallback: {
-    aspectRatio: 1,
-  },
-  commentPreviewContainer: {
-    marginTop: spacing[2],
-    borderTopWidth: 1,
-    borderTopColor: colors.border.light,
-    paddingTop: spacing[2],
-    gap: spacing[2],
-  },
-  commentPreviewRow: {
-    flexDirection: 'row',
-    gap: spacing[2],
-  },
-  commentPreviewHandle: {
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.text.primary,
-    fontSize: typography.fontSize.sm,
-  },
-  commentPreviewText: {
-    flex: 1,
-    color: colors.text.secondary,
-    fontSize: typography.fontSize.sm,
-  },
-  viewMoreComments: {
-    color: colors.primary[700],
-    fontWeight: typography.fontWeight.medium,
-    fontSize: typography.fontSize.sm,
-  },
-  quickReactions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing[2],
-    paddingTop: spacing[2],
-    borderTopWidth: 1,
-    borderTopColor: colors.border.light,
-  },
-  reactionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing[1],
-    paddingVertical: spacing[2],
-    paddingHorizontal: spacing[2],
-    borderRadius: borderRadius.full,
-    backgroundColor: 'transparent',
-  },
-  reactionButtonActive: {
-    backgroundColor: colors.primary[50],
-  },
-  reactionCount: {
-    fontSize: typography.fontSize.xs,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.text.secondary,
-  },
-  commentButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing[1],
-    padding: spacing[2],
-    marginLeft: 'auto',
-  },
-  commentCountText: {
-    fontSize: typography.fontSize.sm,
-    color: colors.text.secondary,
-    fontWeight: typography.fontWeight.medium,
-  },
-});
+const createStyles = (colors: any, mode: 'light' | 'dark') => {
+  const dividerColor = mode === 'dark' ? 'rgba(148, 163, 184, 0.24)' : 'rgba(15, 23, 42, 0.08)';
+  const chipBase = mode === 'dark' ? 'rgba(148, 163, 184, 0.12)' : 'rgba(33, 150, 243, 0.1)';
+  const chipActive = mode === 'dark' ? 'rgba(59, 130, 246, 0.28)' : 'rgba(33, 150, 243, 0.2)';
+  const cardOverlay = mode === 'dark' ? 'rgba(15, 23, 42, 0.45)' : 'rgba(255, 255, 255, 0.72)';
+
+  return StyleSheet.create({
+    surface: {
+      width: '100%',
+    },
+    surfaceContent: {
+      borderRadius: borderRadius['3xl'],
+      padding: spacing[1],
+    },
+    card: {
+      backgroundColor: cardOverlay,
+      borderRadius: borderRadius['3xl'] - 6,
+      padding: spacing[5],
+      gap: spacing[3],
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: spacing[2],
+      justifyContent: 'space-between',
+    },
+    headerRight: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing[1],
+    },
+    author: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flexShrink: 1,
+      marginRight: spacing[3],
+    },
+    handle: {
+      ...typography.styles.label,
+      marginLeft: spacing[2],
+      flexShrink: 1,
+      color: colors.text.primary,
+    },
+    timestamp: {
+      ...typography.styles.caption,
+      color: colors.text.secondary,
+    },
+    text: {
+      ...typography.styles.body,
+      marginBottom: spacing[2],
+      color: colors.text.primary,
+    },
+    image: {
+      width: '100%',
+      borderRadius: borderRadius.base,
+      marginBottom: spacing[2],
+      backgroundColor: colors.neutral[100],
+    },
+    imageFallback: {
+      aspectRatio: 1,
+    },
+    commentPreviewContainer: {
+      marginTop: spacing[3],
+      borderTopWidth: StyleSheet.hairlineWidth * 2,
+      borderTopColor: dividerColor,
+      paddingTop: spacing[3],
+      gap: spacing[2],
+    },
+    commentPreviewRow: {
+      flexDirection: 'row',
+      gap: spacing[2],
+    },
+    commentPreviewHandle: {
+      fontWeight: typography.fontWeight.semibold,
+      color: colors.text.primary,
+      fontSize: typography.fontSize.sm,
+    },
+    commentPreviewText: {
+      flex: 1,
+      color: colors.text.secondary,
+      fontSize: typography.fontSize.sm,
+    },
+    viewMoreComments: {
+      color: colors.primary[700],
+      fontWeight: typography.fontWeight.medium,
+      fontSize: typography.fontSize.sm,
+    },
+    quickReactions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing[3],
+      paddingTop: spacing[3],
+      borderTopWidth: StyleSheet.hairlineWidth * 2,
+      borderTopColor: dividerColor,
+    },
+    reactionButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing[1],
+      paddingVertical: spacing[1],
+      paddingHorizontal: spacing[3],
+      borderRadius: borderRadius.full,
+      backgroundColor: chipBase,
+    },
+    reactionButtonActive: {
+      backgroundColor: chipActive,
+    },
+    reactionCount: {
+      fontSize: typography.fontSize.xs,
+      fontWeight: typography.fontWeight.semibold,
+      color: colors.text.secondary,
+    },
+    commentButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing[1],
+      paddingVertical: spacing[1],
+      paddingHorizontal: spacing[3],
+      marginLeft: 'auto',
+      borderRadius: borderRadius.full,
+      backgroundColor: chipBase,
+    },
+    commentCountText: {
+      fontSize: typography.fontSize.sm,
+      color: colors.text.secondary,
+      fontWeight: typography.fontWeight.medium,
+    },
+  });
+};
 
 // Memoize PostCard to prevent unnecessary re-renders when parent updates
 // Only re-render if post.id changes or callbacks change

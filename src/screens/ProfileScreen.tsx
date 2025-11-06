@@ -15,6 +15,7 @@ import { User, Post } from '../types';
 import PostCard from '../components/PostCard';
 import { Avatar } from '../components/Avatar';
 import { Button } from '../components/ui';
+import { LiquidGlassBackground, LiquidGlassSurface } from '../components/layout';
 import { useTheme, spacing, typography, borderRadius, shadows } from '../theme';
 import { cache, CacheKeys, CacheTTL } from '../lib/cache';
 import { useCurrentUser } from '../hooks/useCurrentUser';
@@ -31,7 +32,7 @@ type ProfileIdentity = {
 };
 
 export default function ProfileScreen({ navigation, route }: any) {
-  const { colors } = useTheme();
+  const { colors, effectiveMode } = useTheme();
   const { currentUser } = useCurrentUser(); // Use global context instead of fetching
   const [user, setUser] = React.useState<ProfileIdentity | null>(null);
   const [posts, setPosts] = React.useState<Post[]>([]);
@@ -807,23 +808,28 @@ export default function ProfileScreen({ navigation, route }: any) {
     }
   }, [navigation, user?.handle]);
 
-  const styles = React.useMemo(() => createStyles(colors), [colors]);
+  const styles = React.useMemo(() => createStyles(colors, effectiveMode), [colors, effectiveMode]);
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
+      <LiquidGlassBackground style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
         <ActivityIndicator size="large" color={colors.primary[500]} />
-      </View>
+      </LiquidGlassBackground>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['bottom']}>
-      <FlatList
+    <LiquidGlassBackground style={{ flex: 1 }}>
+      <SafeAreaView style={styles.container} edges={['bottom']}>
+        <FlatList
         data={posts}
         keyExtractor={(item) => item.id}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.primary[500]}
+          />
         }
         onEndReached={loadMore}
         onEndReachedThreshold={0.5}
@@ -836,56 +842,71 @@ export default function ProfileScreen({ navigation, route }: any) {
         }
         ListHeaderComponent={
           <View style={styles.header}>
-            <View style={styles.profileInfoRow}>
-              <Avatar avatarKey={user?.avatarKey} size={56} />
-              <View style={styles.profileTextContainer}>
-                <Text style={styles.handle}>{displayHandle}</Text>
-                {user?.fullName && (
-                  <Text style={styles.fullName}>{user.fullName}</Text>
-                )}
-                {user?.email && !isViewingSelf && (
-                  <Text style={styles.email}>{user.email}</Text>
-                )}
+            <LiquidGlassSurface
+              padding={spacing[2]}
+              borderRadius={borderRadius['3xl']}
+              contentStyle={{
+                borderRadius: borderRadius['3xl'],
+                padding: spacing[5],
+                gap: spacing[4],
+              }}
+            >
+              <View style={styles.profileInfoRow}>
+                <Avatar avatarKey={user?.avatarKey} size={64} />
+                <View style={styles.profileTextContainer}>
+                  <Text style={styles.handle}>{displayHandle}</Text>
+                  {user?.fullName && (
+                    <Text style={styles.fullName}>{user.fullName}</Text>
+                  )}
+                  {user?.email && !isViewingSelf && (
+                    <Text style={styles.email}>{user.email}</Text>
+                  )}
+                </View>
               </View>
-            </View>
 
-            <View style={styles.statsRow}>
-              <View style={styles.stat}>
-                <Text style={styles.statValue}>{posts.length}</Text>
-                <Text style={styles.statLabel}>Posts</Text>
+              <View style={styles.statsRow}>
+                <View style={styles.stat}>
+                  <Text style={styles.statValue}>{posts.length}</Text>
+                  <Text style={styles.statLabel}>Posts</Text>
+                </View>
+                <TouchableOpacity style={styles.stat} onPress={handleFollowersPress}>
+                  <Text style={styles.statValue}>{followerCount}</Text>
+                  <Text style={styles.statLabel}>Followers</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.stat} onPress={handleFollowingPress}>
+                  <Text style={styles.statValue}>{followingCount}</Text>
+                  <Text style={styles.statLabel}>Following</Text>
+                </TouchableOpacity>
               </View>
-              <TouchableOpacity style={styles.stat} onPress={handleFollowersPress}>
-                <Text style={styles.statValue}>{followerCount}</Text>
-                <Text style={styles.statLabel}>Followers</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.stat} onPress={handleFollowingPress}>
-                <Text style={styles.statValue}>{followingCount}</Text>
-                <Text style={styles.statLabel}>Following</Text>
-              </TouchableOpacity>
-            </View>
 
-            {!isViewingSelf && (
-              <TouchableOpacity
-                style={[
-                  styles.followButton,
-                  followStatus === 'following' && styles.followingButton,
-                  followStatus === 'pending' && styles.pendingButton,
-                ]}
-                onPress={handleFollowPress}
-                disabled={followLoading}
-              >
-                <Text style={[
-                  styles.followButtonText,
-                  followStatus === 'following' && styles.followingButtonText,
-                  followStatus === 'pending' && styles.pendingButtonText,
-                ]}>
-                  {followLoading ? 'Loading...' :
-                   followStatus === 'following' ? 'Following' :
-                   followStatus === 'pending' ? 'Pending' :
-                   'Follow'}
-                </Text>
-              </TouchableOpacity>
-            )}
+              {!isViewingSelf && (
+                <TouchableOpacity
+                  style={[
+                    styles.followButton,
+                    followStatus === 'following' && styles.followingButton,
+                    followStatus === 'pending' && styles.pendingButton,
+                  ]}
+                  onPress={handleFollowPress}
+                  disabled={followLoading}
+                >
+                  <Text
+                    style={[
+                      styles.followButtonText,
+                      followStatus === 'following' && styles.followingButtonText,
+                      followStatus === 'pending' && styles.pendingButtonText,
+                    ]}
+                  >
+                    {followLoading
+                      ? 'Loading…'
+                      : followStatus === 'following'
+                      ? 'Following'
+                      : followStatus === 'pending'
+                      ? 'Pending'
+                      : 'Follow'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </LiquidGlassSurface>
 
             {posts.length > 0 && (
               <Text style={styles.sectionTitle}>{postsSectionTitle}</Text>
@@ -905,14 +926,24 @@ export default function ProfileScreen({ navigation, route }: any) {
             onPostDeleted={handlePostDeleted}
           />
         )}
-        ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
+        ItemSeparatorComponent={() => <View style={{ height: spacing[4] }} />}
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={
-          <View style={styles.emptyContainer}>
+          <LiquidGlassSurface
+            padding={spacing[4]}
+            borderRadius={borderRadius['3xl']}
+            style={{ marginTop: spacing[8], marginHorizontal: spacing[2] }}
+            contentStyle={{
+              borderRadius: borderRadius['3xl'],
+              alignItems: 'center',
+              padding: spacing[6],
+              gap: spacing[3],
+            }}
+          >
             <Text style={styles.emptyText}>
               {isViewingSelf
-                ? 'No posts yet'
-                : 'This user has not posted yet'}
+                ? 'You have not shared anything yet.'
+                : 'This user has not posted yet.'}
             </Text>
             {isViewingSelf && (
               <TouchableOpacity
@@ -922,157 +953,129 @@ export default function ProfileScreen({ navigation, route }: any) {
                 <Text style={styles.createPostButtonText}>Create your first post</Text>
               </TouchableOpacity>
             )}
-          </View>
+          </LiquidGlassSurface>
         }
+        showsVerticalScrollIndicator={false}
       />
-    </SafeAreaView>
+      </SafeAreaView>
+    </LiquidGlassBackground>
   );
 }
 
-const createStyles = (colors: any) => StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background.secondary,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  listContent: {
-    padding: spacing[3],
-  },
-  header: {
-    backgroundColor: colors.background.elevated,
-    borderRadius: borderRadius.lg,
-    marginBottom: spacing[4],
-    padding: spacing[3],
-    ...shadows.base,
-  },
-  profileInfoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing[3],
-  },
-  profileTextContainer: {
-    flex: 1,
-    justifyContent: 'center',
-  },
-  handle: {
-    ...typography.styles.h4,
-    color: colors.text.primary,
-  },
-  fullName: {
-    fontSize: typography.fontSize.base,
-    color: colors.text.secondary,
-    marginTop: spacing[0.5],
-  },
-  email: {
-    fontSize: typography.fontSize.sm,
-    color: colors.text.tertiary,
-    marginTop: spacing[0.5],
-  },
-  statsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginTop: spacing[3],
-    gap: spacing[4],
-  },
-  stat: {
-    alignItems: 'center',
-  },
-  statValue: {
-    ...typography.styles.h4,
-    color: colors.text.primary,
-  },
-  statLabel: {
-    fontSize: typography.fontSize.sm,
-    color: colors.text.secondary,
-    marginTop: spacing[1],
-  },
-  editButton: {
-    marginTop: spacing[4],
-    paddingHorizontal: spacing[6],
-    paddingVertical: spacing[2],
-    borderRadius: borderRadius.full,
-    borderWidth: 1,
-    borderColor: colors.primary[500],
-  },
-  editButtonText: {
-    color: colors.primary[500],
-    fontWeight: typography.fontWeight.semibold,
-    fontSize: typography.fontSize.base,
-  },
-  headerSettingsButton: {
-    paddingHorizontal: spacing[3],
-    paddingVertical: spacing[2],
-    borderRadius: borderRadius.base,
-    borderWidth: 1,
-    borderColor: colors.primary[500],
-  },
-  headerSettingsButtonText: {
-    color: colors.primary[500],
-    fontWeight: typography.fontWeight.semibold,
-    fontSize: typography.fontSize.sm,
-  },
-  followButton: {
-    marginTop: spacing[3],
-    paddingHorizontal: spacing[6],
-    paddingVertical: spacing[2],
-    borderRadius: borderRadius.full,
-    backgroundColor: colors.primary[500],
-    alignSelf: 'stretch',
-    ...shadows.sm,
-  },
-  followButtonText: {
-    color: colors.text.inverse,
-    fontWeight: typography.fontWeight.semibold,
-    fontSize: typography.fontSize.base,
-    textAlign: 'center',
-  },
-  followingButton: {
-    backgroundColor: colors.background.elevated,
-    borderWidth: 1,
-    borderColor: colors.primary[500],
-  },
-  followingButtonText: {
-    color: colors.primary[500],
-  },
-  pendingButton: {
-    backgroundColor: colors.background.elevated,
-    borderWidth: 1,
-    borderColor: colors.warning.main,
-  },
-  pendingButtonText: {
-    color: colors.warning.main,
-  },
-  sectionTitle: {
-    ...typography.styles.h5,
-    marginTop: spacing[3],
-    marginBottom: spacing[2],
-    alignSelf: 'flex-start',
-    color: colors.text.primary,
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    paddingVertical: spacing[10],
-  },
-  emptyText: {
-    fontSize: typography.fontSize.base,
-    color: colors.text.tertiary,
-    marginBottom: spacing[4],
-    textAlign: 'center',
-  },
-  createPostButton: {
-    backgroundColor: colors.primary[500],
-    paddingHorizontal: spacing[6],
-    paddingVertical: spacing[3],
-    borderRadius: borderRadius.full,
-    ...shadows.sm,
-  },
-  createPostButtonText: {
-    color: colors.text.inverse,
-    fontWeight: typography.fontWeight.semibold,
-    fontSize: typography.fontSize.base,
-  },
-});
+const createStyles = (colors: any, mode: 'light' | 'dark') => {
+  const statBackground = mode === 'dark' ? 'rgba(148, 163, 184, 0.14)' : 'rgba(255, 255, 255, 0.7)';
+  const statBorder = mode === 'dark' ? 'rgba(148, 163, 184, 0.28)' : 'rgba(59, 130, 246, 0.18)';
+
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+    },
+    listContent: {
+      paddingHorizontal: spacing[5],
+      paddingTop: spacing[6],
+      paddingBottom: spacing[10],
+      gap: spacing[4],
+    },
+    header: {
+      gap: spacing[4],
+      marginBottom: spacing[4],
+    },
+    profileInfoRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing[4],
+    },
+    profileTextContainer: {
+      flex: 1,
+      gap: spacing[1],
+    },
+    handle: {
+      ...typography.styles.h4,
+      color: colors.text.primary,
+    },
+    fullName: {
+      fontSize: typography.fontSize.lg,
+      color: colors.text.secondary,
+    },
+    email: {
+      fontSize: typography.fontSize.sm,
+      color: colors.text.tertiary,
+    },
+    statsRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: spacing[3],
+    },
+    stat: {
+      flex: 1,
+      alignItems: 'center',
+      paddingVertical: spacing[2],
+      borderRadius: borderRadius.xl,
+      backgroundColor: statBackground,
+      borderWidth: StyleSheet.hairlineWidth * 2,
+      borderColor: statBorder,
+    },
+    statValue: {
+      ...typography.styles.h4,
+      color: colors.text.primary,
+    },
+    statLabel: {
+      fontSize: typography.fontSize.sm,
+      color: colors.text.secondary,
+      marginTop: spacing[1],
+    },
+    followButton: {
+      marginTop: spacing[1],
+      paddingVertical: spacing[3],
+      borderRadius: borderRadius.full,
+      backgroundColor: colors.primary[500],
+      alignSelf: 'stretch',
+      ...shadows.sm,
+    },
+    followButtonText: {
+      color: colors.text.inverse,
+      fontWeight: typography.fontWeight.semibold,
+      fontSize: typography.fontSize.base,
+      textAlign: 'center',
+    },
+    followingButton: {
+      backgroundColor: 'transparent',
+      borderWidth: 1,
+      borderColor: colors.primary[500],
+    },
+    followingButtonText: {
+      color: colors.primary[500],
+    },
+    pendingButton: {
+      backgroundColor: 'transparent',
+      borderWidth: 1,
+      borderColor: colors.warning.main,
+    },
+    pendingButtonText: {
+      color: colors.warning.main,
+    },
+    sectionTitle: {
+      ...typography.styles.h5,
+      color: colors.text.primary,
+      paddingHorizontal: spacing[1],
+    },
+    emptyText: {
+      fontSize: typography.fontSize.base,
+      color: colors.text.secondary,
+      textAlign: 'center',
+    },
+    createPostButton: {
+      backgroundColor: colors.primary[500],
+      paddingHorizontal: spacing[6],
+      paddingVertical: spacing[3],
+      borderRadius: borderRadius.full,
+      ...shadows.sm,
+    },
+    createPostButtonText: {
+      color: colors.text.inverse,
+      fontWeight: typography.fontWeight.semibold,
+      fontSize: typography.fontSize.base,
+    },
+  });
+};

@@ -5,7 +5,8 @@
 
 import React from 'react';
 import { View, StyleSheet, ViewStyle } from 'react-native';
-import { colors, spacing, borderRadius, shadows } from '../../theme';
+import { spacing, borderRadius, shadows, useTheme } from '../../theme';
+import { LiquidGlassSurface } from '../layout';
 
 export type CardVariant = 'elevated' | 'outlined' | 'glass';
 export type CardPadding = 'none' | 'sm' | 'md' | 'lg';
@@ -23,6 +24,7 @@ export const Card: React.FC<CardProps> = ({
   padding = 'md',
   style,
 }) => {
+  const { colors } = useTheme();
   const getCardStyle = (): ViewStyle => {
     const baseStyle: ViewStyle = {
       borderRadius: borderRadius.lg,
@@ -39,17 +41,9 @@ export const Card: React.FC<CardProps> = ({
       case 'outlined':
         return {
           ...baseStyle,
-          backgroundColor: colors.background.elevated,
+          backgroundColor: colors.background.secondary,
           borderWidth: 1,
           borderColor: colors.border.light,
-        };
-      case 'glass':
-        return {
-          ...baseStyle,
-          backgroundColor: 'rgba(255, 255, 255, 0.7)',
-          borderWidth: 1,
-          borderColor: 'rgba(255, 255, 255, 0.3)',
-          ...shadows.sm,
         };
       default:
         return baseStyle;
@@ -71,10 +65,23 @@ export const Card: React.FC<CardProps> = ({
     }
   };
 
+  if (variant === 'glass') {
+    return (
+      <LiquidGlassSurface
+        style={style}
+        contentStyle={{
+          padding: getPadding(),
+          borderRadius: borderRadius.lg,
+        }}
+        borderRadius={borderRadius['2xl']}
+      >
+        {children}
+      </LiquidGlassSurface>
+    );
+  }
+
   return (
-    <View style={[getCardStyle(), { padding: getPadding() }, style]}>
-      {children}
-    </View>
+    <View style={[getCardStyle(), { padding: getPadding() }, style]}>{children}</View>
   );
 };
 

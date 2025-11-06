@@ -6,7 +6,8 @@ import PostCard from '../components/PostCard';
 import { Post } from '../types';
 import { resolveHandle } from '../lib/resolveHandle';
 import { IconButton } from '../components/ui';
-import { useTheme, spacing, shadows } from '../theme';
+import { LiquidGlassBackground, LiquidGlassSurface } from '../components/layout';
+import { useTheme, spacing, shadows, borderRadius, typography } from '../theme';
 import { cache, CacheKeys, CacheTTL } from '../lib/cache';
 
 const POSTS_PER_PAGE = 20;
@@ -155,10 +156,39 @@ export default function FeedScreen({ navigation }: any){
     return unsubscribe;
   }, [navigation, load]);
 
+  const heroCard = React.useMemo(
+    () => (
+      <LiquidGlassSurface
+        padding={spacing[2]}
+        borderRadius={borderRadius['3xl']}
+        style={{ marginBottom: spacing[4] }}
+        contentStyle={{
+          borderRadius: borderRadius['3xl'],
+          padding: spacing[5],
+          gap: spacing[2],
+        }}
+      >
+        <View style={{ gap: spacing[1] }}>
+          <Text style={[typography.styles.h4, { color: colors.text.primary }]}>Your glassy timeline</Text>
+          <Text
+            style={{
+              color: colors.text.secondary,
+              fontSize: typography.fontSize.base,
+              lineHeight: 22,
+            }}
+          >
+            Stories float over a luminous backdrop so you can focus on the people you care about.
+          </Text>
+        </View>
+      </LiquidGlassSurface>
+    ),
+    [colors.text.primary, colors.text.secondary]
+  );
+
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background.secondary }}>
+    <LiquidGlassBackground style={{ flex: 1 }}>
       <FlatList
-        style={{ padding: spacing[3] }}
+        style={{ flex: 1 }}
         data={items}
         keyExtractor={(it)=>it.id}
         maxToRenderPerBatch={10}
@@ -183,7 +213,12 @@ export default function FeedScreen({ navigation }: any){
             onReactionsUpdated={(reactions) => handleReactionsUpdated(item.id, reactions)}
           />
         )}
-        ItemSeparatorComponent={() => <View style={{ height: spacing[3] }} />}
+        ItemSeparatorComponent={() => <View style={{ height: spacing[4] }} />}
+        contentContainerStyle={{
+          paddingHorizontal: spacing[5],
+          paddingBottom: spacing[10],
+          paddingTop: spacing[6],
+        }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -193,6 +228,8 @@ export default function FeedScreen({ navigation }: any){
         }
         onEndReached={loadMore}
         onEndReachedThreshold={0.5}
+        showsVerticalScrollIndicator={false}
+        ListHeaderComponent={heroCard}
         ListFooterComponent={
           loadingMore ? (
             <View style={{ paddingVertical: spacing[4], alignItems: 'center' }}>
@@ -201,9 +238,33 @@ export default function FeedScreen({ navigation }: any){
           ) : null
         }
         ListEmptyComponent={
-          <Text style={{ textAlign: 'center', color: colors.text.secondary, marginTop: spacing[10], fontSize: 16 }}>
-            No posts yet.
-          </Text>
+          <LiquidGlassSurface
+            padding={spacing[4]}
+            borderRadius={borderRadius['3xl']}
+            style={{ marginTop: spacing[10], marginHorizontal: spacing[2] }}
+            contentStyle={{
+              borderRadius: borderRadius['3xl'],
+              alignItems: 'center',
+              padding: spacing[6],
+              gap: spacing[2],
+            }}
+          >
+            <Text style={{
+              color: colors.text.primary,
+              fontSize: typography.fontSize.lg,
+              fontWeight: typography.fontWeight.semibold,
+            }}>
+              You're all caught up
+            </Text>
+            <Text style={{
+              textAlign: 'center',
+              color: colors.text.secondary,
+              fontSize: typography.fontSize.base,
+              lineHeight: 22,
+            }}>
+              Follow new friends or share something shimmering to start the conversation.
+            </Text>
+          </LiquidGlassSurface>
         }
       />
 
@@ -221,6 +282,6 @@ export default function FeedScreen({ navigation }: any){
           ...shadows.lg,
         }}
       />
-    </View>
+    </LiquidGlassBackground>
   );
 }
