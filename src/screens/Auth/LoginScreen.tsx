@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TextInput, Button, Alert, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, Button, Alert, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { signInFn, checkAuthStatus } from '../../api/auth';
 import { useTheme } from '../../theme/ThemeContext';
@@ -70,9 +70,11 @@ export default function LoginScreen({ navigation }: any) {
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.select({ ios: 'padding', android: undefined })}>
         <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', paddingVertical: 24 }}>
           <View style={{ padding: 24, gap: 12, maxWidth: 400, width: '100%', alignSelf: 'center' }}>
-            <Text style={{ fontSize: 24, fontWeight: '700', textAlign: 'center', marginBottom: 16, color: colors.text.primary }}>
-              Welcome to ScooterBooter
-            </Text>
+            <Image
+              source={require('../../../assets/scoot.png')}
+              style={{ width: 200, height: 80, alignSelf: 'center', marginBottom: 16 }}
+              resizeMode="contain"
+            />
             <TextInput
               placeholder="Username or email"
               placeholderTextColor={colors.text.tertiary}
