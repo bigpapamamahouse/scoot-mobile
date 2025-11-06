@@ -460,7 +460,9 @@ function extractUserFromPayload(payload: unknown, visited = new Set<unknown>()):
     if (!normalized.createdAt && typeof record.createdAt === 'string') {
       normalized.createdAt = record.createdAt;
     }
-    if (normalized.id && normalized.createdAt) {
+    // Accept user object if it has an id (createdAt is optional)
+    // Many API endpoints return user info without createdAt
+    if (normalized.id) {
       return normalized as User;
     }
     return null;
@@ -536,6 +538,8 @@ export async function getUserByIdentity(options: UserIdentityOptions = {}): Prom
   }
 
   let lastError: unknown;
+  const failedAttempts: string[] = [];
+
   for (const path of attempts) {
     try {
       const payload = await api(path);
@@ -543,6 +547,7 @@ export async function getUserByIdentity(options: UserIdentityOptions = {}): Prom
       if (user) {
         return user;
       }
+      // Only log if we get an unexpected response shape (not a 404)
       console.warn(`User lookup ${path} returned unrecognized shape`, payload);
     } catch (err: any) {
       lastError = err;
@@ -550,12 +555,20 @@ export async function getUserByIdentity(options: UserIdentityOptions = {}): Prom
       const statusMatch = message.match(/HTTP\s+(\d+)/);
       const statusCode = statusMatch ? parseInt(statusMatch[1], 10) : undefined;
       if (statusCode === 404 || statusCode === 405) {
-        console.warn(`User lookup ${path} returned ${statusCode}: ${message}`);
+        // Silently track failed attempts - 404s are expected when trying multiple endpoints
+        failedAttempts.push(path);
         continue;
       }
+      // Only warn for non-404/405 errors (unexpected failures)
       console.warn(`User lookup ${path} failed:`, message || err);
       break;
     }
+  }
+
+  // Only log a single warning if all attempts failed with 404s
+  if (failedAttempts.length === attempts.length) {
+    const identifier = handle || userId || 'unknown';
+    console.warn(`User not found: ${identifier} (tried ${failedAttempts.length} endpoints)`);
   }
 
   if (lastError) {

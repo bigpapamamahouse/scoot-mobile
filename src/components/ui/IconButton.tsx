@@ -65,12 +65,20 @@ export const IconButton: React.FC<IconButtonProps> = ({
           ...shadows.sm,
         };
       case 'glass':
+        // Apple-style liquid glass with theme-aware colors
+        const glassBackgroundColor = backgroundColor ||
+          (colors.background.primary === '#FFFFFF' || colors.background.primary === '#ffffff'
+            ? 'rgba(255, 255, 255, 0.85)'  // Light mode: slightly transparent white
+            : 'rgba(30, 30, 30, 0.85)');    // Dark mode: slightly transparent dark
+
         return {
           ...baseStyle,
-          backgroundColor: 'rgba(255, 255, 255, 0.7)',
-          borderWidth: 1,
-          borderColor: 'rgba(255, 255, 255, 0.3)',
-          ...shadows.sm,
+          backgroundColor: glassBackgroundColor,
+          borderWidth: 0.5,
+          borderColor: colors.background.primary === '#FFFFFF' || colors.background.primary === '#ffffff'
+            ? 'rgba(0, 0, 0, 0.1)'         // Light mode: subtle dark border
+            : 'rgba(255, 255, 255, 0.15)', // Dark mode: subtle light border
+          ...shadows.lg,
         };
       case 'ghost':
       default:

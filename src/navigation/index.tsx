@@ -2,7 +2,6 @@
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { createNavigationContainerRef } from '@react-navigation/native';
 import { View, Image } from 'react-native';
 import FeedScreen from '../screens/FeedScreen';
 import ProfileScreen from '../screens/ProfileScreen';
@@ -19,11 +18,12 @@ import { useNotifications } from '../lib/notifications';
 import PostScreen from '../screens/PostScreen';
 import { IconButton, Badge } from '../components/ui';
 import { useTheme, spacing } from '../theme';
+import { navigationRef } from './navigationRef';
 
 const Stack = createNativeStackNavigator();
 
-// Create a navigation ref that can be used outside of React components
-export const navigationRef = createNavigationContainerRef();
+// Re-export navigationRef for backwards compatibility
+export { navigationRef };
 
 function HeaderLogo() {
   const { effectiveMode } = useTheme();

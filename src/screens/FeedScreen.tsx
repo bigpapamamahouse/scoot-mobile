@@ -207,18 +207,17 @@ export default function FeedScreen({ navigation }: any){
         }
       />
 
-      {/* Floating Action Button with glass morphism */}
+      {/* Floating Action Button - Apple-style liquid glass */}
       <IconButton
         icon="add"
         onPress={() => navigation.navigate('ComposePost')}
         variant="glass"
         size="lg"
-        color={colors.primary[600]}
+        color={colors.primary[500]}
         style={{
           position: 'absolute',
           right: spacing[5],
           bottom: spacing[5],
-          ...shadows.lg,
         }}
       />
     </View>
