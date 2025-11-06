@@ -1260,6 +1260,58 @@ module.exports.handler = async (event) => {
               console.error('FEED avatar/handle hydrate failed', e);
             }
 
+            // Fetch comment previews for all posts
+            try {
+              for (const post of items) {
+                const commentsResult = await ddb.send(new QueryCommand({
+                  TableName: COMMENTS_TABLE,
+                  KeyConditionExpression: 'pk = :p',
+                  ExpressionAttributeValues: { ':p': `POST#${post.id}` },
+                  ScanIndexForward: true,
+                  Limit: 4, // Fetch 4 to detect if there are more than 3
+                  ConsistentRead: true,
+                }));
+
+                const allComments = (commentsResult.Items || []).map(it => ({
+                  id: it.id,
+                  userId: it.userId,
+                  handle: it.userHandle || null,
+                  text: it.text || '',
+                  createdAt: it.createdAt || 0,
+                }));
+
+                // Take only first 3 for preview
+                const comments = allComments.slice(0, 3);
+
+                // Fetch avatarKey for comment authors
+                if (comments.length > 0) {
+                  try {
+                    const userIds = [...new Set(comments.map(c => c.userId).filter(Boolean))];
+                    if (userIds.length > 0) {
+                      const summaries = await fetchUserSummaries(userIds);
+                      const avatarMap = Object.fromEntries(
+                        summaries.map(u => [u.userId, u.avatarKey || null])
+                      );
+                      for (const comment of comments) {
+                        if (comment.userId && avatarMap[comment.userId]) {
+                          comment.avatarKey = avatarMap[comment.userId];
+                        }
+                      }
+                    }
+                  } catch (e) {
+                    console.error('Failed to fetch comment avatars:', e);
+                  }
+                }
+
+                post.comments = comments;
+                // If we got 4 comments, there are at least 4. Otherwise use actual count.
+                post.commentCount = allComments.length >= 4 ? 4 : allComments.length;
+              }
+            } catch (e) {
+              console.error('Failed to fetch comment previews for feed:', e);
+              // Continue without comment previews if this fails
+            }
+
             return ok({ items });
           }
         }
@@ -1307,6 +1359,58 @@ module.exports.handler = async (event) => {
           }
         } catch (e) {
           console.error('FEED avatar/handle hydrate failed', e);
+        }
+
+        // Fetch comment previews for all posts (fallback path)
+        try {
+          for (const post of items) {
+            const commentsResult = await ddb.send(new QueryCommand({
+              TableName: COMMENTS_TABLE,
+              KeyConditionExpression: 'pk = :p',
+              ExpressionAttributeValues: { ':p': `POST#${post.id}` },
+              ScanIndexForward: true,
+              Limit: 4, // Fetch 4 to detect if there are more than 3
+              ConsistentRead: true,
+            }));
+
+            const allComments = (commentsResult.Items || []).map(it => ({
+              id: it.id,
+              userId: it.userId,
+              handle: it.userHandle || null,
+              text: it.text || '',
+              createdAt: it.createdAt || 0,
+            }));
+
+            // Take only first 3 for preview
+            const comments = allComments.slice(0, 3);
+
+            // Fetch avatarKey for comment authors
+            if (comments.length > 0) {
+              try {
+                const userIds = [...new Set(comments.map(c => c.userId).filter(Boolean))];
+                if (userIds.length > 0) {
+                  const summaries = await fetchUserSummaries(userIds);
+                  const avatarMap = Object.fromEntries(
+                    summaries.map(u => [u.userId, u.avatarKey || null])
+                  );
+                  for (const comment of comments) {
+                    if (comment.userId && avatarMap[comment.userId]) {
+                      comment.avatarKey = avatarMap[comment.userId];
+                    }
+                  }
+                }
+              } catch (e) {
+                console.error('Failed to fetch comment avatars:', e);
+              }
+            }
+
+            post.comments = comments;
+            // If we got 4 comments, there are at least 4. Otherwise use actual count.
+            post.commentCount = allComments.length >= 4 ? 4 : allComments.length;
+          }
+        } catch (e) {
+          console.error('Failed to fetch comment previews for feed (fallback):', e);
+          // Continue without comment previews if this fails
         }
 
         return ok({ items });
