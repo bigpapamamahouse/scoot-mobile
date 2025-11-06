@@ -240,11 +240,31 @@ async function generateUserInviteCode(userId) {
     }));
 
     if (existing.Items && existing.Items[0]) {
+      console.log(`[Invites] Found existing code via GSI: ${existing.Items[0].code}`);
       return existing.Items[0].code;
     }
   } catch (e) {
-    // If GSI doesn't exist yet, fall back to creating a new code
-    console.log('[Invites] GSI byUserId not available, will create new code:', e.message);
+    // If GSI doesn't exist yet, fall back to Scan with filter
+    console.log('[Invites] GSI byUserId not available, trying Scan fallback:', e.message);
+
+    try {
+      const scanResult = await ddb.send(new ScanCommand({
+        TableName: INVITES_TABLE,
+        FilterExpression: 'userId = :uid',
+        ExpressionAttributeValues: { ':uid': userId },
+        Limit: 10, // Should only be 1, but allow a few in case of duplicates
+        ConsistentRead: true,
+      }));
+
+      if (scanResult.Items && scanResult.Items.length > 0) {
+        // Return the first (oldest) code for this user
+        console.log(`[Invites] Found existing code via Scan: ${scanResult.Items[0].code}`);
+        return scanResult.Items[0].code;
+      }
+    } catch (scanError) {
+      console.error('[Invites] Scan fallback also failed:', scanError.message);
+      // Continue to create new code
+    }
   }
 
   // Generate a new code if none exists
