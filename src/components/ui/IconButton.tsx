@@ -34,7 +34,7 @@ export const IconButton: React.FC<IconButtonProps> = ({
   badge,
   style,
 }) => {
-  const { colors } = useTheme();
+  const { colors, effectiveMode } = useTheme();
   const getSize = () => {
     switch (size) {
       case 'sm':
@@ -66,18 +66,17 @@ export const IconButton: React.FC<IconButtonProps> = ({
         };
       case 'glass':
         // Apple-style liquid glass with theme-aware colors
-        const glassBackgroundColor = backgroundColor ||
-          (colors.background.primary === '#FFFFFF' || colors.background.primary === '#ffffff'
-            ? 'rgba(255, 255, 255, 0.85)'  // Light mode: slightly transparent white
-            : 'rgba(30, 30, 30, 0.85)');    // Dark mode: slightly transparent dark
+        const glassBackgroundColor = backgroundColor || (
+          effectiveMode === 'dark'
+            ? 'rgba(20, 20, 24, 0.65)'
+            : 'rgba(255, 255, 255, 0.75)'
+        );
 
         return {
           ...baseStyle,
           backgroundColor: glassBackgroundColor,
-          borderWidth: 0.5,
-          borderColor: colors.background.primary === '#FFFFFF' || colors.background.primary === '#ffffff'
-            ? 'rgba(0, 0, 0, 0.1)'         // Light mode: subtle dark border
-            : 'rgba(255, 255, 255, 0.15)', // Dark mode: subtle light border
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.glass.border,
           ...shadows.lg,
         };
       case 'ghost':

@@ -1,18 +1,19 @@
 
 import React from 'react';
 import { View, Text, FlatList, RefreshControl, StyleSheet, ActivityIndicator } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { PostsAPI, ReactionsAPI } from '../api';
 import PostCard from '../components/PostCard';
 import { Post } from '../types';
 import { resolveHandle } from '../lib/resolveHandle';
-import { IconButton } from '../components/ui';
+import { IconButton, LiquidGlassSurface } from '../components/ui';
 import { useTheme, spacing, shadows } from '../theme';
 import { cache, CacheKeys, CacheTTL } from '../lib/cache';
 
 const POSTS_PER_PAGE = 20;
 
 export default function FeedScreen({ navigation }: any){
-  const { colors } = useTheme();
+  const { colors, effectiveMode } = useTheme();
   const [items, setItems] = React.useState<Post[]>([]);
   const [refreshing, setRefreshing] = React.useState(false);
   const [loadingMore, setLoadingMore] = React.useState(false);
@@ -155,10 +156,22 @@ export default function FeedScreen({ navigation }: any){
     return unsubscribe;
   }, [navigation, load]);
 
+  const gradientColors = React.useMemo<[string, string]>(() => (
+    effectiveMode === 'dark'
+      ? ['rgba(6, 8, 12, 1)', 'rgba(14, 16, 22, 0.9)']
+      : ['#F2F5FF', '#E8F1FF']
+  ), [effectiveMode]);
+
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
+
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background.secondary }}>
+    <View style={{ flex: 1 }}>
+      <LinearGradient colors={gradientColors} style={StyleSheet.absoluteFill} />
       <FlatList
-        style={{ padding: spacing[3] }}
+        contentContainerStyle={{
+          padding: spacing[3],
+          paddingBottom: spacing[10],
+        }}
         data={items}
         keyExtractor={(it)=>it.id}
         maxToRenderPerBatch={10}
@@ -201,9 +214,15 @@ export default function FeedScreen({ navigation }: any){
           ) : null
         }
         ListEmptyComponent={
-          <Text style={{ textAlign: 'center', color: colors.text.secondary, marginTop: spacing[10], fontSize: 16 }}>
-            No posts yet.
-          </Text>
+          <LiquidGlassSurface
+            style={styles.emptyState}
+            borderRadiusOverride={spacing[5]}
+          >
+            <Text style={styles.emptyStateTitle}>No posts yet</Text>
+            <Text style={styles.emptyStateBody}>
+              Follow friends or share something new to see activity here.
+            </Text>
+          </LiquidGlassSurface>
         }
       />
 
@@ -223,3 +242,24 @@ export default function FeedScreen({ navigation }: any){
     </View>
   );
 }
+
+const createStyles = (colors: any) => StyleSheet.create({
+  emptyState: {
+    padding: spacing[5],
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: spacing[12],
+    gap: spacing[2],
+  },
+  emptyStateTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.text.primary,
+  },
+  emptyStateBody: {
+    color: colors.text.secondary,
+    textAlign: 'center',
+    fontSize: 15,
+    lineHeight: 22,
+  },
+});

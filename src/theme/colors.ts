@@ -77,6 +77,8 @@ export const lightColors = {
     dark: 'rgba(0, 0, 0, 0.1)',
     darker: 'rgba(0, 0, 0, 0.2)',
     darkest: 'rgba(0, 0, 0, 0.3)',
+    border: 'rgba(255, 255, 255, 0.65)',
+    borderClear: 'rgba(255, 255, 255, 0.35)',
   },
 
   // Background colors
@@ -187,6 +189,8 @@ export const darkColors = {
     dark: 'rgba(255, 255, 255, 0.1)',
     darker: 'rgba(255, 255, 255, 0.2)',
     darkest: 'rgba(255, 255, 255, 0.3)',
+    border: 'rgba(255, 255, 255, 0.25)',
+    borderClear: 'rgba(255, 255, 255, 0.15)',
   },
 
   // Background colors - dark theme

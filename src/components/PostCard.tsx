@@ -7,7 +7,7 @@ import { Avatar } from './Avatar';
 import { CommentsAPI, ReactionsAPI, PostsAPI } from '../api';
 import { resolveHandle } from '../lib/resolveHandle';
 import { useCurrentUser, isOwner } from '../hooks/useCurrentUser';
-import { IconButton, Badge } from './ui';
+import { IconButton, Badge, LiquidGlassSurface } from './ui';
 import { useTheme, spacing, typography, borderRadius, shadows } from '../theme';
 import { ReactionDetailsModal } from './ReactionDetailsModal';
 import { imageDimensionCache } from '../lib/imageCache';
@@ -314,11 +314,12 @@ function PostCard({
   const styles = React.useMemo(() => createStyles(colors), [colors]);
 
   return (
-    <TouchableOpacity
-      onPress={onPress}
-      style={styles.card}
-      activeOpacity={onPress ? 0.7 : 1}
-    >
+    <LiquidGlassSurface style={styles.cardSurface} withShadow>
+      <TouchableOpacity
+        onPress={onPress}
+        style={styles.card}
+        activeOpacity={onPress ? 0.7 : 1}
+      >
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
@@ -506,29 +507,30 @@ function PostCard({
         </View>
       )}
 
-      <ReactionDetailsModal
-        visible={showReactionModal}
-        onClose={() => {
-          setShowReactionModal(false);
-          setSelectedEmoji(null);
-        }}
-        reactions={selectedEmoji
-          ? detailedReactions.filter(r => r.emoji === selectedEmoji)
-          : detailedReactions
-        }
-        loading={loadingReactionDetails}
-        onUserPress={onPressUser}
-      />
-    </TouchableOpacity>
+        <ReactionDetailsModal
+          visible={showReactionModal}
+          onClose={() => {
+            setShowReactionModal(false);
+            setSelectedEmoji(null);
+          }}
+          reactions={selectedEmoji
+            ? detailedReactions.filter(r => r.emoji === selectedEmoji)
+            : detailedReactions
+          }
+          loading={loadingReactionDetails}
+          onUserPress={onPressUser}
+        />
+      </TouchableOpacity>
+    </LiquidGlassSurface>
   );
 }
 
 const createStyles = (colors: any) => StyleSheet.create({
-  card: {
-    backgroundColor: colors.background.elevated,
+  cardSurface: {
     borderRadius: borderRadius.lg,
+  },
+  card: {
     padding: spacing[3],
-    ...shadows.base,
   },
   header: {
     flexDirection: 'row',
@@ -602,8 +604,8 @@ const createStyles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
     gap: spacing[2],
     paddingTop: spacing[2],
-    borderTopWidth: 1,
-    borderTopColor: colors.border.light,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.glass.borderClear,
   },
   reactionButton: {
     flexDirection: 'row',
@@ -615,7 +617,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     backgroundColor: 'transparent',
   },
   reactionButtonActive: {
-    backgroundColor: colors.primary[50],
+    backgroundColor: colors.glass.lightest,
   },
   reactionCount: {
     fontSize: typography.fontSize.xs,

@@ -10,11 +10,12 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { UsersAPI, PostsAPI } from '../api';
 import { User, Post } from '../types';
 import PostCard from '../components/PostCard';
 import { Avatar } from '../components/Avatar';
-import { Button } from '../components/ui';
+import { Button, LiquidGlassSurface } from '../components/ui';
 import { useTheme, spacing, typography, borderRadius, shadows } from '../theme';
 import { cache, CacheKeys, CacheTTL } from '../lib/cache';
 import { useCurrentUser } from '../hooks/useCurrentUser';
@@ -31,7 +32,7 @@ type ProfileIdentity = {
 };
 
 export default function ProfileScreen({ navigation, route }: any) {
-  const { colors } = useTheme();
+  const { colors, effectiveMode } = useTheme();
   const { currentUser } = useCurrentUser(); // Use global context instead of fetching
   const [user, setUser] = React.useState<ProfileIdentity | null>(null);
   const [posts, setPosts] = React.useState<Post[]>([]);
@@ -813,6 +814,12 @@ export default function ProfileScreen({ navigation, route }: any) {
 
   const styles = React.useMemo(() => createStyles(colors), [colors]);
 
+  const gradientColors = React.useMemo<[string, string]>(() => (
+    effectiveMode === 'dark'
+      ? ['rgba(8, 9, 12, 1)', 'rgba(12, 13, 18, 0.92)']
+      : ['#F4F7FF', '#E9F1FF']
+  ), [effectiveMode]);
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -822,10 +829,12 @@ export default function ProfileScreen({ navigation, route }: any) {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['bottom']}>
-      <FlatList
-        data={posts}
-        keyExtractor={(item) => item.id}
+    <View style={{ flex: 1 }}>
+      <LinearGradient colors={gradientColors} style={StyleSheet.absoluteFill} />
+      <SafeAreaView style={styles.container} edges={['bottom']}>
+        <FlatList
+          data={posts}
+          keyExtractor={(item) => item.id}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
@@ -839,62 +848,72 @@ export default function ProfileScreen({ navigation, route }: any) {
           ) : null
         }
         ListHeaderComponent={
-          <View style={styles.header}>
-            <View style={styles.profileInfoRow}>
-              <Avatar avatarKey={user?.avatarKey} size={56} />
-              <View style={styles.profileTextContainer}>
-                <Text style={styles.handle}>{displayHandle}</Text>
-                {user?.fullName && (
-                  <Text style={styles.fullName}>{user.fullName}</Text>
-                )}
-                {user?.email && !isViewingSelf && (
-                  <Text style={styles.email}>{user.email}</Text>
-                )}
+          <LiquidGlassSurface style={styles.header} withShadow>
+            <View style={styles.headerContent}>
+              <View style={styles.profileInfoRow}>
+                <Avatar avatarKey={user?.avatarKey} size={56} />
+                <View style={styles.profileTextContainer}>
+                  <Text style={styles.handle}>{displayHandle}</Text>
+                  {user?.fullName && (
+                    <Text style={styles.fullName}>{user.fullName}</Text>
+                  )}
+                  {user?.email && !isViewingSelf && (
+                    <Text style={styles.email}>{user.email}</Text>
+                  )}
+                </View>
               </View>
-            </View>
 
-            <View style={styles.statsRow}>
-              <View style={styles.stat}>
-                <Text style={styles.statValue}>{posts.length}</Text>
-                <Text style={styles.statLabel}>Posts</Text>
+              <View style={styles.statsRow}>
+                <View style={styles.stat}>
+                  <Text style={styles.statValue}>{posts.length}</Text>
+                  <Text style={styles.statLabel}>Posts</Text>
+                </View>
+                <TouchableOpacity style={styles.stat} onPress={handleFollowersPress}>
+                  <Text style={styles.statValue}>{followerCount}</Text>
+                  <Text style={styles.statLabel}>Followers</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.stat} onPress={handleFollowingPress}>
+                  <Text style={styles.statValue}>{followingCount}</Text>
+                  <Text style={styles.statLabel}>Following</Text>
+                </TouchableOpacity>
               </View>
-              <TouchableOpacity style={styles.stat} onPress={handleFollowersPress}>
-                <Text style={styles.statValue}>{followerCount}</Text>
-                <Text style={styles.statLabel}>Followers</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.stat} onPress={handleFollowingPress}>
-                <Text style={styles.statValue}>{followingCount}</Text>
-                <Text style={styles.statLabel}>Following</Text>
-              </TouchableOpacity>
+
+              {!isViewingSelf && (
+                <LiquidGlassSurface
+                  variant={followStatus === 'following' ? 'clear' : 'regular'}
+                  borderRadiusOverride={borderRadius.full}
+                  style={styles.followSurface}
+                >
+                  <TouchableOpacity
+                    style={[
+                      styles.followButton,
+                      followStatus === 'following' && styles.followingButton,
+                      followStatus === 'pending' && styles.pendingButton,
+                      followStatus === 'none' && styles.followPrimary,
+                    ]}
+                    onPress={handleFollowPress}
+                    disabled={followLoading}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={[
+                      styles.followButtonText,
+                      followStatus === 'following' && styles.followingButtonText,
+                      followStatus === 'pending' && styles.pendingButtonText,
+                    ]}>
+                      {followLoading ? 'Loading...' :
+                       followStatus === 'following' ? 'Following' :
+                       followStatus === 'pending' ? 'Pending' :
+                       'Follow'}
+                    </Text>
+                  </TouchableOpacity>
+                </LiquidGlassSurface>
+              )}
+
+              {posts.length > 0 && (
+                <Text style={styles.sectionTitle}>{postsSectionTitle}</Text>
+              )}
             </View>
-
-            {!isViewingSelf && (
-              <TouchableOpacity
-                style={[
-                  styles.followButton,
-                  followStatus === 'following' && styles.followingButton,
-                  followStatus === 'pending' && styles.pendingButton,
-                ]}
-                onPress={handleFollowPress}
-                disabled={followLoading}
-              >
-                <Text style={[
-                  styles.followButtonText,
-                  followStatus === 'following' && styles.followingButtonText,
-                  followStatus === 'pending' && styles.pendingButtonText,
-                ]}>
-                  {followLoading ? 'Loading...' :
-                   followStatus === 'following' ? 'Following' :
-                   followStatus === 'pending' ? 'Pending' :
-                   'Follow'}
-                </Text>
-              </TouchableOpacity>
-            )}
-
-            {posts.length > 0 && (
-              <Text style={styles.sectionTitle}>{postsSectionTitle}</Text>
-            )}
-          </View>
+          </LiquidGlassSurface>
         }
         renderItem={({ item }) => (
           <PostCard
@@ -929,14 +948,15 @@ export default function ProfileScreen({ navigation, route }: any) {
           </View>
         }
       />
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
   );
 }
 
 const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background.secondary,
+    backgroundColor: 'transparent',
   },
   loadingContainer: {
     flex: 1,
@@ -947,11 +967,12 @@ const createStyles = (colors: any) => StyleSheet.create({
     padding: spacing[3],
   },
   header: {
-    backgroundColor: colors.background.elevated,
-    borderRadius: borderRadius.lg,
+    borderRadius: borderRadius.xl,
     marginBottom: spacing[4],
+  },
+  headerContent: {
     padding: spacing[3],
-    ...shadows.base,
+    gap: spacing[3],
   },
   profileInfoRow: {
     flexDirection: 'row',
@@ -969,12 +990,12 @@ const createStyles = (colors: any) => StyleSheet.create({
   fullName: {
     fontSize: typography.fontSize.base,
     color: colors.text.secondary,
-    marginTop: spacing[0.5],
+    marginTop: spacing[1] / 2,
   },
   email: {
     fontSize: typography.fontSize.sm,
     color: colors.text.tertiary,
-    marginTop: spacing[0.5],
+    marginTop: spacing[1] / 2,
   },
   statsRow: {
     flexDirection: 'row',
@@ -1019,32 +1040,37 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontWeight: typography.fontWeight.semibold,
     fontSize: typography.fontSize.sm,
   },
-  followButton: {
-    marginTop: spacing[3],
-    paddingHorizontal: spacing[6],
-    paddingVertical: spacing[2],
+  followSurface: {
     borderRadius: borderRadius.full,
-    backgroundColor: colors.primary[500],
     alignSelf: 'stretch',
-    ...shadows.sm,
+  },
+  followButton: {
+    paddingHorizontal: spacing[6],
+    paddingVertical: spacing[5] / 2,
+    borderRadius: borderRadius.full,
+    alignSelf: 'stretch',
+    backgroundColor: 'transparent',
   },
   followButtonText: {
-    color: colors.text.inverse,
+    color: colors.primary[600],
     fontWeight: typography.fontWeight.semibold,
     fontSize: typography.fontSize.base,
     textAlign: 'center',
   },
+  followPrimary: {
+    backgroundColor: 'rgba(33, 150, 243, 0.22)',
+  },
   followingButton: {
-    backgroundColor: colors.background.elevated,
-    borderWidth: 1,
+    backgroundColor: 'rgba(33, 150, 243, 0.12)',
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.primary[500],
   },
   followingButtonText: {
     color: colors.primary[500],
   },
   pendingButton: {
-    backgroundColor: colors.background.elevated,
-    borderWidth: 1,
+    backgroundColor: 'rgba(255, 152, 0, 0.12)',
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.warning.main,
   },
   pendingButtonText: {

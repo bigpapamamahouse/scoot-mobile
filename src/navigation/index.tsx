@@ -2,7 +2,8 @@
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { View, Image } from 'react-native';
+import { View, Image, StyleSheet } from 'react-native';
+import { BlurView } from 'expo-blur';
 import FeedScreen from '../screens/FeedScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
@@ -90,6 +91,14 @@ function HeaderActions({ navigation }: { navigation: any }) {
 export default function RootNavigator(){
   const { colors, effectiveMode } = useTheme();
 
+  const headerBackground = React.useCallback(() => (
+    <BlurView
+      tint={effectiveMode === 'dark' ? 'dark' : 'light'}
+      intensity={70}
+      style={StyleSheet.absoluteFill}
+    />
+  ), [effectiveMode]);
+
   const navigationTheme = {
     dark: effectiveMode === 'dark',
     colors: {
@@ -104,7 +113,27 @@ export default function RootNavigator(){
 
   return (
     <NavigationContainer ref={navigationRef} theme={navigationTheme}>
-      <Stack.Navigator>
+      <Stack.Navigator
+        screenOptions={{
+          headerTitleAlign: 'left',
+          headerShadowVisible: false,
+          headerTintColor: colors.text.primary,
+          headerTitleStyle: {
+            color: colors.text.primary,
+            fontSize: 18,
+            fontWeight: '600',
+          },
+          headerBackground,
+          headerStyle: {
+            backgroundColor: effectiveMode === 'dark'
+              ? 'rgba(20, 20, 24, 0.55)'
+              : 'rgba(255, 255, 255, 0.65)',
+          },
+          contentStyle: {
+            backgroundColor: 'transparent',
+          },
+        }}
+      >
         <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
         <Stack.Screen name="Signup" component={SignupScreen} options={{ title: 'Sign up' }} />
         <Stack.Screen name="ConfirmCode" component={ConfirmCodeScreen} options={{ title: 'Confirm' }} />
