@@ -252,6 +252,7 @@ export default function ProfileScreen({ navigation, route }: any) {
 
       // OPTIMIZATION: Check cache FIRST for instant display (before any API calls)
       let hasValidCache = false;
+      let shouldSkipAPICall = false;
       if (!append && pageNum === 0) {
         const cacheIdentifier = requestedUserId || requestedHandle || 'unknown';
         const cachedPosts = cache.get<Post[]>(CacheKeys.userPosts(cacheIdentifier, 0));
@@ -267,6 +268,13 @@ export default function ProfileScreen({ navigation, route }: any) {
           console.log('[ProfileScreen] Loading user from cache:', cachedUser.handle || cachedUser.id);
           setUser(cachedUser);
           hasValidCache = true;
+        }
+
+        // If we have BOTH cached posts and user, we can skip the posts API call
+        // But we'll still load follower/following counts since they aren't cached
+        if (cachedPosts && cachedPosts.length > 0 && cachedUser) {
+          shouldSkipAPICall = true;
+          console.log('[ProfileScreen] Using cached posts, will only fetch counts');
         }
 
         // If we have valid cache, hide loading spinner immediately
@@ -390,97 +398,84 @@ export default function ProfileScreen({ navigation, route }: any) {
 
         // Generate cache key based on user identifier
         const cacheIdentifier = targetUserId || targetHandle || 'unknown';
-        const cacheKey = CacheKeys.userPosts(cacheIdentifier, pageNum);
-
-        // Try to load from cache first for instant display (only for first page)
-        if (!append && pageNum === 0) {
-          const cachedPosts = cache.get<Post[]>(CacheKeys.userPosts(cacheIdentifier, 0));
-          if (cachedPosts && cachedPosts.length > 0) {
-            console.log('[ProfileScreen] Loading posts from cache:', cachedPosts.length, 'posts');
-            setPosts(cachedPosts);
-          }
-
-          // Also try to load cached user profile
-          const cachedUser = cache.get<ProfileIdentity>(CacheKeys.userProfile(cacheIdentifier));
-          if (cachedUser) {
-            console.log('[ProfileScreen] Loading profile from cache:', cachedUser.handle);
-            setUser(cachedUser);
-          }
-        }
-
-        const offset = pageNum * POSTS_PER_PAGE;
-        const postsData = await PostsAPI.getUserPosts({
-          handle: targetHandle,
-          userId: targetUserId,
-          limit: POSTS_PER_PAGE,
-          offset,
-        });
-        const normalizedPosts = resolvePosts(postsData);
-        const filteredPosts = filterPostsForUser(normalizedPosts, {
-          id: targetUserId,
-          handle: targetHandle,
-        });
-        // Silently filter posts - no need to log this routine operation
-        if (!filteredPosts.length && postsData && !Array.isArray(postsData)) {
-          console.warn('Unrecognized user posts response shape', postsData);
-        }
-
-        // Update posts state with append support and deduplication
-        if (append) {
-          setPosts((prev) => {
-            // Create a Set of existing post IDs for O(1) lookup
-            const existingIds = new Set(prev.map(p => p.id));
-            // Filter out any new posts that already exist
-            const uniqueNewPosts = filteredPosts.filter((post: Post) => !existingIds.has(post.id));
-            return [...prev, ...uniqueNewPosts];
-          });
-        } else {
-          setPosts(filteredPosts);
-          // Cache the first page for instant loads
-          if (pageNum === 0 && filteredPosts.length > 0) {
-            cache.set(CacheKeys.userPosts(cacheIdentifier, 0), filteredPosts, CacheTTL.userPosts);
-          }
-        }
-
-        // Check if there are more posts to load
-        setHasMore(filteredPosts.length >= POSTS_PER_PAGE);
 
         let resolvedIdentity = targetIdentity;
-        const derivedIdentity = deriveIdentityFromPosts(filteredPosts);
-        if (derivedIdentity) {
-          resolvedIdentity = {
-            ...(resolvedIdentity ?? {}),
-            ...derivedIdentity,
-            id: derivedIdentity.id ?? resolvedIdentity?.id ?? null,
-            handle: derivedIdentity.handle ?? resolvedIdentity?.handle ?? null,
-            avatarKey: derivedIdentity.avatarKey ?? resolvedIdentity?.avatarKey,
-            fullName: derivedIdentity.fullName ?? resolvedIdentity?.fullName,
-            email: derivedIdentity.email ?? resolvedIdentity?.email ?? null,
-          };
-        }
 
-        if (!resolvedIdentity && (targetHandle || targetUserId)) {
-          resolvedIdentity = {
-            id: targetUserId ?? null,
-            handle: targetHandle ?? null,
-          };
-        }
+        // Skip posts API call if we already have cached data
+        if (!shouldSkipAPICall) {
+          const offset = pageNum * POSTS_PER_PAGE;
+          const postsData = await PostsAPI.getUserPosts({
+            handle: targetHandle,
+            userId: targetUserId,
+            limit: POSTS_PER_PAGE,
+            offset,
+          });
+          const normalizedPosts = resolvePosts(postsData);
+          const filteredPosts = filterPostsForUser(normalizedPosts, {
+            id: targetUserId,
+            handle: targetHandle,
+          });
+          // Silently filter posts - no need to log this routine operation
+          if (!filteredPosts.length && postsData && !Array.isArray(postsData)) {
+            console.warn('Unrecognized user posts response shape', postsData);
+          }
 
-        if (!resolvedIdentity && filteredPosts.length) {
-          resolvedIdentity = deriveIdentityFromPosts(filteredPosts);
-        }
+          // Update posts state with append support and deduplication
+          if (append) {
+            setPosts((prev) => {
+              // Create a Set of existing post IDs for O(1) lookup
+              const existingIds = new Set(prev.map(p => p.id));
+              // Filter out any new posts that already exist
+              const uniqueNewPosts = filteredPosts.filter((post: Post) => !existingIds.has(post.id));
+              return [...prev, ...uniqueNewPosts];
+            });
+          } else {
+            setPosts(filteredPosts);
+            // Cache the first page for instant loads
+            if (pageNum === 0 && filteredPosts.length > 0) {
+              cache.set(CacheKeys.userPosts(cacheIdentifier, 0), filteredPosts, CacheTTL.userPosts);
+            }
+          }
 
-        const finalUserToSet = resolvedIdentity ?? targetIdentity ?? null;
-        setUser(finalUserToSet);
+          // Check if there are more posts to load
+          setHasMore(filteredPosts.length >= POSTS_PER_PAGE);
 
-        // Cache user profile (only on first page load)
-        if (pageNum === 0 && finalUserToSet) {
-          const cacheIdentifier = finalUserToSet.id || finalUserToSet.handle || 'unknown';
-          cache.set(CacheKeys.userProfile(cacheIdentifier), finalUserToSet, CacheTTL.userProfile);
+          const derivedIdentity = deriveIdentityFromPosts(filteredPosts);
+          if (derivedIdentity) {
+            resolvedIdentity = {
+              ...(resolvedIdentity ?? {}),
+              ...derivedIdentity,
+              id: derivedIdentity.id ?? resolvedIdentity?.id ?? null,
+              handle: derivedIdentity.handle ?? resolvedIdentity?.handle ?? null,
+              avatarKey: derivedIdentity.avatarKey ?? resolvedIdentity?.avatarKey,
+              fullName: derivedIdentity.fullName ?? resolvedIdentity?.fullName,
+              email: derivedIdentity.email ?? resolvedIdentity?.email ?? null,
+            };
+          }
+
+          if (!resolvedIdentity && (targetHandle || targetUserId)) {
+            resolvedIdentity = {
+              id: targetUserId ?? null,
+              handle: targetHandle ?? null,
+            };
+          }
+
+          if (!resolvedIdentity && filteredPosts.length) {
+            resolvedIdentity = deriveIdentityFromPosts(filteredPosts);
+          }
+
+          const finalUserToSet = resolvedIdentity ?? targetIdentity ?? null;
+          setUser(finalUserToSet);
+
+          // Cache user profile (only on first page load)
+          if (pageNum === 0 && finalUserToSet) {
+            const cacheIdentifier = finalUserToSet.id || finalUserToSet.handle || 'unknown';
+            cache.set(CacheKeys.userProfile(cacheIdentifier), finalUserToSet, CacheTTL.userProfile);
+          }
         }
 
         // Load follower/following counts and follow status (only on first page)
-        const finalIdentity = resolvedIdentity ?? targetIdentity;
+        const finalIdentity = resolvedIdentity;
         const userHandle = finalIdentity?.handle?.replace(/^@/, '').trim();
         if (userHandle && pageNum === 0) {
           try {
