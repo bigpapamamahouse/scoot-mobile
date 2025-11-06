@@ -126,7 +126,7 @@ async function userIdFromHandle(handle) {
       ExpressionAttributeNames: { '#t': 'type', '#h': 'handle' },
       ExpressionAttributeValues: { ':t': 'HANDLE', ':h': h },
       Limit: 1,
-      ConsistentRead: true,
+      // Note: GSIs do not support ConsistentRead - only eventually consistent
     }));
     const it = (qr.Items || [])[0];
     if (it && it.userId) return String(it.userId);
@@ -236,15 +236,35 @@ async function generateUserInviteCode(userId) {
       KeyConditionExpression: 'userId = :uid',
       ExpressionAttributeValues: { ':uid': userId },
       Limit: 1,
-      ConsistentRead: true,
+      // Note: GSIs do not support ConsistentRead - only eventually consistent
     }));
 
     if (existing.Items && existing.Items[0]) {
+      console.log(`[Invites] Found existing code via GSI: ${existing.Items[0].code}`);
       return existing.Items[0].code;
     }
   } catch (e) {
-    // If GSI doesn't exist yet, fall back to creating a new code
-    console.log('[Invites] GSI byUserId not available, will create new code:', e.message);
+    // If GSI doesn't exist yet, fall back to Scan with filter
+    console.log('[Invites] GSI byUserId not available, trying Scan fallback:', e.message);
+
+    try {
+      const scanResult = await ddb.send(new ScanCommand({
+        TableName: INVITES_TABLE,
+        FilterExpression: 'userId = :uid',
+        ExpressionAttributeValues: { ':uid': userId },
+        Limit: 10, // Should only be 1, but allow a few in case of duplicates
+        ConsistentRead: true,
+      }));
+
+      if (scanResult.Items && scanResult.Items.length > 0) {
+        // Return the first (oldest) code for this user
+        console.log(`[Invites] Found existing code via Scan: ${scanResult.Items[0].code}`);
+        return scanResult.Items[0].code;
+      }
+    } catch (scanError) {
+      console.error('[Invites] Scan fallback also failed:', scanError.message);
+      // Continue to create new code
+    }
   }
 
   // Generate a new code if none exists
@@ -655,7 +675,7 @@ module.exports.handler = async (event) => {
           IndexName: 'byUserId',
           KeyConditionExpression: 'userId = :uid',
           ExpressionAttributeValues: { ':uid': userId },
-          ConsistentRead: true,
+          // Note: GSIs do not support ConsistentRead - only eventually consistent
         }));
 
         const items = (result.Items || []).map(it => ({
@@ -1260,6 +1280,58 @@ module.exports.handler = async (event) => {
               console.error('FEED avatar/handle hydrate failed', e);
             }
 
+            // Fetch comment previews for all posts
+            try {
+              for (const post of items) {
+                const commentsResult = await ddb.send(new QueryCommand({
+                  TableName: COMMENTS_TABLE,
+                  KeyConditionExpression: 'pk = :p',
+                  ExpressionAttributeValues: { ':p': `POST#${post.id}` },
+                  ScanIndexForward: true,
+                  Limit: 4, // Fetch 4 to detect if there are more than 3
+                  ConsistentRead: true,
+                }));
+
+                const allComments = (commentsResult.Items || []).map(it => ({
+                  id: it.id,
+                  userId: it.userId,
+                  handle: it.userHandle || null,
+                  text: it.text || '',
+                  createdAt: it.createdAt || 0,
+                }));
+
+                // Take only first 3 for preview
+                const comments = allComments.slice(0, 3);
+
+                // Fetch avatarKey for comment authors
+                if (comments.length > 0) {
+                  try {
+                    const userIds = [...new Set(comments.map(c => c.userId).filter(Boolean))];
+                    if (userIds.length > 0) {
+                      const summaries = await fetchUserSummaries(userIds);
+                      const avatarMap = Object.fromEntries(
+                        summaries.map(u => [u.userId, u.avatarKey || null])
+                      );
+                      for (const comment of comments) {
+                        if (comment.userId && avatarMap[comment.userId]) {
+                          comment.avatarKey = avatarMap[comment.userId];
+                        }
+                      }
+                    }
+                  } catch (e) {
+                    console.error('Failed to fetch comment avatars:', e);
+                  }
+                }
+
+                post.comments = comments;
+                // If we got 4 comments, there are at least 4. Otherwise use actual count.
+                post.commentCount = allComments.length >= 4 ? 4 : allComments.length;
+              }
+            } catch (e) {
+              console.error('Failed to fetch comment previews for feed:', e);
+              // Continue without comment previews if this fails
+            }
+
             return ok({ items });
           }
         }
@@ -1272,7 +1344,7 @@ module.exports.handler = async (event) => {
           ExpressionAttributeValues: { ':g': 'FEED' },
           ScanIndexForward: false,
           Limit: 50,
-          ConsistentRead: true,
+          // Note: GSIs do not support ConsistentRead - only eventually consistent
         }));
 
         const items = (gf.Items || []).map(i => ({
@@ -1307,6 +1379,58 @@ module.exports.handler = async (event) => {
           }
         } catch (e) {
           console.error('FEED avatar/handle hydrate failed', e);
+        }
+
+        // Fetch comment previews for all posts (fallback path)
+        try {
+          for (const post of items) {
+            const commentsResult = await ddb.send(new QueryCommand({
+              TableName: COMMENTS_TABLE,
+              KeyConditionExpression: 'pk = :p',
+              ExpressionAttributeValues: { ':p': `POST#${post.id}` },
+              ScanIndexForward: true,
+              Limit: 4, // Fetch 4 to detect if there are more than 3
+              ConsistentRead: true,
+            }));
+
+            const allComments = (commentsResult.Items || []).map(it => ({
+              id: it.id,
+              userId: it.userId,
+              handle: it.userHandle || null,
+              text: it.text || '',
+              createdAt: it.createdAt || 0,
+            }));
+
+            // Take only first 3 for preview
+            const comments = allComments.slice(0, 3);
+
+            // Fetch avatarKey for comment authors
+            if (comments.length > 0) {
+              try {
+                const userIds = [...new Set(comments.map(c => c.userId).filter(Boolean))];
+                if (userIds.length > 0) {
+                  const summaries = await fetchUserSummaries(userIds);
+                  const avatarMap = Object.fromEntries(
+                    summaries.map(u => [u.userId, u.avatarKey || null])
+                  );
+                  for (const comment of comments) {
+                    if (comment.userId && avatarMap[comment.userId]) {
+                      comment.avatarKey = avatarMap[comment.userId];
+                    }
+                  }
+                }
+              } catch (e) {
+                console.error('Failed to fetch comment avatars:', e);
+              }
+            }
+
+            post.comments = comments;
+            // If we got 4 comments, there are at least 4. Otherwise use actual count.
+            post.commentCount = allComments.length >= 4 ? 4 : allComments.length;
+          }
+        } catch (e) {
+          console.error('Failed to fetch comment previews for feed (fallback):', e);
+          // Continue without comment previews if this fails
         }
 
         return ok({ items });
@@ -1675,7 +1799,7 @@ const items = await listPostsByUserId(targetId, 50);
           ExpressionAttributeNames: { '#t': 'type', '#h': 'handle' },
           ExpressionAttributeValues: { ':H': 'HANDLE', ':q': q },
           Limit: 25,
-          ConsistentRead: true,
+          // Note: GSIs do not support ConsistentRead - only eventually consistent
         }));
         items = qr.Items || [];
       } catch (e) {
