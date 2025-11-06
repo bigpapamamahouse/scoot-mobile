@@ -562,12 +562,25 @@ export default function ProfileScreen({ navigation, route }: any) {
     [deriveIdentityFromPosts, filterPostsForUser, resolvePosts, routeUserHandle, routeUserId, currentUser]
   );
 
+  // Track if initial load has completed to prevent unnecessary reloads
+  const initialLoadCompleteRef = React.useRef(false);
+
   React.useEffect(() => {
-    load();
-  }, [load]);
+    // Only run initial load once on mount
+    if (!initialLoadCompleteRef.current) {
+      load().finally(() => {
+        initialLoadCompleteRef.current = true;
+      });
+    }
+  }, []); // Empty deps - only run on mount
 
   React.useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
+      // Skip if this is the initial mount (initial load handles it)
+      if (!initialLoadCompleteRef.current) {
+        return;
+      }
+
       // Check if cache is stale before reloading
       const cacheIdentifier = routeUserId || routeUserHandle || 'unknown';
       const cachedPosts = cache.get<Post[]>(CacheKeys.userPosts(cacheIdentifier, 0));
