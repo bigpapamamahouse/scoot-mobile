@@ -418,8 +418,9 @@ export default function ProfileScreen({ navigation, route }: any) {
             id: targetUserId,
             handle: targetHandle,
           });
-          // Silently filter posts - no need to log this routine operation
-          if (!filteredPosts.length && postsData && !Array.isArray(postsData)) {
+          // Only warn if we couldn't extract ANY posts from a non-array response
+          // (Empty filteredPosts after filtering is normal - user might not have posts)
+          if (!normalizedPosts.length && postsData && !Array.isArray(postsData)) {
             console.warn('Unrecognized user posts response shape', postsData);
           }
 
