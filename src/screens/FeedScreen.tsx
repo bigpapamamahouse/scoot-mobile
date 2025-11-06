@@ -209,7 +209,7 @@ export default function FeedScreen({ navigation }: any){
 
       {/* Floating Action Button - Apple-style liquid glass */}
       <IconButton
-        icon="add"
+        icon="create-outline"
         onPress={() => navigation.navigate('ComposePost')}
         variant="glass"
         size="lg"

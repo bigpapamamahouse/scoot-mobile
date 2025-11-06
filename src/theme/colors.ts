@@ -11,7 +11,7 @@ export const lightColors = {
     200: '#90CAF9',
     300: '#64B5F6',
     400: '#42A5F5',
-    500: '#2196F3', // Main brand color
+    500: '#010f2c', // Main brand color
     600: '#1E88E5',
     700: '#1976D2',
     800: '#1565C0',
@@ -121,7 +121,7 @@ export const darkColors = {
     200: '#1976D2',
     300: '#1E88E5',
     400: '#2196F3',
-    500: '#42A5F5', // Main brand color in dark mode
+    500: '#7485ff', // Main brand color in dark mode
     600: '#64B5F6',
     700: '#90CAF9',
     800: '#BBDEFB',
