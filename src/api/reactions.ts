@@ -14,24 +14,59 @@ export async function toggleReaction(postId: string, emoji: string){
 }
 
 /**
- * Batches reactions fetching for multiple posts in parallel.
+ * Throttles concurrent promises to prevent overwhelming the backend.
+ * Processes items in chunks with a maximum concurrency limit.
+ */
+async function throttledMap<T, R>(
+  items: T[],
+  mapFn: (item: T) => Promise<R>,
+  maxConcurrency: number = 5
+): Promise<R[]> {
+  const results: R[] = [];
+
+  for (let i = 0; i < items.length; i += maxConcurrency) {
+    const chunk = items.slice(i, i + maxConcurrency);
+    const chunkResults = await Promise.allSettled(chunk.map(mapFn));
+
+    // Extract results or handle rejections
+    chunkResults.forEach((result, idx) => {
+      if (result.status === 'fulfilled') {
+        results.push(result.value);
+      } else {
+        // For rejected promises, push a default/empty value
+        // This will be handled by the caller
+        results.push(null as any);
+      }
+    });
+  }
+
+  return results;
+}
+
+/**
+ * Batches reactions fetching for multiple posts with throttling.
  * Returns a Map of postId -> reactions data.
- * This prevents N+1 query problem when loading feeds.
+ *
+ * FIXED: Now limits concurrent requests to 5 at a time to prevent
+ * overwhelming Lambda with cold starts and causing 503 errors.
  */
 export async function getBatchedReactions(postIds: string[]): Promise<Map<string, any>> {
   const uniqueIds = [...new Set(postIds)];
 
-  // Fetch all reactions in parallel
-  const results = await Promise.allSettled(
-    uniqueIds.map(postId => getReactions(postId))
+  // Fetch reactions with throttling (max 5 concurrent requests)
+  // This prevents the "thundering herd" problem that causes random 503 errors
+  const results = await throttledMap(
+    uniqueIds,
+    (postId) => getReactions(postId),
+    5 // Max 5 concurrent requests instead of 20+
   );
 
   const reactionsMap = new Map<string, any>();
 
   uniqueIds.forEach((postId, index) => {
     const result = results[index];
-    if (result.status === 'fulfilled') {
-      reactionsMap.set(postId, result.value);
+    if (result !== null) {
+      reactionsMap.set(postId, result);
     } else {
       // On error, store empty array so components don't break
       reactionsMap.set(postId, []);

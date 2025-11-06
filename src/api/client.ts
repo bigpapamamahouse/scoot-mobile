@@ -33,6 +33,30 @@ async function refreshSession(previousToken?: string | null) {
   return null;
 }
 
+/**
+ * Creates a fetch request with a timeout.
+ * Aborts the request if it takes longer than the specified timeout.
+ */
+async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: number = 10000) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(url, {
+      ...init,
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    return response;
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    if (error.name === 'AbortError') {
+      throw new Error(`Request timeout after ${timeoutMs}ms`);
+    }
+    throw error;
+  }
+}
+
 export async function api(path: string, init: RequestInit = {}) {
   let lastText = '';
   let attempt = 0;
@@ -44,7 +68,9 @@ export async function api(path: string, init: RequestInit = {}) {
     attempt += 1;
     const { headers, token: currentToken } = await buildRequestInit(init);
     token = currentToken;
-    const res = await fetch(fullUrl, { ...init, headers });
+
+    // Use 10-second timeout to prevent hanging requests
+    const res = await fetchWithTimeout(fullUrl, { ...init, headers }, 10000);
 
     if (res.ok) {
       const ct = res.headers.get('content-type') || '';
