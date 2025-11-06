@@ -41,7 +41,12 @@ const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '')
   .filter(Boolean);
 
 // ---------- Clients ----------
-const ddbClient = new DynamoDBClient({});
+const ddbClient = new DynamoDBClient({
+  requestHandler: {
+    requestTimeout: 3000, // 3 second timeout per request to prevent cascading delays
+  },
+  maxAttempts: 2, // Reduce retries from default 3 to prevent timeout cascade
+});
 const ddb = DynamoDBDocumentClient.from(ddbClient, {
   marshallOptions: { removeUndefinedValues: true },
 });
@@ -413,28 +418,40 @@ async function fetchUserSummaries(userIds) {
     }
   }
 
-  // Fallback per-item
+  // Fallback per-item (LIMITED to prevent excessive queries)
   if (out.length === 0 && unique.length > 0) {
-    for (const id of unique) {
-      const r = await ddb.send(new GetCommand({
-        TableName: USERS_TABLE,
-        Key: { pk: `USER#${id}` },
-        ProjectionExpression: 'pk, handle, userId, avatarKey, fullName',
-        ConsistentRead: true,
-      }));
-      const it = r.Item;
-      if (!it) continue;
-      let uid = (it.userId && String(it.userId)) || '';
-      if (!uid && typeof it.pk === 'string' && it.pk.startsWith('USER#')) {
-        uid = it.pk.slice('USER#'.length);
+    console.warn(`[fetchUserSummaries] BatchGet returned 0 results for ${unique.length} users - using limited fallback`);
+    // IMPORTANT: Limit fallback to prevent timeout on large reaction lists
+    const limit = Math.min(unique.length, 5);
+    for (let i = 0; i < limit; i++) {
+      const id = unique[i];
+      try {
+        const r = await ddb.send(new GetCommand({
+          TableName: USERS_TABLE,
+          Key: { pk: `USER#${id}` },
+          ProjectionExpression: 'pk, handle, userId, avatarKey, fullName',
+          ConsistentRead: false, // Use eventually consistent for speed
+        }));
+        const it = r.Item;
+        if (!it) continue;
+        let uid = (it.userId && String(it.userId)) || '';
+        if (!uid && typeof it.pk === 'string' && it.pk.startsWith('USER#')) {
+          uid = it.pk.slice('USER#'.length);
+        }
+        if (!uid) continue;
+        out.push({
+          userId: uid,
+          handle: it.handle || null,
+          avatarKey: it.avatarKey || null,
+          fullName: it.fullName || null,
+        });
+      } catch (err) {
+        console.error(`[fetchUserSummaries] Fallback GetCommand failed for user ${id}:`, err);
+        // Continue to next user instead of failing entirely
       }
-      if (!uid) continue;
-      out.push({
-        userId: uid,
-        handle: it.handle || null,
-        avatarKey: it.avatarKey || null,
-        fullName: it.fullName || null,
-      });
+    }
+    if (unique.length > limit) {
+      console.warn(`[fetchUserSummaries] Truncated fallback from ${unique.length} to ${limit} users to prevent timeout`);
     }
   }
   return out;
@@ -1028,65 +1045,101 @@ module.exports.handler = async (event) => {
     if (method === 'GET' && path.startsWith('/reactions/')) {
       if (!REACTIONS_TABLE) return ok({ message: 'Reactions not enabled' }, 501);
       const postId = path.split('/')[2];
-      const qr = await ddb.send(new QueryCommand({
-        TableName: REACTIONS_TABLE,
-        KeyConditionExpression: 'pk = :p',
-        ExpressionAttributeValues: { ':p': `POST#${postId}` },
-        ProjectionExpression: 'sk, #c, emoji',
-        ExpressionAttributeNames: { '#c': 'count' },
-        ConsistentRead: true,
-      }));
-      const counts = {};
-      let mine = null;
-      for (const it of (qr.Items || [])) {
-        if (typeof it.sk === 'string' && it.sk.startsWith('COUNT#')) {
-          const emoji = it.sk.slice('COUNT#'.length);
-          counts[emoji] = Number(it.count || 0);
-        } else if (userId && it.sk === `USER#${userId}`) {
-          mine = it.emoji || null;
-        }
-      }
-      if (userId && mine === null) {
-        const ur = await ddb.send(new GetCommand({
-          TableName: REACTIONS_TABLE,
-          Key: { pk: `POST#${postId}`, sk: `USER#${userId}` },
-          ProjectionExpression: 'emoji',
-          ConsistentRead: true
-        }));
-        mine = ur.Item?.emoji || null;
-      }
+      const startTime = Date.now();
 
-      const wantWho = (event?.queryStringParameters?.who === '1');
-      let who = undefined;
-      if (wantWho) {
-        const uqr = await ddb.send(new QueryCommand({
+      try {
+        const qr = await ddb.send(new QueryCommand({
           TableName: REACTIONS_TABLE,
-          KeyConditionExpression: 'pk = :p AND begins_with(sk, :u)',
-          ExpressionAttributeValues: { ':p': `POST#${postId}`, ':u': 'USER#' },
-          ProjectionExpression: 'sk, emoji',
-          ConsistentRead: true,
+          KeyConditionExpression: 'pk = :p',
+          ExpressionAttributeValues: { ':p': `POST#${postId}` },
+          ProjectionExpression: 'sk, #c, emoji',
+          ExpressionAttributeNames: { '#c': 'count' },
+          ConsistentRead: false, // Use eventually consistent for better performance
         }));
-        const byEmoji = {};
-        const uids = [];
-        for (const row of (uqr.Items || [])) {
-          const uid = String(row.sk).slice('USER#'.length);
-          const e = row.emoji || '';
-          if (!e) continue;
-          (byEmoji[e] ||= []).push(uid);
-          uids.push(uid);
+        const counts = {};
+        let mine = null;
+        for (const it of (qr.Items || [])) {
+          if (typeof it.sk === 'string' && it.sk.startsWith('COUNT#')) {
+            const emoji = it.sk.slice('COUNT#'.length);
+            counts[emoji] = Number(it.count || 0);
+          } else if (userId && it.sk === `USER#${userId}`) {
+            mine = it.emoji || null;
+          }
         }
-        const profiles = await fetchUserSummaries(uids);
-        const map = Object.fromEntries((profiles || []).map(p => [p.userId, p]));
-        who = {};
-        for (const [e, ids] of Object.entries(byEmoji)) {
-          who[e] = ids.map(uid => ({
-            userId: uid,
-            handle: map[uid]?.handle || null,
-            avatarKey: map[uid]?.avatarKey || null,
-          }));
+
+        // Fallback query for current user's reaction if not found
+        if (userId && mine === null) {
+          try {
+            const ur = await ddb.send(new GetCommand({
+              TableName: REACTIONS_TABLE,
+              Key: { pk: `POST#${postId}`, sk: `USER#${userId}` },
+              ProjectionExpression: 'emoji',
+              ConsistentRead: false, // Use eventually consistent for better performance
+            }));
+            mine = ur.Item?.emoji || null;
+          } catch (err) {
+            console.error('[GET /reactions] Fallback user reaction query failed:', err);
+            // Continue with mine=null instead of failing entire request
+          }
         }
+
+        const wantWho = (event?.queryStringParameters?.who === '1');
+        let who = undefined;
+        if (wantWho) {
+          try {
+            const uqr = await ddb.send(new QueryCommand({
+              TableName: REACTIONS_TABLE,
+              KeyConditionExpression: 'pk = :p AND begins_with(sk, :u)',
+              ExpressionAttributeValues: { ':p': `POST#${postId}`, ':u': 'USER#' },
+              ProjectionExpression: 'sk, emoji',
+              ConsistentRead: false, // Use eventually consistent for better performance
+            }));
+            const byEmoji = {};
+            const uids = [];
+            for (const row of (uqr.Items || [])) {
+              const uid = String(row.sk).slice('USER#'.length);
+              const e = row.emoji || '';
+              if (!e) continue;
+              (byEmoji[e] ||= []).push(uid);
+              uids.push(uid);
+            }
+
+            // Graceful degradation: if user profile fetch fails, return reactions without user details
+            try {
+              const profiles = await fetchUserSummaries(uids);
+              const map = Object.fromEntries((profiles || []).map(p => [p.userId, p]));
+              who = {};
+              for (const [e, ids] of Object.entries(byEmoji)) {
+                who[e] = ids.map(uid => ({
+                  userId: uid,
+                  handle: map[uid]?.handle || null,
+                  avatarKey: map[uid]?.avatarKey || null,
+                }));
+              }
+            } catch (err) {
+              console.error('[GET /reactions] Failed to fetch user summaries:', err);
+              // Return reaction data without user profiles instead of failing
+              who = {};
+              for (const [e, ids] of Object.entries(byEmoji)) {
+                who[e] = ids.map(uid => ({ userId: uid, handle: null, avatarKey: null }));
+              }
+            }
+          } catch (err) {
+            console.error('[GET /reactions] Who query failed:', err);
+            // Return without "who" data instead of failing entire request
+            who = undefined;
+          }
+        }
+
+        const duration = Date.now() - startTime;
+        console.log(`[GET /reactions/${postId}] Completed in ${duration}ms`);
+        return ok({ counts, my: mine ? [mine] : [], ...(wantWho ? { who } : {}) });
+
+      } catch (err) {
+        console.error('[GET /reactions] Main query failed:', err);
+        // Return empty reactions instead of 500 error
+        return ok({ counts: {}, my: [], message: 'Failed to fetch reactions' });
       }
-      return ok({ counts, my: mine ? [mine] : [], ...(wantWho ? { who } : {}) });
     }
 
     // POST /posts/{id}/reactions  body: { emoji, action:'toggle' }
