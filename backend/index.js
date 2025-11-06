@@ -126,7 +126,7 @@ async function userIdFromHandle(handle) {
       ExpressionAttributeNames: { '#t': 'type', '#h': 'handle' },
       ExpressionAttributeValues: { ':t': 'HANDLE', ':h': h },
       Limit: 1,
-      ConsistentRead: true,
+      // Note: GSIs do not support ConsistentRead - only eventually consistent
     }));
     const it = (qr.Items || [])[0];
     if (it && it.userId) return String(it.userId);
@@ -236,7 +236,7 @@ async function generateUserInviteCode(userId) {
       KeyConditionExpression: 'userId = :uid',
       ExpressionAttributeValues: { ':uid': userId },
       Limit: 1,
-      ConsistentRead: true,
+      // Note: GSIs do not support ConsistentRead - only eventually consistent
     }));
 
     if (existing.Items && existing.Items[0]) {
@@ -655,7 +655,7 @@ module.exports.handler = async (event) => {
           IndexName: 'byUserId',
           KeyConditionExpression: 'userId = :uid',
           ExpressionAttributeValues: { ':uid': userId },
-          ConsistentRead: true,
+          // Note: GSIs do not support ConsistentRead - only eventually consistent
         }));
 
         const items = (result.Items || []).map(it => ({
@@ -1324,7 +1324,7 @@ module.exports.handler = async (event) => {
           ExpressionAttributeValues: { ':g': 'FEED' },
           ScanIndexForward: false,
           Limit: 50,
-          ConsistentRead: true,
+          // Note: GSIs do not support ConsistentRead - only eventually consistent
         }));
 
         const items = (gf.Items || []).map(i => ({
@@ -1779,7 +1779,7 @@ const items = await listPostsByUserId(targetId, 50);
           ExpressionAttributeNames: { '#t': 'type', '#h': 'handle' },
           ExpressionAttributeValues: { ':H': 'HANDLE', ':q': q },
           Limit: 25,
-          ConsistentRead: true,
+          // Note: GSIs do not support ConsistentRead - only eventually consistent
         }));
         items = qr.Items || [];
       } catch (e) {
