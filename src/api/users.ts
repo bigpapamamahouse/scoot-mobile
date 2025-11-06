@@ -460,7 +460,9 @@ function extractUserFromPayload(payload: unknown, visited = new Set<unknown>()):
     if (!normalized.createdAt && typeof record.createdAt === 'string') {
       normalized.createdAt = record.createdAt;
     }
-    if (normalized.id && normalized.createdAt) {
+    // Accept user object if it has an id (createdAt is optional)
+    // Many API endpoints return user info without createdAt
+    if (normalized.id) {
       return normalized as User;
     }
     return null;
