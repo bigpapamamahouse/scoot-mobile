@@ -11,7 +11,7 @@ import {
   readSeenNotificationIds,
   writeSeenNotificationIds,
 } from './storage';
-import { navigationRef } from '../navigation';
+import { navigationRef } from '../navigation/navigationRef';
 
 type NotificationsContextValue = {
   unreadCount: number;
