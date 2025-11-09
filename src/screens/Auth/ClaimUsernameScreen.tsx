@@ -46,6 +46,16 @@ export default function ClaimUsernameScreen({ route, navigation }: any) {
       return;
     }
 
+    // Validate username: only letters and numbers allowed
+    const usernameRegex = /^[a-zA-Z0-9]+$/;
+    if (!usernameRegex.test(username.trim())) {
+      Alert.alert(
+        'Invalid username',
+        'Username can only contain letters and numbers. No spaces or special characters allowed.'
+      );
+      return;
+    }
+
     if (!fullName.trim()) {
       Alert.alert('Missing name', 'Please enter your full name');
       return;
