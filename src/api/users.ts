@@ -633,13 +633,40 @@ export async function searchUsersWithMutuals(query: string): Promise<User[]> {
   }
 
   try {
+    // Enrich incomplete user data by fetching full profiles
+    const enrichedDataPromises = results.map(async (user) => {
+      // Check if user data is incomplete (missing fullName or avatarKey)
+      const isIncomplete = !user.fullName || !user.avatarKey;
+
+      if (isIncomplete && user.handle) {
+        try {
+          // Fetch complete user data
+          const fullUserData = await getUser(user.handle);
+          // Merge with existing data, preferring the fetched data for missing fields
+          return {
+            ...user,
+            fullName: fullUserData?.fullName || user.fullName,
+            avatarKey: fullUserData?.avatarKey || user.avatarKey,
+          };
+        } catch (error) {
+          console.error(`Failed to enrich user data for ${user.handle}:`, error);
+          // Return original user data if enrichment fails
+          return user;
+        }
+      }
+
+      return user;
+    });
+
+    const fullyEnrichedResults = await Promise.all(enrichedDataPromises);
+
     // Get current user to fetch their followers/following
     const currentUser = await me();
     const currentUserHandle = currentUser?.handle;
 
     if (!currentUserHandle) {
-      // If we can't get current user, return unsorted results
-      return results;
+      // If we can't get current user, return enriched but unsorted results
+      return fullyEnrichedResults;
     }
 
     // Check if cache is valid
@@ -688,7 +715,7 @@ export async function searchUsersWithMutuals(query: string): Promise<User[]> {
     }
 
     // Mark users with mutual connections
-    const enrichedResults = results.map(user => {
+    const enrichedResults = fullyEnrichedResults.map(user => {
       const userHandle = user.handle;
       if (!userHandle || !followerCache) {
         return user;
