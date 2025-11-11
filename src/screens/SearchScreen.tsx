@@ -50,7 +50,7 @@ export function SearchScreen({ navigation }: Props) {
         setResults(searchResults);
       } catch (err) {
         console.error('Search error:', err);
-        setError('Failed to search users. Please try again.');
+        setError('Failed to search scooters. Please try again.');
         setResults([]);
       } finally {
         setLoading(false);
@@ -103,7 +103,7 @@ export function SearchScreen({ navigation }: Props) {
     if (query.trim().length === 0) {
       return (
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>Search for users by name or handle</Text>
+          <Text style={styles.emptyText}>Search for scooters by name or handle</Text>
         </View>
       );
     }
@@ -118,7 +118,7 @@ export function SearchScreen({ navigation }: Props) {
 
     return (
       <View style={styles.emptyContainer}>
-        <Text style={styles.emptyText}>No users found</Text>
+        <Text style={styles.emptyText}>No scooters found</Text>
       </View>
     );
   };
@@ -128,7 +128,7 @@ export function SearchScreen({ navigation }: Props) {
       <View style={styles.searchContainer}>
         <TextInput
           style={styles.searchInput}
-          placeholder="Search users..."
+          placeholder="Search scooters..."
           placeholderTextColor={colors.text.tertiary}
           value={query}
           onChangeText={setQuery}
