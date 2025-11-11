@@ -28,13 +28,18 @@ If you don't have an Expo account, create one at https://expo.dev
 
 ## Step 3: Configure Your Project
 
-First, link your project to EAS:
+First, link your project to EAS. This will create a project in your Expo account and generate a unique project ID:
 
 ```bash
 eas build:configure
 ```
 
-This will create an `eas.json` file. Replace its contents with the following configuration:
+When prompted:
+- **Select a project**: Choose "Create a new project"
+- This will automatically add a `projectId` to your `app.json` under `expo.extra.eas.projectId`
+- This will create an `eas.json` file
+
+After the command completes, update your `eas.json` file with the following configuration:
 
 ```json
 {
