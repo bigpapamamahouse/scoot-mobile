@@ -88,8 +88,8 @@ Open `app.json` and ensure the following iOS-specific fields are set:
       "bundleIdentifier": "com.scooterbooter.scoot",
       "buildNumber": "1",
       "infoPlist": {
-        "NSCameraUsageDescription": "This app uses the camera to scan QR codes on scooters.",
-        "NSPhotoLibraryUsageDescription": "This app needs access to your photo library."
+        "NSCameraUsageDescription": "This app uses the camera to take photos for creating posts.",
+        "NSPhotoLibraryUsageDescription": "This app needs access to your photo library to select photos for posts."
       }
     }
   }
