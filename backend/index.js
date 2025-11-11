@@ -493,7 +493,12 @@ module.exports.handler = async (event) => {
   }
 
   const { method, rawPath, stage, path, route } = normalizePath(event);
-  console.log('ROUTE', { method, rawPath, stage, normalized: path, route });
+  // Always log DELETE requests for debugging
+  if (method === 'DELETE') {
+    console.log('===== DELETE REQUEST =====', { method, rawPath, stage, normalized: path, route });
+  } else {
+    console.log('ROUTE', { method, rawPath, stage, normalized: path, route });
+  }
 
   const claims = claimsFrom(event);
   const userId = claims.sub;
@@ -856,8 +861,8 @@ module.exports.handler = async (event) => {
     }
 
     // DELETE /me - Delete user account and all associated data
-    console.log(`[DEBUG] Checking DELETE /me: route="${route}", method="${method}", path="${path}"`);
     if (route === 'DELETE /me') {
+      console.log(`===== MATCHED DELETE /me ENDPOINT =====`);
       if (!userId) return bad('Unauthorized', 401);
 
       console.log(`[DELETE /me] Starting account deletion for user ${userId}`);
@@ -2224,6 +2229,9 @@ const items = await listPostsByUserId(targetId, 50);
     }
 
     // ----- default -----
+    if (method === 'DELETE') {
+      console.error(`[404] DELETE request not matched: route="${route}", path="${path}"`);
+    }
     return bad('Not found', 404);
 
   } catch (err) {
