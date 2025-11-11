@@ -64,6 +64,11 @@ export async function api(path: string, init: RequestInit = {}) {
 
   const fullUrl = `${ENV.API_URL}${path}`;
 
+  // Debug logging for DELETE requests
+  if (init.method === 'DELETE') {
+    console.log(`[API CLIENT] Making ${init.method} request to ${fullUrl}`);
+  }
+
   while (attempt < 2) {
     attempt += 1;
     const { headers, token: currentToken } = await buildRequestInit(init);

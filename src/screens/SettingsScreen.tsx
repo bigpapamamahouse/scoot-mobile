@@ -158,6 +158,42 @@ export default function SettingsScreen({ navigation }: any) {
     }
   };
 
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Delete Account',
+      'Are you sure you want to delete your account? This will permanently delete all your posts, comments, reactions, and remove you from the system. This action cannot be undone.',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: confirmDeleteAccount,
+        },
+      ]
+    );
+  };
+
+  const confirmDeleteAccount = async () => {
+    try {
+      setSaving(true);
+      await UsersAPI.deleteAccount();
+
+      // Sign out and navigate to login screen
+      await signOutFn();
+      navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
+
+      Alert.alert('Account Deleted', 'Your account has been successfully deleted.');
+    } catch (error: any) {
+      console.error('Failed to delete account:', error);
+      Alert.alert('Error', error?.message || 'Failed to delete account. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const uploadAvatar = React.useCallback(
     async (uri: string) => {
       setUploading(true);
@@ -407,6 +443,16 @@ export default function SettingsScreen({ navigation }: any) {
           )}
         </TouchableOpacity>
 
+        <TouchableOpacity
+          style={styles.deleteAccountButton}
+          onPress={handleDeleteAccount}
+          disabled={saving || uploading}
+        >
+          <Text style={[styles.deleteAccountButtonText, (saving || uploading) && styles.deleteAccountButtonDisabled]}>
+            Delete Account
+          </Text>
+        </TouchableOpacity>
+
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
           <Text style={styles.logoutButtonText}>Log out</Text>
         </TouchableOpacity>
@@ -568,8 +614,20 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 16,
   },
-  logoutButton: {
+  deleteAccountButton: {
     marginTop: 32,
+    alignItems: 'center',
+  },
+  deleteAccountButtonText: {
+    color: '#e53935',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  deleteAccountButtonDisabled: {
+    opacity: 0.5,
+  },
+  logoutButton: {
+    marginTop: 16,
     alignItems: 'center',
   },
   logoutButtonText: {
