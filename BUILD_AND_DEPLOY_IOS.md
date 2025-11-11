@@ -85,12 +85,11 @@ Open `app.json` and ensure the following iOS-specific fields are set:
     "version": "0.1.0",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.scooterbooter.app",
+      "bundleIdentifier": "com.scooterbooter.scoot",
       "buildNumber": "1",
       "infoPlist": {
         "NSCameraUsageDescription": "This app uses the camera to scan QR codes on scooters.",
-        "NSPhotoLibraryUsageDescription": "This app needs access to your photo library.",
-        "NSLocationWhenInUseUsageDescription": "This app uses your location to find nearby scooters."
+        "NSPhotoLibraryUsageDescription": "This app needs access to your photo library."
       }
     }
   }
@@ -108,7 +107,7 @@ Open `app.json` and ensure the following iOS-specific fields are set:
 5. Select **App** → **Continue**
 6. Configure:
    - **Description**: ScooterBooter
-   - **Bundle ID**: `com.scooterbooter.app` (must match your app.json)
+   - **Bundle ID**: `com.scooterbooter.scoot` (must match your app.json)
    - **Capabilities**: Enable any needed (Push Notifications, etc.)
 7. Click **Continue** → **Register**
 
@@ -120,7 +119,7 @@ Open `app.json` and ensure the following iOS-specific fields are set:
    - **Platform**: iOS
    - **Name**: ScooterBooter
    - **Primary Language**: English (or your preference)
-   - **Bundle ID**: Select `com.scooterbooter.app` from dropdown
+   - **Bundle ID**: Select `com.scooterbooter.scoot` from dropdown
    - **SKU**: `scooterbooter-001` (or any unique identifier)
 4. Click **Create**
 5. Note your **App Store Connect App ID** (found in App Information, looks like: 1234567890)
