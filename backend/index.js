@@ -493,7 +493,7 @@ module.exports.handler = async (event) => {
   }
 
   const { method, rawPath, stage, path, route } = normalizePath(event);
-  console.log('ROUTE', { method, rawPath, stage, normalized: path });
+  console.log('ROUTE', { method, rawPath, stage, normalized: path, route });
 
   const claims = claimsFrom(event);
   const userId = claims.sub;
@@ -856,6 +856,7 @@ module.exports.handler = async (event) => {
     }
 
     // DELETE /me - Delete user account and all associated data
+    console.log(`[DEBUG] Checking DELETE /me: route="${route}", method="${method}", path="${path}"`);
     if (route === 'DELETE /me') {
       if (!userId) return bad('Unauthorized', 401);
 
