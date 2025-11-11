@@ -18,6 +18,8 @@ const {
 const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 
+const { CognitoIdentityProviderClient, AdminDeleteUserCommand } = require('@aws-sdk/client-cognito-identity-provider');
+
 // ---------- Env ----------
 const POSTS_TABLE     = process.env.POSTS_TABLE;
 const USERS_TABLE     = process.env.USERS_TABLE;
@@ -28,6 +30,7 @@ const COMMENTS_TABLE  = process.env.COMMENTS_TABLE;   // pk: POST#<postId>, sk: 
 const REACTIONS_TABLE = process.env.REACTIONS_TABLE;  // pk: POST#<postId>, sk: COUNT#<emoji> (count item)
 //                                                    // pk: POST#<postId>, sk: USER#<userId>  (who reacted + emoji)
 const NOTIFICATIONS_TABLE = process.env.NOTIFICATIONS_TABLE; // NEW: pk USER#<targetId>, sk N#<ts>#<uuid>
+const USER_POOL_ID = process.env.USER_POOL_ID;
 
 // ---------- Allowed origins for CORS ----------
 const ALLOWED_ORIGINS = new Set([
@@ -51,6 +54,7 @@ const ddb = DynamoDBDocumentClient.from(ddbClient, {
   marshallOptions: { removeUndefinedValues: true },
 });
 const s3 = new S3Client({});
+const cognito = new CognitoIdentityProviderClient({});
 
 // ---------- CORS + response helpers ----------
 
@@ -849,6 +853,274 @@ module.exports.handler = async (event) => {
         }));
       }
       return ok({ success: true, avatarKey: key });
+    }
+
+    // DELETE /me - Delete user account and all associated data
+    if (route === 'DELETE /me') {
+      if (!userId) return bad('Unauthorized', 401);
+
+      console.log(`[DELETE /me] Starting account deletion for user ${userId}`);
+
+      try {
+        // Get user's handle before deletion
+        const userRecord = await ddb.send(new GetCommand({
+          TableName: USERS_TABLE,
+          Key: { pk: `USER#${userId}` },
+          ConsistentRead: true,
+        }));
+        const userHandle = userRecord.Item?.handle || null;
+
+        // 1. Delete all user's posts
+        console.log(`[DELETE /me] Deleting posts for user ${userId}`);
+        try {
+          const postsResult = await ddb.send(new QueryCommand({
+            TableName: POSTS_TABLE,
+            KeyConditionExpression: 'pk = :p',
+            ExpressionAttributeValues: { ':p': `USER#${userId}` },
+            ConsistentRead: true,
+          }));
+
+          for (const post of (postsResult.Items || [])) {
+            await ddb.send(new DeleteCommand({
+              TableName: POSTS_TABLE,
+              Key: { pk: post.pk, sk: post.sk },
+            }));
+          }
+          console.log(`[DELETE /me] Deleted ${(postsResult.Items || []).length} posts`);
+        } catch (e) {
+          console.error('[DELETE /me] Failed to delete posts:', e);
+        }
+
+        // 2. Delete all user's comments
+        console.log(`[DELETE /me] Deleting comments for user ${userId}`);
+        try {
+          if (COMMENTS_TABLE) {
+            // Scan for all comments by this user
+            const commentsResult = await ddb.send(new ScanCommand({
+              TableName: COMMENTS_TABLE,
+              FilterExpression: 'userId = :uid',
+              ExpressionAttributeValues: { ':uid': userId },
+              ConsistentRead: true,
+            }));
+
+            for (const comment of (commentsResult.Items || [])) {
+              await ddb.send(new DeleteCommand({
+                TableName: COMMENTS_TABLE,
+                Key: { pk: comment.pk, sk: comment.sk },
+              }));
+            }
+            console.log(`[DELETE /me] Deleted ${(commentsResult.Items || []).length} comments`);
+          }
+        } catch (e) {
+          console.error('[DELETE /me] Failed to delete comments:', e);
+        }
+
+        // 3. Delete all user's reactions
+        console.log(`[DELETE /me] Deleting reactions for user ${userId}`);
+        try {
+          if (REACTIONS_TABLE) {
+            // Scan for all reactions by this user
+            const reactionsResult = await ddb.send(new ScanCommand({
+              TableName: REACTIONS_TABLE,
+              FilterExpression: 'sk = :sk',
+              ExpressionAttributeValues: { ':sk': `USER#${userId}` },
+              ConsistentRead: true,
+            }));
+
+            for (const reaction of (reactionsResult.Items || [])) {
+              // Decrement the count for this emoji
+              if (reaction.emoji) {
+                try {
+                  await ddb.send(new UpdateCommand({
+                    TableName: REACTIONS_TABLE,
+                    Key: { pk: reaction.pk, sk: `COUNT#${reaction.emoji}` },
+                    UpdateExpression: 'ADD #c :neg',
+                    ExpressionAttributeNames: { '#c': 'count' },
+                    ExpressionAttributeValues: { ':neg': -1 },
+                  }));
+                } catch (e) {
+                  console.error('[DELETE /me] Failed to decrement reaction count:', e);
+                }
+              }
+
+              // Delete the user's reaction record
+              await ddb.send(new DeleteCommand({
+                TableName: REACTIONS_TABLE,
+                Key: { pk: reaction.pk, sk: reaction.sk },
+              }));
+            }
+            console.log(`[DELETE /me] Deleted ${(reactionsResult.Items || []).length} reactions`);
+          }
+        } catch (e) {
+          console.error('[DELETE /me] Failed to delete reactions:', e);
+        }
+
+        // 4. Delete all follow relationships (both following and followers)
+        console.log(`[DELETE /me] Deleting follow relationships for user ${userId}`);
+        try {
+          if (FOLLOWS_TABLE) {
+            // Delete users this user is following
+            const followingResult = await ddb.send(new QueryCommand({
+              TableName: FOLLOWS_TABLE,
+              KeyConditionExpression: 'pk = :p',
+              ExpressionAttributeValues: { ':p': userId },
+              ConsistentRead: true,
+            }));
+
+            for (const follow of (followingResult.Items || [])) {
+              await ddb.send(new DeleteCommand({
+                TableName: FOLLOWS_TABLE,
+                Key: { pk: follow.pk, sk: follow.sk },
+              }));
+            }
+
+            // Delete users following this user
+            const followersResult = await ddb.send(new ScanCommand({
+              TableName: FOLLOWS_TABLE,
+              FilterExpression: 'sk = :sk',
+              ExpressionAttributeValues: { ':sk': userId },
+              ConsistentRead: true,
+            }));
+
+            for (const follower of (followersResult.Items || [])) {
+              await ddb.send(new DeleteCommand({
+                TableName: FOLLOWS_TABLE,
+                Key: { pk: follower.pk, sk: follower.sk },
+              }));
+            }
+            console.log(`[DELETE /me] Deleted follow relationships`);
+          }
+        } catch (e) {
+          console.error('[DELETE /me] Failed to delete follows:', e);
+        }
+
+        // 5. Delete all notifications (both sent to user and from user)
+        console.log(`[DELETE /me] Deleting notifications for user ${userId}`);
+        try {
+          if (NOTIFICATIONS_TABLE) {
+            // Delete notifications sent TO this user
+            const notificationsResult = await ddb.send(new QueryCommand({
+              TableName: NOTIFICATIONS_TABLE,
+              KeyConditionExpression: 'pk = :p',
+              ExpressionAttributeValues: { ':p': `USER#${userId}` },
+              ConsistentRead: true,
+            }));
+
+            for (const notification of (notificationsResult.Items || [])) {
+              await ddb.send(new DeleteCommand({
+                TableName: NOTIFICATIONS_TABLE,
+                Key: { pk: notification.pk, sk: notification.sk },
+              }));
+            }
+
+            // Delete notifications sent FROM this user to others
+            const sentNotificationsResult = await ddb.send(new ScanCommand({
+              TableName: NOTIFICATIONS_TABLE,
+              FilterExpression: 'fromUserId = :uid',
+              ExpressionAttributeValues: { ':uid': userId },
+              ConsistentRead: true,
+            }));
+
+            for (const notification of (sentNotificationsResult.Items || [])) {
+              await ddb.send(new DeleteCommand({
+                TableName: NOTIFICATIONS_TABLE,
+                Key: { pk: notification.pk, sk: notification.sk },
+              }));
+            }
+            console.log(`[DELETE /me] Deleted notifications`);
+          }
+        } catch (e) {
+          console.error('[DELETE /me] Failed to delete notifications:', e);
+        }
+
+        // 6. Delete all invites created by user
+        console.log(`[DELETE /me] Deleting invites for user ${userId}`);
+        try {
+          if (INVITES_TABLE) {
+            // Query using GSI if available, otherwise scan
+            try {
+              const invitesResult = await ddb.send(new QueryCommand({
+                TableName: INVITES_TABLE,
+                IndexName: 'byUserId',
+                KeyConditionExpression: 'userId = :uid',
+                ExpressionAttributeValues: { ':uid': userId },
+              }));
+
+              for (const invite of (invitesResult.Items || [])) {
+                await ddb.send(new DeleteCommand({
+                  TableName: INVITES_TABLE,
+                  Key: { code: invite.code },
+                }));
+              }
+              console.log(`[DELETE /me] Deleted ${(invitesResult.Items || []).length} invites`);
+            } catch (e) {
+              // Fallback to scan if GSI not available
+              console.log('[DELETE /me] GSI not available, using scan for invites');
+              const invitesResult = await ddb.send(new ScanCommand({
+                TableName: INVITES_TABLE,
+                FilterExpression: 'userId = :uid',
+                ExpressionAttributeValues: { ':uid': userId },
+                ConsistentRead: true,
+              }));
+
+              for (const invite of (invitesResult.Items || [])) {
+                await ddb.send(new DeleteCommand({
+                  TableName: INVITES_TABLE,
+                  Key: { code: invite.code },
+                }));
+              }
+              console.log(`[DELETE /me] Deleted ${(invitesResult.Items || []).length} invites (via scan)`);
+            }
+          }
+        } catch (e) {
+          console.error('[DELETE /me] Failed to delete invites:', e);
+        }
+
+        // 7. Delete user records from users table
+        console.log(`[DELETE /me] Deleting user records for user ${userId}`);
+        try {
+          // Delete USER# record
+          await ddb.send(new DeleteCommand({
+            TableName: USERS_TABLE,
+            Key: { pk: `USER#${userId}` },
+          }));
+
+          // Delete HANDLE# record if user has a handle
+          if (userHandle) {
+            await ddb.send(new DeleteCommand({
+              TableName: USERS_TABLE,
+              Key: { pk: `HANDLE#${userHandle}` },
+            }));
+          }
+          console.log(`[DELETE /me] Deleted user records`);
+        } catch (e) {
+          console.error('[DELETE /me] Failed to delete user records:', e);
+        }
+
+        // 8. Delete user from Cognito
+        console.log(`[DELETE /me] Deleting user from Cognito: ${userId}`);
+        try {
+          if (USER_POOL_ID) {
+            await cognito.send(new AdminDeleteUserCommand({
+              UserPoolId: USER_POOL_ID,
+              Username: userId,
+            }));
+            console.log(`[DELETE /me] Deleted user from Cognito`);
+          } else {
+            console.warn('[DELETE /me] USER_POOL_ID not set, skipping Cognito deletion');
+          }
+        } catch (e) {
+          console.error('[DELETE /me] Failed to delete user from Cognito:', e);
+          // Continue even if Cognito deletion fails
+        }
+
+        console.log(`[DELETE /me] Account deletion completed for user ${userId}`);
+        return ok({ success: true, message: 'Account deleted successfully' });
+
+      } catch (err) {
+        console.error('[DELETE /me] Error during account deletion:', err);
+        return bad('Failed to delete account', 500);
+      }
     }
 
   // GET /posts/{id}/comments

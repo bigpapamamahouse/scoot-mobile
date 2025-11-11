@@ -774,3 +774,19 @@ export async function unfollowUser(handle: string) {
   console.error('[API] All unfollow attempts failed:', lastError);
   throw lastError;
 }
+
+export async function deleteAccount() {
+  console.log('[deleteAccount] Sending DELETE /me request');
+
+  try {
+    const result = await api('/me', {
+      method: 'DELETE',
+    });
+
+    console.log('[deleteAccount] Account deletion successful:', result);
+    return result;
+  } catch (err: any) {
+    console.error('[deleteAccount] Account deletion failed:', err);
+    throw err;
+  }
+}
