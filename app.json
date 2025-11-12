@@ -5,9 +5,9 @@
     "scheme": "scooterbooter",
     "version": "0.1.0",
     "orientation": "portrait",
-    "icon": "./assets/scoot.png",
+    "icon": "./assets/icon.png",
     "splash": {
-      "image": "./assets/scoot.png",
+      "image": "./assets/icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
