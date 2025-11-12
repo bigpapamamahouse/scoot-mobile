@@ -18,7 +18,8 @@
     },
     "production": {
       "ios": {
-        "simulator": false
+        "simulator": false,
+        "image": "latest"
       }
     }
   },
