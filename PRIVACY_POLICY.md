@@ -1,6 +1,6 @@
 # Privacy Policy for ScooterBooter
 
-**Last Updated:** November 9, 2025
+**Last Updated:** November 18, 2025
 
 ## Introduction
 
@@ -111,11 +111,12 @@ However, no method of transmission over the internet or electronic storage is 10
 
 We retain your information for as long as your account is active or as needed to provide you services. Specifically:
 
-- **Account Data:** Retained until you delete your account
-- **Posts and Comments:** Retained until you delete them
+- **Account Data:** Retained until you delete your account through the App settings. Upon account deletion, all your data is immediately and permanently removed from our active systems.
+- **Posts and Comments:** Retained until you delete them individually, or until you delete your account (which removes all posts and comments)
 - **Authentication Tokens:** Automatically refreshed and cleared when you sign out
 - **Local Cache:** Automatically cleared every 5 minutes and when you sign out
-- **Notification History:** Retained for your reference; older notifications may be purged
+- **Notification History:** Retained for your reference; older notifications may be purged. All notifications are deleted when you delete your account.
+- **Backup Data:** Deleted data may remain in system backups for a limited period (typically 30-90 days) for disaster recovery purposes, but will not be accessible or used
 
 ## 6. Your Privacy Rights and Choices
 
@@ -129,7 +130,26 @@ You can delete your posts and comments at any time through the App.
 
 ### 6.3 Account Deletion
 
-You may request deletion of your account by contacting us at [YOUR SUPPORT EMAIL]. Upon account deletion, we will remove your personal information from our systems, though some information may be retained in backups for a limited period.
+You can delete your account at any time directly from the App's Settings screen. When you delete your account:
+
+**What Gets Deleted Immediately:**
+- Your user profile (name, email, username, avatar)
+- All posts you've created
+- All comments you've made
+- All reactions you've given to posts
+- All follow relationships (users you follow and users who follow you)
+- All notifications associated with your account
+- All invite codes you've created
+- Your authentication credentials
+
+**Important Notes:**
+- Account deletion is **permanent and cannot be undone**
+- The deletion process happens immediately upon confirmation
+- Your content will no longer be visible to other users
+- You will be automatically signed out after deletion
+- Some data may be retained in system backups for a limited period (typically 30-90 days) for disaster recovery purposes, but will not be accessible or used
+
+If you have questions about account deletion, you can contact us at [YOUR SUPPORT EMAIL].
 
 ### 6.4 Push Notifications
 
