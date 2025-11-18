@@ -28,6 +28,11 @@ module.exports = {
     },
     android: {
       package: "com.scooterbooter.app"
+    },
+    extra: {
+      eas: {
+        projectId: "200cf867-218b-460c-8e41-3a7f31411cb4"
+      }
     }
   }
 };
