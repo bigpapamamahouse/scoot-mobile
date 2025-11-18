@@ -406,75 +406,100 @@ export default function ProfileScreen({ navigation, route }: any) {
 
         // Skip posts API call if we already have cached data
         if (!shouldSkipAPICall) {
-          const offset = pageNum * POSTS_PER_PAGE;
-          const postsData = await PostsAPI.getUserPosts({
-            handle: targetHandle,
-            userId: targetUserId,
-            limit: POSTS_PER_PAGE,
-            offset,
-          });
-          const normalizedPosts = resolvePosts(postsData);
-          const filteredPosts = filterPostsForUser(normalizedPosts, {
-            id: targetUserId,
-            handle: targetHandle,
-          });
-          // Only warn if we couldn't extract ANY posts from a non-array response
-          // (Empty filteredPosts after filtering is normal - user might not have posts)
-          if (!normalizedPosts.length && postsData && !Array.isArray(postsData)) {
-            console.warn('Unrecognized user posts response shape', postsData);
-          }
-
-          // Update posts state with append support and deduplication
-          if (append) {
-            setPosts((prev) => {
-              // Create a Set of existing post IDs for O(1) lookup
-              const existingIds = new Set(prev.map(p => p.id));
-              // Filter out any new posts that already exist
-              const uniqueNewPosts = filteredPosts.filter((post: Post) => !existingIds.has(post.id));
-              return [...prev, ...uniqueNewPosts];
+          try {
+            const offset = pageNum * POSTS_PER_PAGE;
+            const postsData = await PostsAPI.getUserPosts({
+              handle: targetHandle,
+              userId: targetUserId,
+              limit: POSTS_PER_PAGE,
+              offset,
             });
-          } else {
-            setPosts(filteredPosts);
-            // Cache the first page for instant loads
-            if (pageNum === 0 && filteredPosts.length > 0) {
-              cache.set(CacheKeys.userPosts(cacheIdentifier, 0), filteredPosts, CacheTTL.userPosts);
+            const normalizedPosts = resolvePosts(postsData);
+            const filteredPosts = filterPostsForUser(normalizedPosts, {
+              id: targetUserId,
+              handle: targetHandle,
+            });
+            // Only warn if we couldn't extract ANY posts from a non-array response
+            // (Empty filteredPosts after filtering is normal - user might not have posts)
+            if (!normalizedPosts.length && postsData && !Array.isArray(postsData)) {
+              console.warn('Unrecognized user posts response shape', postsData);
             }
-          }
 
-          // Check if there are more posts to load
-          setHasMore(filteredPosts.length >= POSTS_PER_PAGE);
+            // Update posts state with append support and deduplication
+            if (append) {
+              setPosts((prev) => {
+                // Create a Set of existing post IDs for O(1) lookup
+                const existingIds = new Set(prev.map(p => p.id));
+                // Filter out any new posts that already exist
+                const uniqueNewPosts = filteredPosts.filter((post: Post) => !existingIds.has(post.id));
+                return [...prev, ...uniqueNewPosts];
+              });
+            } else {
+              setPosts(filteredPosts);
+              // Cache the first page for instant loads
+              if (pageNum === 0 && filteredPosts.length > 0) {
+                cache.set(CacheKeys.userPosts(cacheIdentifier, 0), filteredPosts, CacheTTL.userPosts);
+              }
+            }
 
-          const derivedIdentity = deriveIdentityFromPosts(filteredPosts);
-          if (derivedIdentity) {
-            resolvedIdentity = {
-              ...(resolvedIdentity ?? {}),
-              ...derivedIdentity,
-              id: derivedIdentity.id ?? resolvedIdentity?.id ?? null,
-              handle: derivedIdentity.handle ?? resolvedIdentity?.handle ?? null,
-              avatarKey: derivedIdentity.avatarKey ?? resolvedIdentity?.avatarKey,
-              fullName: derivedIdentity.fullName ?? resolvedIdentity?.fullName,
-              email: derivedIdentity.email ?? resolvedIdentity?.email ?? null,
-            };
-          }
+            // Check if there are more posts to load
+            setHasMore(filteredPosts.length >= POSTS_PER_PAGE);
 
-          if (!resolvedIdentity && (targetHandle || targetUserId)) {
-            resolvedIdentity = {
-              id: targetUserId ?? null,
-              handle: targetHandle ?? null,
-            };
-          }
+            const derivedIdentity = deriveIdentityFromPosts(filteredPosts);
+            if (derivedIdentity) {
+              resolvedIdentity = {
+                ...(resolvedIdentity ?? {}),
+                ...derivedIdentity,
+                id: derivedIdentity.id ?? resolvedIdentity?.id ?? null,
+                handle: derivedIdentity.handle ?? resolvedIdentity?.handle ?? null,
+                avatarKey: derivedIdentity.avatarKey ?? resolvedIdentity?.avatarKey,
+                fullName: derivedIdentity.fullName ?? resolvedIdentity?.fullName,
+                email: derivedIdentity.email ?? resolvedIdentity?.email ?? null,
+              };
+            }
 
-          if (!resolvedIdentity && filteredPosts.length) {
-            resolvedIdentity = deriveIdentityFromPosts(filteredPosts);
-          }
+            if (!resolvedIdentity && (targetHandle || targetUserId)) {
+              resolvedIdentity = {
+                id: targetUserId ?? null,
+                handle: targetHandle ?? null,
+              };
+            }
 
-          const finalUserToSet = resolvedIdentity ?? targetIdentity ?? null;
-          setUser(finalUserToSet);
+            if (!resolvedIdentity && filteredPosts.length) {
+              resolvedIdentity = deriveIdentityFromPosts(filteredPosts);
+            }
 
-          // Cache user profile (only on first page load)
-          if (pageNum === 0 && finalUserToSet) {
-            const cacheIdentifier = finalUserToSet.id || finalUserToSet.handle || 'unknown';
-            cache.set(CacheKeys.userProfile(cacheIdentifier), finalUserToSet, CacheTTL.userProfile);
+            const finalUserToSet = resolvedIdentity ?? targetIdentity ?? null;
+            setUser(finalUserToSet);
+
+            // Cache user profile (only on first page load)
+            if (pageNum === 0 && finalUserToSet) {
+              const cacheIdentifier = finalUserToSet.id || finalUserToSet.handle || 'unknown';
+              cache.set(CacheKeys.userProfile(cacheIdentifier), finalUserToSet, CacheTTL.userProfile);
+            }
+          } catch (postsError: any) {
+            // If posts fail to load, log it but don't fail the entire profile load
+            // The profile can still display user info even without posts
+            console.warn('Failed to load user posts:', postsError?.message || String(postsError));
+
+            // Still set user identity even if posts fail
+            if (!resolvedIdentity && targetIdentity) {
+              resolvedIdentity = targetIdentity;
+            }
+            if (!resolvedIdentity && (targetHandle || targetUserId)) {
+              resolvedIdentity = {
+                id: targetUserId ?? null,
+                handle: targetHandle ?? null,
+              };
+            }
+            const finalUserToSet = resolvedIdentity ?? targetIdentity ?? null;
+            setUser(finalUserToSet);
+
+            // Set empty posts array
+            if (!append) {
+              setPosts([]);
+            }
+            setHasMore(false);
           }
         }
 
