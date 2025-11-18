@@ -57,7 +57,6 @@ We use the information we collect to:
 - **Provide and Maintain the Service:** Create and manage your account, authenticate your identity, and enable core app functionality
 - **Social Features:** Enable you to post content, comment, react to posts, follow other users, and receive notifications about social interactions
 - **Communications:** Send you push notifications about comments, reactions, mentions, and follow requests (with your permission)
-- **Improve the App:** Analyze usage patterns to improve app performance and user experience
 - **Security:** Protect against unauthorized access, fraud, and abuse
 - **Compliance:** Comply with legal obligations and enforce our Terms of Service
 
