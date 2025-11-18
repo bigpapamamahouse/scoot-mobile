@@ -19,7 +19,7 @@
     "production": {
       "ios": {
         "simulator": false,
-        "image": "latest"
+        "image": "stable"
       }
     }
   },
