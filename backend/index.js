@@ -30,6 +30,7 @@ const COMMENTS_TABLE  = process.env.COMMENTS_TABLE;   // pk: POST#<postId>, sk: 
 const REACTIONS_TABLE = process.env.REACTIONS_TABLE;  // pk: POST#<postId>, sk: COUNT#<emoji> (count item)
 //                                                    // pk: POST#<postId>, sk: USER#<userId>  (who reacted + emoji)
 const NOTIFICATIONS_TABLE = process.env.NOTIFICATIONS_TABLE; // NEW: pk USER#<targetId>, sk N#<ts>#<uuid>
+const PUSH_TOKENS_TABLE = process.env.PUSH_TOKENS_TABLE; // pk: USER#<userId>, sk: TOKEN#<tokenHash>
 const USER_POOL_ID = process.env.USER_POOL_ID;
 
 // ---------- Allowed origins for CORS ----------
@@ -163,6 +164,65 @@ async function createNotification(targetUserId, type, fromUserId, postId = null,
       createdAt: now,
     },
   }));
+
+  // NEW: Send push notification
+  try {
+    // Get sender's handle for personalized notification
+    let senderHandle = 'Someone';
+    try {
+      senderHandle = await getHandleForUserId(fromUserId) || 'Someone';
+    } catch (e) {
+      console.error('[Push] Failed to get sender handle:', e);
+    }
+
+    // Create notification title and body based on type
+    let title = 'New Notification';
+    let body = message;
+
+    switch (type) {
+      case 'comment':
+        title = `${senderHandle} commented`;
+        body = 'commented on your post';
+        break;
+      case 'reaction':
+        title = `${senderHandle} reacted`;
+        body = 'reacted to your post';
+        break;
+      case 'mention':
+        title = `${senderHandle} mentioned you`;
+        body = 'mentioned you';
+        break;
+      case 'follow':
+        title = `${senderHandle} followed you`;
+        body = 'started following you';
+        break;
+      case 'follow_request':
+        title = `${senderHandle} wants to follow you`;
+        body = 'sent you a follow request';
+        break;
+      case 'follow_accept':
+        title = `${senderHandle} accepted`;
+        body = 'accepted your follow request';
+        break;
+      case 'follow_declined':
+        title = `Follow request declined`;
+        body = `${senderHandle} declined your follow request`;
+        break;
+      default:
+        title = 'New Notification';
+        body = message || 'You have a new notification';
+    }
+
+    // Send push notification
+    await sendPushNotification(targetUserId, title, body, {
+      notificationId: id,
+      postId: postId || undefined,
+      type: type,
+    });
+  } catch (err) {
+    console.error('[Push] Failed to send push notification in createNotification:', err);
+    // Don't throw - notification was still created in DB
+  }
 }
 
 
@@ -231,6 +291,66 @@ async function hasNotification(targetUserId, type, fromUserId = null, postId = n
     }
   } catch (e) { console.error('hasNotification failed', e); }
   return false;
+}
+
+// NEW: Send push notification via Expo Push Service
+async function sendPushNotification(userId, title, body, data = {}) {
+  if (!PUSH_TOKENS_TABLE || !userId) return;
+
+  try {
+    // Get all push tokens for this user
+    const tokensQuery = await ddb.send(new QueryCommand({
+      TableName: PUSH_TOKENS_TABLE,
+      KeyConditionExpression: 'pk = :p',
+      ExpressionAttributeValues: { ':p': `USER#${userId}` },
+      ConsistentRead: true,
+    }));
+
+    const tokens = (tokensQuery.Items || []).map(item => item.token).filter(Boolean);
+
+    if (tokens.length === 0) {
+      console.log(`[Push] No tokens found for user ${userId}`);
+      return;
+    }
+
+    // Send push notification to each token via Expo Push Service
+    const messages = tokens.map(token => ({
+      to: token,
+      sound: 'default',
+      title: title,
+      body: body,
+      data: data,
+      priority: 'high',
+      channelId: 'default',
+    }));
+
+    // Send to Expo Push Service
+    const response = await fetch('https://exp.host/--/api/v2/push/send', {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Accept-Encoding': 'gzip, deflate',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(messages),
+    });
+
+    const result = await response.json();
+    console.log(`[Push] Sent to ${tokens.length} device(s) for user ${userId}:`, result);
+
+    // Handle receipts (optional - for production you'd want to track and handle errors)
+    if (result.data) {
+      for (let i = 0; i < result.data.length; i++) {
+        const receipt = result.data[i];
+        if (receipt.status === 'error') {
+          console.error(`[Push] Error sending to token ${tokens[i]}:`, receipt.message);
+          // In production, you might want to delete invalid tokens here
+        }
+      }
+    }
+  } catch (err) {
+    console.error('[Push] Failed to send push notification:', err);
+  }
 }
 
 // NEW: Generate or retrieve a unique invite code for a user
@@ -557,6 +677,42 @@ module.exports.handler = async (event) => {
       return ok({ items: enriched });
 
     }
+
+    // NEW: Register push token
+    if (route === 'POST /push/register') {
+      if (!userId) return bad('Unauthorized', 401);
+      if (!PUSH_TOKENS_TABLE) return bad('Push notifications not enabled', 501);
+
+      const body = JSON.parse(event.body || '{}');
+      const token = String(body.token || '').trim();
+      const platform = String(body.platform || 'ios').toLowerCase();
+
+      if (!token) return bad('Token required', 400);
+
+      // Create a hash of the token to use as sort key (for deduplication)
+      const tokenHash = crypto.createHash('sha256').update(token).digest('hex').slice(0, 16);
+
+      try {
+        await ddb.send(new PutCommand({
+          TableName: PUSH_TOKENS_TABLE,
+          Item: {
+            pk: `USER#${userId}`,
+            sk: `TOKEN#${platform}#${tokenHash}`,
+            token: token,
+            platform: platform,
+            registeredAt: Date.now(),
+            lastUsedAt: Date.now(),
+          },
+        }));
+
+        console.log(`[Push] Registered token for user ${userId} on ${platform}`);
+        return ok({ success: true, registered: true });
+      } catch (err) {
+        console.error('[Push] Failed to register token:', err);
+        return bad('Failed to register push token', 500);
+      }
+    }
+
     // Request to follow -> notify target user
     if (route === 'POST /follow-request') {
       if (!userId) return bad('Unauthorized', 401);
