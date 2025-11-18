@@ -19,6 +19,9 @@
         "NSCameraUsageDescription": "This app uses the camera to take photos for creating posts.",
         "NSPhotoLibraryUsageDescription": "This app needs access to your photo library to select photos for posts."
       },
+      "entitlements": {
+        "aps-environment": "production"
+      },
       "config": {
         "usesNonExemptEncryption": false
       }
