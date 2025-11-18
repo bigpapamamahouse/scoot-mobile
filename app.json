@@ -23,15 +23,6 @@
         "usesNonExemptEncryption": false
       }
     },
-    "plugins": [
-      [
-        "expo-notifications",
-        {
-          "icon": "./assets/icon.png",
-          "sounds": []
-        }
-      ]
-    ],
     "android": {
       "package": "com.scooterbooter.app"
     }
