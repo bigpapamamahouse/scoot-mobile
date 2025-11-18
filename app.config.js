@@ -28,16 +28,6 @@ module.exports = {
     },
     android: {
       package: "com.scooterbooter.app"
-    },
-    plugins: [
-      [
-        "expo-build-properties",
-        {
-          ios: {
-            deploymentTarget: "13.4"
-          }
-        }
-      ]
-    ]
+    }
   }
 };
