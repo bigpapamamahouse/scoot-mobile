@@ -211,14 +211,38 @@ export default function ClaimUsernameScreen({ route, navigation }: any) {
               <Text style={{ fontSize: 12, color: colors.text.secondary, marginBottom: 4, paddingLeft: 4 }}>
                 Username
               </Text>
-              <TextInput
-                placeholder="username"
-                placeholderTextColor={colors.text.tertiary}
-                autoCapitalize="none"
-                value={username}
-                onChangeText={setUsername}
-                style={inputStyle}
-              />
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  borderWidth: 1,
+                  borderColor: colors.border.main,
+                  borderRadius: 8,
+                  backgroundColor: colors.background.primary,
+                  paddingLeft: 12,
+                }}
+              >
+                <Text style={{ fontSize: 16, color: colors.text.secondary, marginRight: 4 }}>
+                  @
+                </Text>
+                <TextInput
+                  placeholder="username"
+                  placeholderTextColor={colors.text.tertiary}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  autoComplete="off"
+                  spellCheck={false}
+                  value={username}
+                  onChangeText={setUsername}
+                  style={{
+                    flex: 1,
+                    padding: 12,
+                    paddingLeft: 0,
+                    color: colors.text.primary,
+                    fontSize: 16,
+                  }}
+                />
+              </View>
             </View>
 
             {/* Full Name */}
