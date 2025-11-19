@@ -132,9 +132,19 @@ export default function ClaimUsernameScreen({ route, navigation }: any) {
 
           await updateAvatar(avatarKey);
           console.log('[ClaimUsername] Avatar set successfully');
-        } catch (uploadError) {
+        } catch (uploadError: any) {
           console.error('[ClaimUsername] Failed to upload/set avatar:', uploadError);
-          Alert.alert('Warning', 'Failed to upload profile picture. You can add it later from your profile.');
+          const errorMsg = uploadError?.message || String(uploadError);
+
+          // Check if this is a network/endpoint issue (backend doesn't have upload endpoints configured)
+          if (errorMsg.includes('Network request failed') || errorMsg.includes('endpoint not found')) {
+            console.warn('[ClaimUsername] Upload endpoints not configured on backend - skipping avatar');
+            // Silently skip avatar upload if backend doesn't support it yet
+            // User can add avatar later from their profile once backend is configured
+          } else {
+            // Show alert only for unexpected failures
+            Alert.alert('Warning', 'Failed to upload profile picture. You can add it later from your profile.');
+          }
           // Continue without avatar if upload fails
         }
       }
