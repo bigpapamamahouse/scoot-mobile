@@ -5,6 +5,7 @@
     "scheme": "scooterbooter",
     "version": "0.3.0",
     "orientation": "portrait",
+    "description": "Social media that respects your time and privacy. Connect with friends without ads, algorithms, or endless scrolling.",
     "icon": "./assets/icon.png",
     "splash": {
       "image": "./assets/icon.png",
