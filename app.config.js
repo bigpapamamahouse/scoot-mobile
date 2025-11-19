@@ -5,6 +5,7 @@ module.exports = {
     scheme: "scooterbooter",
     version: "0.2.0",
     orientation: "portrait",
+    userInterfaceStyle: "automatic",
     icon: "./assets/icon.png",
     splash: {
       image: "./assets/icon.png",
