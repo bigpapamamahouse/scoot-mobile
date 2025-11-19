@@ -134,7 +134,6 @@ export function SearchScreen({ navigation }: Props) {
           onChangeText={setQuery}
           autoFocus
           autoCapitalize="none"
-          autoCorrect={false}
         />
       </View>
 
