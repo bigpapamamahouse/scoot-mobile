@@ -148,7 +148,7 @@ You can delete your account at any time directly from the App's Settings screen.
 - You will be automatically signed out after deletion
 - Some data may be retained in system backups for a limited period (typically 30-90 days) for disaster recovery purposes, but will not be accessible or used
 
-If you have questions about account deletion, you can contact us at [YOUR SUPPORT EMAIL].
+If you have questions about account deletion, you can contact us at contactscoot@yahoo.com.
 
 ### 6.4 Push Notifications
 
@@ -179,11 +179,11 @@ Depending on your location, you may have the following rights:
 - Right to object to processing
 - Right to withdraw consent
 
-To exercise these rights, please contact us at [YOUR SUPPORT EMAIL].
+To exercise these rights, please contact us at contactscoot@yahoo.com.
 
 ## 7. Children's Privacy
 
-ScooterBooter is not intended for children under the age of 13. We do not knowingly collect personal information from children under 13. If you are a parent or guardian and believe your child has provided us with personal information, please contact us at [YOUR SUPPORT EMAIL], and we will delete such information from our systems.
+ScooterBooter is not intended for children under the age of 13. We do not knowingly collect personal information from children under 13. If you are a parent or guardian and believe your child has provided us with personal information, please contact us at contactscoot@yahoo.com, and we will delete such information from our systems.
 
 ## 8. International Data Transfers
 
@@ -210,8 +210,7 @@ Your continued use of the App after changes are posted constitutes your acceptan
 
 If you have any questions, concerns, or requests regarding this Privacy Policy or our privacy practices, please contact us at:
 
-**Email:** [YOUR SUPPORT EMAIL]
-**Address:** [YOUR BUSINESS ADDRESS]
+**Email:** contactscoot@yahoo.com
 
 ## 13. Apple App Store Privacy Requirements
 
