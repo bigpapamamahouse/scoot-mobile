@@ -166,6 +166,7 @@ export default function FeedScreen({ navigation }: any){
         initialNumToRender={10}
         windowSize={10}
         removeClippedSubviews={true}
+        keyboardShouldPersistTaps="handled"
         renderItem={({ item }) => (
           <PostCard
             post={item}
