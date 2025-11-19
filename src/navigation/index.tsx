@@ -71,6 +71,7 @@ function HeaderActions({ navigation }: { navigation: any }) {
               position: 'absolute',
               top: 8,
               right: 8,
+              pointerEvents: 'none',
             }}
           />
         )}
