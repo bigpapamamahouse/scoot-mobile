@@ -87,10 +87,37 @@ export default function ClaimUsernameScreen({ route, navigation }: any) {
           fullName: fullName.trim(),
         });
         console.log('[ClaimUsername] Profile updated successfully');
-      } catch (updateError) {
+      } catch (updateError: any) {
         console.error('[ClaimUsername] Failed to update profile:', updateError);
-        Alert.alert('Warning', 'Failed to update profile information');
-        // Continue anyway since they're signed in
+
+        // Check if this is a duplicate username error
+        const errorMessage = updateError?.message || String(updateError);
+        const isDuplicateUsername =
+          errorMessage.toLowerCase().includes('already exists') ||
+          errorMessage.toLowerCase().includes('already taken') ||
+          errorMessage.toLowerCase().includes('duplicate') ||
+          errorMessage.toLowerCase().includes('conflict') ||
+          errorMessage.includes('409');
+
+        if (isDuplicateUsername) {
+          // Username is already taken - show specific error and don't proceed
+          Alert.alert(
+            'Username Taken',
+            'This username is already taken. Please choose a different one.',
+            [{ text: 'OK' }]
+          );
+          setIsLoading(false);
+          return; // Don't navigate to Feed
+        } else {
+          // Other error - show generic error and don't proceed
+          Alert.alert(
+            'Error',
+            `Failed to update profile: ${errorMessage}`,
+            [{ text: 'OK' }]
+          );
+          setIsLoading(false);
+          return; // Don't navigate to Feed
+        }
       }
 
       // Upload and set avatar if provided
@@ -107,12 +134,12 @@ export default function ClaimUsernameScreen({ route, navigation }: any) {
           console.log('[ClaimUsername] Avatar set successfully');
         } catch (uploadError) {
           console.error('[ClaimUsername] Failed to upload/set avatar:', uploadError);
-          Alert.alert('Warning', 'Failed to upload profile picture');
+          Alert.alert('Warning', 'Failed to upload profile picture. You can add it later from your profile.');
           // Continue without avatar if upload fails
         }
       }
 
-      // Navigate to the main app
+      // Navigate to the main app only if profile update succeeded
       navigation.reset({ index: 0, routes: [{ name: 'Feed' }] });
     } catch (e: any) {
       Alert.alert('Error', e?.message || String(e));
