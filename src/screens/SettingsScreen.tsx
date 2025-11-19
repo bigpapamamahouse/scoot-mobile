@@ -329,7 +329,7 @@ export default function SettingsScreen({ navigation }: any) {
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background.secondary }]} edges={['bottom']}>
-      <ScrollView contentContainerStyle={styles.container}>
+      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
         <Text style={[styles.title, { color: colors.text.primary }]}>Settings</Text>
 
         <View style={styles.section}>

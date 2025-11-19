@@ -150,6 +150,7 @@ export function SearchScreen({ navigation }: Props) {
         keyExtractor={(item) => item.id || item.handle || Math.random().toString()}
         contentContainerStyle={styles.listContainer}
         ListEmptyComponent={renderEmptyState}
+        keyboardShouldPersistTaps="handled"
       />
     </SafeAreaView>
   );
