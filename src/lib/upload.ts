@@ -219,20 +219,57 @@ async function performDescriptorUpload(
       blobSize: blob.size,
     });
 
-    const uploadResponse = await fetch(descriptor.uploadUrl, {
-      method: descriptor.method || 'PUT',
-      headers: uploadHeaders,
-      body: blob,
-    });
+    // Retry S3 upload up to 3 times with exponential backoff
+    let uploadResponse: Response | null = null;
+    let lastError: Error | null = null;
+    const maxRetries = 3;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`[performDescriptorUpload] Upload attempt ${attempt}/${maxRetries}`);
+
+        // Add timeout to prevent hanging
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
+        uploadResponse = await fetch(descriptor.uploadUrl, {
+          method: descriptor.method || 'PUT',
+          headers: uploadHeaders,
+          body: blob,
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
+        if (uploadResponse.ok) {
+          console.log('[performDescriptorUpload] S3 upload successful on attempt', attempt);
+          break; // Success!
+        }
+
+        // If not ok but we got a response, don't retry (it's a server error)
+        lastError = new Error(`HTTP ${uploadResponse.status}: ${uploadResponse.statusText}`);
+        console.warn(`[performDescriptorUpload] S3 upload failed with HTTP ${uploadResponse.status}`);
+        break; // Don't retry on HTTP errors
+
+      } catch (error: any) {
+        lastError = error;
+        console.warn(`[performDescriptorUpload] Attempt ${attempt} failed:`, error.message);
+
+        // If it's a network error and we have retries left, wait and retry
+        if (attempt < maxRetries) {
+          const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000); // 1s, 2s, 4s
+          console.log(`[performDescriptorUpload] Retrying in ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
+    }
+
+    if (!uploadResponse || !uploadResponse.ok) {
+      const errorMsg = lastError?.message || 'Upload failed after retries';
+      throw new Error(`S3 upload failed: ${errorMsg}`);
+    }
 
     console.log('[performDescriptorUpload] S3 upload response:', uploadResponse.status, uploadResponse.statusText);
-
-    if (!uploadResponse.ok) {
-      const text = await uploadResponse.text().catch(() => '');
-      throw new Error(
-        text ? `Storage upload failed: ${text}` : `Storage upload failed: HTTP ${uploadResponse.status}`
-      );
-    }
   }
 
   if (!finalKey) {

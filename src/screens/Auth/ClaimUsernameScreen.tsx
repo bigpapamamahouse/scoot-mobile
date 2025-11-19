@@ -87,10 +87,37 @@ export default function ClaimUsernameScreen({ route, navigation }: any) {
           fullName: fullName.trim(),
         });
         console.log('[ClaimUsername] Profile updated successfully');
-      } catch (updateError) {
+      } catch (updateError: any) {
         console.error('[ClaimUsername] Failed to update profile:', updateError);
-        Alert.alert('Warning', 'Failed to update profile information');
-        // Continue anyway since they're signed in
+
+        // Check if this is a duplicate username error
+        const errorMessage = updateError?.message || String(updateError);
+        const isDuplicateUsername =
+          errorMessage.toLowerCase().includes('already exists') ||
+          errorMessage.toLowerCase().includes('already taken') ||
+          errorMessage.toLowerCase().includes('duplicate') ||
+          errorMessage.toLowerCase().includes('conflict') ||
+          errorMessage.includes('409');
+
+        if (isDuplicateUsername) {
+          // Username is already taken - show specific error and don't proceed
+          Alert.alert(
+            'Username Taken',
+            'This username is already taken. Please choose a different one.',
+            [{ text: 'OK' }]
+          );
+          setIsLoading(false);
+          return; // Don't navigate to Feed
+        } else {
+          // Other error - show generic error and don't proceed
+          Alert.alert(
+            'Error',
+            `Failed to update profile: ${errorMessage}`,
+            [{ text: 'OK' }]
+          );
+          setIsLoading(false);
+          return; // Don't navigate to Feed
+        }
       }
 
       // Upload and set avatar if provided
@@ -105,14 +132,24 @@ export default function ClaimUsernameScreen({ route, navigation }: any) {
 
           await updateAvatar(avatarKey);
           console.log('[ClaimUsername] Avatar set successfully');
-        } catch (uploadError) {
+        } catch (uploadError: any) {
           console.error('[ClaimUsername] Failed to upload/set avatar:', uploadError);
-          Alert.alert('Warning', 'Failed to upload profile picture');
+          const errorMsg = uploadError?.message || String(uploadError);
+
+          // Check if this is a network/endpoint issue (backend doesn't have upload endpoints configured)
+          if (errorMsg.includes('Network request failed') || errorMsg.includes('endpoint not found')) {
+            console.warn('[ClaimUsername] Upload endpoints not configured on backend - skipping avatar');
+            // Silently skip avatar upload if backend doesn't support it yet
+            // User can add avatar later from their profile once backend is configured
+          } else {
+            // Show alert only for unexpected failures
+            Alert.alert('Warning', 'Failed to upload profile picture. You can add it later from your profile.');
+          }
           // Continue without avatar if upload fails
         }
       }
 
-      // Navigate to the main app
+      // Navigate to the main app only if profile update succeeded
       navigation.reset({ index: 0, routes: [{ name: 'Feed' }] });
     } catch (e: any) {
       Alert.alert('Error', e?.message || String(e));
@@ -184,14 +221,38 @@ export default function ClaimUsernameScreen({ route, navigation }: any) {
               <Text style={{ fontSize: 12, color: colors.text.secondary, marginBottom: 4, paddingLeft: 4 }}>
                 Username
               </Text>
-              <TextInput
-                placeholder="username"
-                placeholderTextColor={colors.text.tertiary}
-                autoCapitalize="none"
-                value={username}
-                onChangeText={setUsername}
-                style={inputStyle}
-              />
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  borderWidth: 1,
+                  borderColor: colors.border.main,
+                  borderRadius: 8,
+                  backgroundColor: colors.background.primary,
+                  paddingLeft: 12,
+                }}
+              >
+                <Text style={{ fontSize: 16, color: colors.text.secondary, marginRight: 4 }}>
+                  @
+                </Text>
+                <TextInput
+                  placeholder="username"
+                  placeholderTextColor={colors.text.tertiary}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  autoComplete="off"
+                  spellCheck={false}
+                  value={username}
+                  onChangeText={setUsername}
+                  style={{
+                    flex: 1,
+                    padding: 12,
+                    paddingLeft: 0,
+                    color: colors.text.primary,
+                    fontSize: 16,
+                  }}
+                />
+              </View>
             </View>
 
             {/* Full Name */}
