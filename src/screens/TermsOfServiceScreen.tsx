@@ -14,7 +14,7 @@ import { api } from '../api/client';
 export default function TermsOfServiceScreen({ navigation }: any) {
   const [agreed, setAgreed] = useState(false);
   const [loading, setLoading] = useState(false);
-  const { refreshCurrentUser } = useCurrentUser();
+  const { refreshUser } = useCurrentUser();
 
   const handleAccept = async () => {
     setLoading(true);
@@ -22,7 +22,7 @@ export default function TermsOfServiceScreen({ navigation }: any) {
       await api('/me/accept-terms', {
         method: 'POST',
       });
-      await refreshCurrentUser();
+      await refreshUser();
       navigation.replace('Main');
     } catch (error) {
       console.error('Error accepting terms:', error);
