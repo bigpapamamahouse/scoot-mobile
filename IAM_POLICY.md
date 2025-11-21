@@ -6,6 +6,8 @@ This document contains the IAM policy you need to add to your Lambda execution r
 
 ## Complete IAM Policy (Copy-Paste Ready)
 
+**Note**: This policy uses **Claude Sonnet 4** since it's already enabled in your account. If you want to use the cheaper Claude 3 Haiku instead, request access in Bedrock console and change the model ARN.
+
 Replace the following placeholders:
 - `YOUR_AWS_ACCOUNT_ID` - Your AWS account ID (e.g., 123456789012)
 - `YOUR_AWS_REGION` - Your AWS region (e.g., us-east-1)
@@ -23,7 +25,7 @@ Replace the following placeholders:
         "bedrock:InvokeModelWithResponseStream"
       ],
       "Resource": [
-        "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-3-haiku-20240307-v1:0"
+        "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-sonnet-4-20250514-v1:0"
       ]
     },
     {
@@ -83,7 +85,7 @@ cat > lambda-moderation-policy.json << 'EOF'
         "bedrock:InvokeModelWithResponseStream"
       ],
       "Resource": [
-        "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-3-haiku-20240307-v1:0"
+        "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-sonnet-4-20250514-v1:0"
       ]
     },
     {
@@ -124,6 +126,23 @@ aws iam put-role-policy \
 ## Minimal Policy (Bedrock Only)
 
 If you only want to add Bedrock access and handle DynamoDB separately:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": "bedrock:InvokeModel",
+      "Resource": "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-sonnet-4-20250514-v1:0"
+    }
+  ]
+}
+```
+
+### Alternative: Use Cheaper Claude 3 Haiku (12x cheaper!)
+
+If you request access to Claude 3 Haiku in Bedrock console:
 
 ```json
 {
@@ -187,7 +206,7 @@ Here's an example with placeholder values filled in:
         "bedrock:InvokeModelWithResponseStream"
       ],
       "Resource": [
-        "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-3-haiku-20240307-v1:0"
+        "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-sonnet-4-20250514-v1:0"
       ]
     },
     {
