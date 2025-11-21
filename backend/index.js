@@ -293,25 +293,39 @@ async function moderateContent(text, imageKey = null) {
 
     // Add text prompt
     const prompt = imageKey
-      ? `You are a content moderation system. Analyze the provided content (text and/or image) and determine if it contains:
-- Pornographic or sexually explicit content
+      ? `You are a content moderation system. Analyze the provided content (text and/or image) and flag ONLY if it contains:
+
+BLOCK if it contains:
+- Pornographic or sexually explicit imagery
 - Graphic violence, gore, or disturbing imagery
-- Hate speech or discrimination
-- Harassment, bullying, or threats
-- Spam or fraudulent content
-- Illegal activities or dangerous behavior
+- Hate speech targeting protected groups (race, religion, ethnicity, gender, sexual orientation, disability)
+- Direct threats or harassment targeting specific individuals
+- Content promoting illegal activities (terrorism, child exploitation, drug trafficking)
+
+ALLOW (do not block):
+- Casual profanity or strong language (e.g., "fuck", "shit", "damn") when not directed at groups or individuals
+- Political opinions or criticism (even if heated)
+- Edgy humor that doesn't target protected groups
+- General complaints or frustration
 
 ${text ? `Text: "${text}"` : 'No text provided - analyze the image only.'}
 
 Respond ONLY with a JSON object in this exact format:
 {"safe": true/false, "reason": "brief explanation if unsafe, null if safe"}`
-      : `You are a content moderation system. Analyze the following text and determine if it contains:
+      : `You are a content moderation system. Analyze the following text and flag ONLY if it contains:
+
+BLOCK if it contains:
 - Pornographic or sexually explicit content
-- Graphic violence, gore, or disturbing imagery
-- Hate speech or discrimination
-- Harassment, bullying, or threats
-- Spam or fraudulent content
-- Illegal activities or dangerous behavior
+- Graphic descriptions of violence or gore
+- Hate speech targeting protected groups (race, religion, ethnicity, gender, sexual orientation, disability)
+- Direct threats or harassment targeting specific individuals
+- Content promoting illegal activities (terrorism, child exploitation, drug trafficking)
+
+ALLOW (do not block):
+- Casual profanity or strong language (e.g., "fuck", "shit", "damn") when not directed at groups or individuals
+- Political opinions or criticism (even if heated)
+- Edgy humor that doesn't target protected groups
+- General complaints or frustration
 
 Text to analyze: "${text}"
 
