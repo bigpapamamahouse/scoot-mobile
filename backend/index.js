@@ -359,26 +359,39 @@ Respond ONLY with a JSON object in this exact format:
 
         console.log(`[Moderation] Image fetched, size: ${imageBuffer.length} bytes`);
 
-        // Determine media type from S3 ContentType header or key extension
-        let mediaType = s3Response.ContentType;
+        // Determine and normalize media type to Bedrock's strict requirements
+        // Bedrock only accepts: image/jpeg, image/png, image/gif, image/webp
+        let mediaType = 'image/jpeg'; // Default
 
-        // Fallback: try to determine from key extension
-        if (!mediaType || mediaType === 'application/octet-stream') {
-          const keyLower = imageKey.toLowerCase();
-          if (keyLower.includes('.jpg') || keyLower.includes('.jpeg')) {
+        // First check S3 ContentType
+        const s3ContentType = s3Response.ContentType?.toLowerCase();
+        console.log(`[Moderation] S3 ContentType: ${s3ContentType}`);
+
+        if (s3ContentType) {
+          if (s3ContentType.includes('png')) {
+            mediaType = 'image/png';
+          } else if (s3ContentType.includes('gif')) {
+            mediaType = 'image/gif';
+          } else if (s3ContentType.includes('webp')) {
+            mediaType = 'image/webp';
+          } else if (s3ContentType.includes('jpeg') || s3ContentType.includes('jpg')) {
             mediaType = 'image/jpeg';
-          } else if (keyLower.includes('.png')) {
+          }
+        }
+
+        // Fallback: check image key for extension hints
+        if (mediaType === 'image/jpeg') {
+          const keyLower = imageKey.toLowerCase();
+          if (keyLower.includes('.png')) {
             mediaType = 'image/png';
           } else if (keyLower.includes('.gif')) {
             mediaType = 'image/gif';
           } else if (keyLower.includes('.webp')) {
             mediaType = 'image/webp';
-          } else {
-            mediaType = 'image/jpeg'; // Default to JPEG
           }
         }
 
-        console.log(`[Moderation] Image media type: ${mediaType}`);
+        console.log(`[Moderation] Normalized media type: ${mediaType}`);
 
         contentParts.push({
           type: "image",
