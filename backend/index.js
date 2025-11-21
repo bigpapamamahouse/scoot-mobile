@@ -15,7 +15,7 @@ const {
   BatchGetCommand,
 } = require('@aws-sdk/lib-dynamodb');
 
-const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
+const { S3Client, PutObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 
 const { CognitoIdentityProviderClient, AdminDeleteUserCommand } = require('@aws-sdk/client-cognito-identity-provider');
@@ -278,16 +278,34 @@ async function deleteNotifications(targetUserId, type, fromUserId = null, postId
 // ---------- Content Moderation with Amazon Bedrock ----------
 
 /**
- * Moderate content using Amazon Bedrock
+ * Moderate content using Amazon Bedrock (text and/or image)
  * Returns { safe: boolean, reason: string }
  */
-async function moderateContent(text) {
-  if (!text || typeof text !== 'string') {
+async function moderateContent(text, imageKey = null) {
+  // Must have at least text or image
+  if ((!text || typeof text !== 'string') && !imageKey) {
     return { safe: true, reason: null };
   }
 
   try {
-    const prompt = `You are a content moderation system. Analyze the following text and determine if it contains:
+    // Build content array for multimodal input
+    const contentParts = [];
+
+    // Add text prompt
+    const prompt = imageKey
+      ? `You are a content moderation system. Analyze the provided content (text and/or image) and determine if it contains:
+- Pornographic or sexually explicit content
+- Graphic violence, gore, or disturbing imagery
+- Hate speech or discrimination
+- Harassment, bullying, or threats
+- Spam or fraudulent content
+- Illegal activities or dangerous behavior
+
+${text ? `Text: "${text}"` : 'No text provided - analyze the image only.'}
+
+Respond ONLY with a JSON object in this exact format:
+{"safe": true/false, "reason": "brief explanation if unsafe, null if safe"}`
+      : `You are a content moderation system. Analyze the following text and determine if it contains:
 - Pornographic or sexually explicit content
 - Graphic violence, gore, or disturbing imagery
 - Hate speech or discrimination
@@ -300,12 +318,60 @@ Text to analyze: "${text}"
 Respond ONLY with a JSON object in this exact format:
 {"safe": true/false, "reason": "brief explanation if unsafe, null if safe"}`;
 
+    contentParts.push({
+      type: "text",
+      text: prompt
+    });
+
+    // Add image if provided
+    if (imageKey) {
+      try {
+        // Fetch image from S3
+        const getCommand = new GetObjectCommand({
+          Bucket: MEDIA_BUCKET,
+          Key: imageKey
+        });
+        const s3Response = await s3.send(getCommand);
+
+        // Convert stream to buffer
+        const chunks = [];
+        for await (const chunk of s3Response.Body) {
+          chunks.push(chunk);
+        }
+        const imageBuffer = Buffer.concat(chunks);
+        const base64Image = imageBuffer.toString('base64');
+
+        // Determine media type from key extension
+        const ext = imageKey.split('.').pop().toLowerCase();
+        const mediaTypeMap = {
+          'jpg': 'image/jpeg',
+          'jpeg': 'image/jpeg',
+          'png': 'image/png',
+          'gif': 'image/gif',
+          'webp': 'image/webp'
+        };
+        const mediaType = mediaTypeMap[ext] || 'image/jpeg';
+
+        contentParts.push({
+          type: "image",
+          source: {
+            type: "base64",
+            media_type: mediaType,
+            data: base64Image
+          }
+        });
+      } catch (imageError) {
+        console.error('[Moderation] Failed to fetch image from S3:', imageError);
+        // Continue with text-only moderation if image fetch fails
+      }
+    }
+
     const payload = {
       anthropic_version: "bedrock-2023-05-31",
       max_tokens: 200,
       messages: [{
         role: "user",
-        content: prompt
+        content: contentParts
       }]
     };
 
@@ -2104,9 +2170,10 @@ module.exports.handler = async (event) => {
       if (!userId) return bad('Unauthorized', 401);
       const body = JSON.parse(event.body || '{}');
 
-      // Moderate content using Amazon Bedrock
+      // Moderate content using Amazon Bedrock (text and image)
       const textContent = String(body.text || '').slice(0, 500);
-      const moderation = await moderateContent(textContent);
+      const imageKey = body.imageKey || null;
+      const moderation = await moderateContent(textContent, imageKey);
       if (!moderation.safe) {
         console.log(`[Moderation] Post blocked for user ${userId}: ${moderation.reason}`);
         return bad(`Content blocked: ${moderation.reason || 'Content violates our community guidelines'}`, 403);
