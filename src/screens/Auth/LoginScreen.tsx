@@ -3,6 +3,7 @@ import { View, Text, TextInput, Button, Alert, KeyboardAvoidingView, Platform, S
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { signInFn, checkAuthStatus } from '../../api/auth';
 import { useTheme } from '../../theme/ThemeContext';
+import { UsersAPI } from '../../api';
 
 export default function LoginScreen({ navigation }: any) {
   const { colors } = useTheme();
@@ -12,10 +13,22 @@ export default function LoginScreen({ navigation }: any) {
 
   // Check if user is already authenticated when component mounts
   React.useEffect(() => {
-    checkAuthStatus().then(isAuthenticated => {
+    checkAuthStatus().then(async (isAuthenticated) => {
       if (isAuthenticated) {
-        console.log('User already authenticated, navigating to Feed');
-        navigation.reset({ index: 0, routes: [{ name: 'Feed' }] });
+        console.log('User already authenticated, checking TOS acceptance');
+        try {
+          const user = await UsersAPI.me();
+          if (!(user as any)?.termsAccepted) {
+            console.log('User has not accepted TOS, navigating to TermsOfService');
+            navigation.reset({ index: 0, routes: [{ name: 'TermsOfService' }] });
+          } else {
+            console.log('User authenticated and TOS accepted, navigating to Feed');
+            navigation.reset({ index: 0, routes: [{ name: 'Feed' }] });
+          }
+        } catch (error) {
+          console.error('Error checking user TOS status:', error);
+          setChecking(false);
+        }
       } else {
         setChecking(false);
       }
@@ -37,7 +50,18 @@ export default function LoginScreen({ navigation }: any) {
     const r = await signInFn(user.trim(), pass);
     switch (r.status) {
       case 'SIGNED_IN':
-        navigation.reset({ index: 0, routes: [{ name: 'Feed' }] });
+        // Check if user has accepted terms of service
+        try {
+          const userData = await UsersAPI.me();
+          if (!(userData as any)?.termsAccepted) {
+            navigation.reset({ index: 0, routes: [{ name: 'TermsOfService' }] });
+          } else {
+            navigation.reset({ index: 0, routes: [{ name: 'Feed' }] });
+          }
+        } catch (error) {
+          console.error('Error checking user TOS status:', error);
+          navigation.reset({ index: 0, routes: [{ name: 'Feed' }] });
+        }
         return;
       case 'NEEDS_CONFIRMATION':
         Alert.alert('Confirm your account', 'We sent you a code by email.');

@@ -15,10 +15,12 @@ const {
   BatchGetCommand,
 } = require('@aws-sdk/lib-dynamodb');
 
-const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
+const { S3Client, PutObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 
 const { CognitoIdentityProviderClient, AdminDeleteUserCommand } = require('@aws-sdk/client-cognito-identity-provider');
+
+const { BedrockRuntimeClient, InvokeModelCommand } = require('@aws-sdk/client-bedrock-runtime');
 
 // ---------- Env ----------
 const POSTS_TABLE     = process.env.POSTS_TABLE;
@@ -31,6 +33,8 @@ const REACTIONS_TABLE = process.env.REACTIONS_TABLE;  // pk: POST#<postId>, sk: 
 //                                                    // pk: POST#<postId>, sk: USER#<userId>  (who reacted + emoji)
 const NOTIFICATIONS_TABLE = process.env.NOTIFICATIONS_TABLE; // NEW: pk USER#<targetId>, sk N#<ts>#<uuid>
 const PUSH_TOKENS_TABLE = process.env.PUSH_TOKENS_TABLE; // pk: USER#<userId>, sk: TOKEN#<tokenHash>
+const REPORTS_TABLE = process.env.REPORTS_TABLE; // pk: REPORT#<reportId>, sk: <timestamp>
+const BLOCKS_TABLE = process.env.BLOCKS_TABLE; // pk: USER#<userId>, sk: BLOCKED#<blockedUserId>
 const USER_POOL_ID = process.env.USER_POOL_ID;
 
 // ---------- Allowed origins for CORS ----------
@@ -56,6 +60,7 @@ const ddb = DynamoDBDocumentClient.from(ddbClient, {
 });
 const s3 = new S3Client({});
 const cognito = new CognitoIdentityProviderClient({});
+const bedrock = new BedrockRuntimeClient({ region: 'us-east-1' });
 
 // ---------- CORS + response helpers ----------
 
@@ -267,6 +272,247 @@ async function deleteNotifications(targetUserId, type, fromUserId = null, postId
     }
   } catch (e) {
     console.error('deleteNotifications query failed', e);
+  }
+}
+
+// ---------- Content Moderation with Amazon Bedrock ----------
+
+/**
+ * Moderate content using Amazon Bedrock (text and/or image)
+ * Returns { safe: boolean, reason: string }
+ */
+async function moderateContent(text, imageKey = null) {
+  // Must have at least text or image
+  if ((!text || typeof text !== 'string') && !imageKey) {
+    return { safe: true, reason: null };
+  }
+
+  try {
+    // Build content array for multimodal input
+    const contentParts = [];
+
+    // Add text prompt
+    const prompt = imageKey
+      ? `You are a strict content moderation system for a social media app. Your job is to protect users from harmful content.
+
+Analyze the provided image and/or text. You MUST block content if it contains ANY of the following:
+
+BLOCK IMMEDIATELY:
+- Nudity or sexual content (exposed genitals, breasts, buttocks, sexual acts, suggestive poses)
+- Sexually suggestive imagery or poses, even if clothed
+- Pornographic, erotic, or adult content of any kind
+- Graphic violence, blood, gore, or disturbing imagery
+- Hate symbols, slurs, or attacks on protected groups (race, religion, ethnicity, gender, sexual orientation, disability)
+- Weapons being used to threaten or harm
+- Drug paraphernalia or illegal drug use
+- Self-harm or suicide content
+
+ALLOW (safe content):
+- Artistic nudity in classical art/sculptures (museums, famous paintings)
+- Medical or educational diagrams
+- Swimwear or beach photos (non-sexual context)
+- Casual profanity in text (when not attacking people/groups)
+- Political opinions or criticism
+
+${text ? `Text: "${text}"` : 'No text provided.'}
+
+IMPORTANT: When in doubt about sexual/inappropriate content, err on the side of BLOCKING it. User safety is the top priority.
+
+Respond ONLY with a JSON object:
+{"safe": true/false, "reason": "brief explanation if unsafe, null if safe"}`
+      : `You are a content moderation system. Analyze the following text and flag ONLY if it contains:
+
+BLOCK if it contains:
+- Pornographic or sexually explicit content
+- Graphic descriptions of violence or gore
+- Hate speech targeting protected groups (race, religion, ethnicity, gender, sexual orientation, disability)
+- Direct threats or harassment targeting specific individuals
+- Content promoting illegal activities (terrorism, child exploitation, drug trafficking)
+
+ALLOW (do not block):
+- Casual profanity or strong language (e.g., "fuck", "shit", "damn") when not directed at groups or individuals
+- Political opinions or criticism (even if heated)
+- Edgy humor that doesn't target protected groups
+- General complaints or frustration
+
+Text to analyze: "${text}"
+
+Respond ONLY with a JSON object in this exact format:
+{"safe": true/false, "reason": "brief explanation if unsafe, null if safe"}`;
+
+    contentParts.push({
+      type: "text",
+      text: prompt
+    });
+
+    // Add image if provided
+    if (imageKey) {
+      try {
+        console.log(`[Moderation] Fetching image from S3: ${imageKey}`);
+
+        // Fetch image from S3
+        const getCommand = new GetObjectCommand({
+          Bucket: MEDIA_BUCKET,
+          Key: imageKey
+        });
+        const s3Response = await s3.send(getCommand);
+
+        // Convert stream to buffer
+        const chunks = [];
+        for await (const chunk of s3Response.Body) {
+          chunks.push(chunk);
+        }
+        const imageBuffer = Buffer.concat(chunks);
+        const base64Image = imageBuffer.toString('base64');
+
+        console.log(`[Moderation] Image fetched, size: ${imageBuffer.length} bytes`);
+
+        // Determine and normalize media type to Bedrock's strict requirements
+        // Bedrock only accepts: image/jpeg, image/png, image/gif, image/webp
+        let mediaType = 'image/jpeg'; // Default
+
+        // First check S3 ContentType
+        const s3ContentType = s3Response.ContentType?.toLowerCase();
+        console.log(`[Moderation] S3 ContentType: ${s3ContentType}`);
+
+        if (s3ContentType) {
+          if (s3ContentType.includes('png')) {
+            mediaType = 'image/png';
+          } else if (s3ContentType.includes('gif')) {
+            mediaType = 'image/gif';
+          } else if (s3ContentType.includes('webp')) {
+            mediaType = 'image/webp';
+          } else if (s3ContentType.includes('jpeg') || s3ContentType.includes('jpg')) {
+            mediaType = 'image/jpeg';
+          }
+        }
+
+        // Fallback: check image key for extension hints
+        if (mediaType === 'image/jpeg') {
+          const keyLower = imageKey.toLowerCase();
+          if (keyLower.includes('.png')) {
+            mediaType = 'image/png';
+          } else if (keyLower.includes('.gif')) {
+            mediaType = 'image/gif';
+          } else if (keyLower.includes('.webp')) {
+            mediaType = 'image/webp';
+          }
+        }
+
+        console.log(`[Moderation] Normalized media type: ${mediaType}`);
+
+        contentParts.push({
+          type: "image",
+          source: {
+            type: "base64",
+            media_type: mediaType,
+            data: base64Image
+          }
+        });
+
+        console.log('[Moderation] Image added to content parts for analysis');
+      } catch (imageError) {
+        console.error('[Moderation] Failed to fetch image from S3:', imageError);
+        console.error('[Moderation] Image key:', imageKey);
+        console.error('[Moderation] Bucket:', MEDIA_BUCKET);
+        // Continue with text-only moderation if image fetch fails
+      }
+    }
+
+    const payload = {
+      anthropic_version: "bedrock-2023-05-31",
+      max_tokens: 200,
+      messages: [{
+        role: "user",
+        content: contentParts
+      }]
+    };
+
+    console.log(`[Moderation] Calling Bedrock with ${contentParts.length} content parts (text: ${!!text}, image: ${!!imageKey})`);
+
+    const command = new InvokeModelCommand({
+      modelId: "anthropic.claude-3-haiku-20240307-v1:0",
+      contentType: "application/json",
+      accept: "application/json",
+      body: JSON.stringify(payload)
+    });
+
+    const response = await bedrock.send(command);
+    const responseBody = JSON.parse(new TextDecoder().decode(response.body));
+
+    // Extract the content from Claude's response
+    const content = responseBody.content[0].text;
+    console.log('[Moderation] Bedrock response:', content);
+
+    // Try to parse the JSON response
+    try {
+      const result = JSON.parse(content);
+      const isSafe = result.safe === true;
+      console.log(`[Moderation] Result: ${isSafe ? 'SAFE' : 'BLOCKED'} - ${result.reason || 'no reason'}`);
+      return {
+        safe: isSafe,
+        reason: result.reason || null
+      };
+    } catch (parseErr) {
+      console.error('[Moderation] Failed to parse Bedrock response:', content);
+      // Default to safe if we can't parse (fail open to prevent blocking all content)
+      return { safe: true, reason: null };
+    }
+  } catch (error) {
+    console.error('[Moderation] Bedrock moderation failed:', error);
+    // Fail open - allow content if moderation service is down
+    return { safe: true, reason: null };
+  }
+}
+
+// ---------- Blocking helpers ----------
+
+/**
+ * Check if userA has blocked userB
+ */
+async function isBlocked(userA, userB) {
+  if (!BLOCKS_TABLE || !userA || !userB) return false;
+  try {
+    const result = await ddb.send(new GetCommand({
+      TableName: BLOCKS_TABLE,
+      Key: { pk: `USER#${userA}`, sk: `BLOCKED#${userB}` },
+      ConsistentRead: true,
+    }));
+    return !!result.Item;
+  } catch (e) {
+    console.error('[Blocking] isBlocked check failed:', e);
+    return false;
+  }
+}
+
+/**
+ * Check if there's a bidirectional block between two users
+ */
+async function hasBlockBetween(userA, userB) {
+  if (!userA || !userB) return false;
+  const [aBlocksB, bBlocksA] = await Promise.all([
+    isBlocked(userA, userB),
+    isBlocked(userB, userA)
+  ]);
+  return aBlocksB || bBlocksA;
+}
+
+/**
+ * Get list of user IDs that the given user has blocked
+ */
+async function getBlockedUserIds(userId) {
+  if (!BLOCKS_TABLE || !userId) return [];
+  try {
+    const result = await ddb.send(new QueryCommand({
+      TableName: BLOCKS_TABLE,
+      KeyConditionExpression: 'pk = :pk',
+      ExpressionAttributeValues: { ':pk': `USER#${userId}` },
+      ConsistentRead: true,
+    }));
+    return (result.Items || []).map(item => item.blockedUserId).filter(Boolean);
+  } catch (e) {
+    console.error('[Blocking] getBlockedUserIds failed:', e);
+    return [];
   }
 }
 
@@ -796,8 +1042,26 @@ module.exports.handler = async (event) => {
         email,
         avatarKey: r.Item?.avatarKey ?? null,
         fullName: r.Item?.fullName ?? null,
+        termsAccepted: r.Item?.termsAccepted ?? false,
         inviteCode, // Include invite code in response
       });
+    }
+
+    // POST /me/accept-terms - Accept terms of service
+    if (route === 'POST /me/accept-terms') {
+      if (!userId) return bad('Unauthorized', 401);
+
+      await ddb.send(new UpdateCommand({
+        TableName: USERS_TABLE,
+        Key: { pk: `USER#${userId}` },
+        UpdateExpression: 'SET termsAccepted = :true, termsAcceptedAt = :now',
+        ExpressionAttributeValues: {
+          ':true': true,
+          ':now': Date.now(),
+        },
+      }));
+
+      return ok({ success: true, termsAccepted: true });
     }
 
     // NEW: GET /me/invite - Get user's invite code
@@ -1336,6 +1600,14 @@ module.exports.handler = async (event) => {
       const body = JSON.parse(event.body || '{}');
       const text = String(body.text || '').trim().slice(0, 500);
       if (!text) return ok({ message: 'Text required' }, 400);
+
+      // Moderate comment content using Amazon Bedrock
+      const moderation = await moderateContent(text);
+      if (!moderation.safe) {
+        console.log(`[Moderation] Comment blocked for user ${userId}: ${moderation.reason}`);
+        return bad(`Content blocked: ${moderation.reason || 'Content violates our community guidelines'}`, 403);
+      }
+
       const handle = await getHandleForUserId(userId) || 'unknown';
       const now = Date.now();
       const id = randomUUID();
@@ -1732,13 +2004,25 @@ module.exports.handler = async (event) => {
             }
             results.sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
 
-            const items = results.slice(0, 50).map(i => ({
+            let items = results.slice(0, 50).map(i => ({
               id: i.id, userId: i.userId, username: i.username || 'unknown',
               handle: i.handle || null,
               text: i.text || '', imageKey: i.imageKey || null,
               avatarKey: i.avatarKey || null,
               createdAt: i.createdAt,
             }));
+
+            // Filter out posts from blocked users
+            if (BLOCKS_TABLE) {
+              try {
+                const blockedUserIds = await getBlockedUserIds(userId);
+                if (blockedUserIds.length > 0) {
+                  items = items.filter(post => !blockedUserIds.includes(post.userId));
+                }
+              } catch (e) {
+                console.error('[Feed] Failed to filter blocked users:', e);
+              }
+            }
 
             // Hydrate avatars/handles
             try {
@@ -1834,13 +2118,25 @@ module.exports.handler = async (event) => {
           // Note: GSIs do not support ConsistentRead - only eventually consistent
         }));
 
-        const items = (gf.Items || []).map(i => ({
+        let items = (gf.Items || []).map(i => ({
           id: i.id, userId: i.userId, username: i.username || 'unknown',
           handle: i.handle || null,
           text: i.text || '', imageKey: i.imageKey || null,
           avatarKey: i.avatarKey || null,
           createdAt: i.createdAt,
         }));
+
+        // Filter out posts from blocked users
+        if (BLOCKS_TABLE) {
+          try {
+            const blockedUserIds = await getBlockedUserIds(userId);
+            if (blockedUserIds.length > 0) {
+              items = items.filter(post => !blockedUserIds.includes(post.userId));
+            }
+          } catch (e) {
+            console.error('[Feed] Failed to filter blocked users:', e);
+          }
+        }
 
         try {
           const summaries = await fetchUserSummaries(items.map(i => i.userId));
@@ -1931,6 +2227,16 @@ module.exports.handler = async (event) => {
     if (route === 'POST /posts') {
       if (!userId) return bad('Unauthorized', 401);
       const body = JSON.parse(event.body || '{}');
+
+      // Moderate content using Amazon Bedrock (text and image)
+      const textContent = String(body.text || '').slice(0, 500);
+      const imageKey = body.imageKey || null;
+      const moderation = await moderateContent(textContent, imageKey);
+      if (!moderation.safe) {
+        console.log(`[Moderation] Post blocked for user ${userId}: ${moderation.reason}`);
+        return bad(`Content blocked: ${moderation.reason || 'Content violates our community guidelines'}`, 403);
+      }
+
       const id = crypto.randomUUID();
       const now = Date.now();
 
@@ -1953,7 +2259,7 @@ module.exports.handler = async (event) => {
         handle: handle || null,
         username: display,
         avatarKey,
-        text: String(body.text || '').slice(0, 500),
+        text: textContent,
         createdAt: now,
       };
       if (body.imageKey) item.imageKey = body.imageKey;
@@ -2382,6 +2688,323 @@ const items = await listPostsByUserId(targetId, 50);
       // Remove any existing 'follow' notification
       try { if (NOTIFICATIONS_TABLE && targetId !== userId) { await deleteNotifications(targetId, 'follow', userId, null); } } catch (e) { console.error('unfollow cleanup notify failed', e); }
       return ok({ ok: true });
+    }
+
+    // ----- Blocking endpoints -----
+    if (route === 'POST /block') {
+      if (!BLOCKS_TABLE) return bad('Blocking not enabled', 501);
+      if (!userId) return bad('Unauthorized', 401);
+
+      const body = JSON.parse(event.body || '{}');
+      const targetUserId = String(body.userId || '').trim();
+      if (!targetUserId) return bad('Missing userId', 400);
+      if (targetUserId === userId) return bad('Cannot block yourself', 400);
+
+      // Create block record
+      await ddb.send(new PutCommand({
+        TableName: BLOCKS_TABLE,
+        Item: {
+          pk: `USER#${userId}`,
+          sk: `BLOCKED#${targetUserId}`,
+          blockedUserId: targetUserId,
+          createdAt: Date.now(),
+        },
+      }));
+
+      // Remove follow relationships in both directions
+      if (FOLLOWS_TABLE) {
+        try {
+          await Promise.all([
+            ddb.send(new DeleteCommand({
+              TableName: FOLLOWS_TABLE,
+              Key: { pk: userId, sk: targetUserId },
+            })),
+            ddb.send(new DeleteCommand({
+              TableName: FOLLOWS_TABLE,
+              Key: { pk: targetUserId, sk: userId },
+            })),
+          ]);
+        } catch (e) {
+          console.error('[Blocking] Failed to remove follow relationships:', e);
+        }
+      }
+
+      return ok({ success: true, blocked: true });
+    }
+
+    if (route === 'POST /unblock') {
+      if (!BLOCKS_TABLE) return bad('Blocking not enabled', 501);
+      if (!userId) return bad('Unauthorized', 401);
+
+      const body = JSON.parse(event.body || '{}');
+      const targetUserId = String(body.userId || '').trim();
+      if (!targetUserId) return bad('Missing userId', 400);
+
+      await ddb.send(new DeleteCommand({
+        TableName: BLOCKS_TABLE,
+        Key: { pk: `USER#${userId}`, sk: `BLOCKED#${targetUserId}` },
+      }));
+
+      return ok({ success: true, blocked: false });
+    }
+
+    if (route === 'GET /blocked') {
+      if (!BLOCKS_TABLE) return bad('Blocking not enabled', 501);
+      if (!userId) return bad('Unauthorized', 401);
+
+      const result = await ddb.send(new QueryCommand({
+        TableName: BLOCKS_TABLE,
+        KeyConditionExpression: 'pk = :pk',
+        ExpressionAttributeValues: { ':pk': `USER#${userId}` },
+        ConsistentRead: true,
+      }));
+
+      const blockedUserIds = (result.Items || []).map(item => item.blockedUserId).filter(Boolean);
+      const users = await fetchUserSummaries(blockedUserIds);
+
+      return ok({
+        items: users.map(u => ({
+          userId: u.userId,
+          handle: u.handle || null,
+          fullName: u.fullName || null,
+          avatarKey: u.avatarKey || null,
+        }))
+      });
+    }
+
+    // ----- Reporting endpoints -----
+    if (route === 'POST /report') {
+      if (!REPORTS_TABLE) return bad('Reporting not enabled', 501);
+      if (!userId) return bad('Unauthorized', 401);
+
+      const body = JSON.parse(event.body || '{}');
+      const contentType = String(body.contentType || '').trim(); // 'post' or 'comment'
+      const contentId = String(body.contentId || '').trim();
+      const reason = String(body.reason || '').trim().slice(0, 500);
+
+      if (!contentType || !contentId) return bad('Missing contentType or contentId', 400);
+      if (!['post', 'comment'].includes(contentType)) return bad('Invalid contentType', 400);
+      if (!reason) return bad('Missing reason', 400);
+
+      const reportId = randomUUID();
+      const now = Date.now();
+
+      // Get reported content details
+      let reportedUserId = null;
+      let contentText = null;
+
+      if (contentType === 'post') {
+        try {
+          const postResult = await ddb.send(new QueryCommand({
+            TableName: POSTS_TABLE,
+            IndexName: 'byId',
+            KeyConditionExpression: 'id = :id',
+            ExpressionAttributeValues: { ':id': contentId },
+            Limit: 1,
+          }));
+          const post = (postResult.Items || [])[0];
+          if (post) {
+            reportedUserId = post.userId;
+            contentText = post.text;
+          }
+        } catch (e) {
+          console.error('[Reporting] Failed to fetch post:', e);
+        }
+      } else if (contentType === 'comment') {
+        try {
+          const commentResult = await ddb.send(new ScanCommand({
+            TableName: COMMENTS_TABLE,
+            FilterExpression: 'id = :id',
+            ExpressionAttributeValues: { ':id': contentId },
+            Limit: 1,
+            ConsistentRead: true,
+          }));
+          const comment = (commentResult.Items || [])[0];
+          if (comment) {
+            reportedUserId = comment.userId;
+            contentText = comment.text;
+          }
+        } catch (e) {
+          console.error('[Reporting] Failed to fetch comment:', e);
+        }
+      }
+
+      // Create report record
+      await ddb.send(new PutCommand({
+        TableName: REPORTS_TABLE,
+        Item: {
+          pk: `REPORT#${reportId}`,
+          sk: String(now),
+          reportId,
+          reporterId: userId,
+          reportedUserId,
+          contentType,
+          contentId,
+          contentText,
+          reason,
+          status: 'pending', // pending, reviewed, resolved
+          createdAt: now,
+        },
+      }));
+
+      return ok({ success: true, reportId });
+    }
+
+    if (route === 'GET /reports') {
+      if (!REPORTS_TABLE) return bad('Reporting not enabled', 501);
+      if (!userId) return bad('Unauthorized', 401);
+      if (!ADMIN_EMAILS.includes(email)) return bad('Forbidden - Admin only', 403);
+
+      const qs = event?.queryStringParameters || {};
+      const status = qs.status || 'pending';
+
+      const result = await ddb.send(new ScanCommand({
+        TableName: REPORTS_TABLE,
+        FilterExpression: '#status = :status',
+        ExpressionAttributeNames: { '#status': 'status' },
+        ExpressionAttributeValues: { ':status': status },
+        ConsistentRead: true,
+      }));
+
+      const reports = (result.Items || []).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+
+      // Enrich with reporter and reported user info
+      const allUserIds = new Set();
+      reports.forEach(r => {
+        if (r.reporterId) allUserIds.add(r.reporterId);
+        if (r.reportedUserId) allUserIds.add(r.reportedUserId);
+      });
+
+      const users = await fetchUserSummaries(Array.from(allUserIds));
+      const userMap = new Map(users.map(u => [u.userId, u]));
+
+      const enrichedReports = reports.map(r => ({
+        ...r,
+        reporter: userMap.get(r.reporterId) || null,
+        reportedUser: userMap.get(r.reportedUserId) || null,
+      }));
+
+      return ok({ items: enrichedReports });
+    }
+
+    if (method === 'POST' && path.startsWith('/reports/')) {
+      if (!REPORTS_TABLE) return bad('Reporting not enabled', 501);
+      if (!userId) return bad('Unauthorized', 401);
+      if (!ADMIN_EMAILS.includes(email)) return bad('Forbidden - Admin only', 403);
+
+      const reportId = path.split('/')[2];
+      const action = path.split('/')[3]; // 'action'
+
+      if (action !== 'action') return bad('Invalid endpoint', 400);
+
+      const body = JSON.parse(event.body || '{}');
+      const actionType = String(body.action || '').trim(); // 'delete_content', 'ban_user', 'dismiss'
+
+      if (!actionType) return bad('Missing action', 400);
+      if (!['delete_content', 'ban_user', 'dismiss'].includes(actionType)) {
+        return bad('Invalid action type', 400);
+      }
+
+      // Get the report
+      const reportResult = await ddb.send(new QueryCommand({
+        TableName: REPORTS_TABLE,
+        KeyConditionExpression: 'pk = :pk',
+        ExpressionAttributeValues: { ':pk': `REPORT#${reportId}` },
+        Limit: 1,
+        ConsistentRead: true,
+      }));
+
+      const report = (reportResult.Items || [])[0];
+      if (!report) return bad('Report not found', 404);
+
+      // Perform the action
+      if (actionType === 'delete_content') {
+        if (report.contentType === 'post') {
+          // Delete the post
+          try {
+            const postResult = await ddb.send(new QueryCommand({
+              TableName: POSTS_TABLE,
+              IndexName: 'byId',
+              KeyConditionExpression: 'id = :id',
+              ExpressionAttributeValues: { ':id': report.contentId },
+              Limit: 1,
+            }));
+            const post = (postResult.Items || [])[0];
+            if (post) {
+              await ddb.send(new DeleteCommand({
+                TableName: POSTS_TABLE,
+                Key: { pk: post.pk, sk: post.sk },
+              }));
+            }
+          } catch (e) {
+            console.error('[Moderation] Failed to delete post:', e);
+            return bad('Failed to delete post', 500);
+          }
+        } else if (report.contentType === 'comment') {
+          // Delete the comment
+          try {
+            const commentResult = await ddb.send(new ScanCommand({
+              TableName: COMMENTS_TABLE,
+              FilterExpression: 'id = :id',
+              ExpressionAttributeValues: { ':id': report.contentId },
+              Limit: 1,
+              ConsistentRead: true,
+            }));
+            const comment = (commentResult.Items || [])[0];
+            if (comment) {
+              await ddb.send(new DeleteCommand({
+                TableName: COMMENTS_TABLE,
+                Key: { pk: comment.pk, sk: comment.sk },
+              }));
+            }
+          } catch (e) {
+            console.error('[Moderation] Failed to delete comment:', e);
+            return bad('Failed to delete comment', 500);
+          }
+        }
+      } else if (actionType === 'ban_user') {
+        // Ban the user by deleting their Cognito account
+        if (report.reportedUserId) {
+          try {
+            await cognito.send(new AdminDeleteUserCommand({
+              UserPoolId: USER_POOL_ID,
+              Username: report.reportedUserId,
+            }));
+          } catch (e) {
+            console.error('[Moderation] Failed to ban user:', e);
+            return bad('Failed to ban user', 500);
+          }
+        }
+      }
+
+      // Update report status
+      await ddb.send(new UpdateCommand({
+        TableName: REPORTS_TABLE,
+        Key: { pk: report.pk, sk: report.sk },
+        UpdateExpression: 'SET #status = :status, reviewedBy = :userId, reviewedAt = :now, actionTaken = :action',
+        ExpressionAttributeNames: { '#status': 'status' },
+        ExpressionAttributeValues: {
+          ':status': 'resolved',
+          ':userId': userId,
+          ':now': Date.now(),
+          ':action': actionType,
+        },
+      }));
+
+      return ok({ success: true, action: actionType });
+    }
+
+    // Check if user is blocked from viewing content
+    if (route === 'GET /is-blocked') {
+      if (!BLOCKS_TABLE) return bad('Blocking not enabled', 501);
+      if (!userId) return bad('Unauthorized', 401);
+
+      const qs = event?.queryStringParameters || {};
+      const targetUserId = qs.userId;
+      if (!targetUserId) return bad('Missing userId', 400);
+
+      const blocked = await hasBlockBetween(userId, targetUserId);
+      return ok({ blocked });
     }
 
     // ----- default -----

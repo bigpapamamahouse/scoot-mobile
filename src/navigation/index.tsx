@@ -16,6 +16,7 @@ import { SearchScreen } from '../screens/SearchScreen';
 import { UserListScreen } from '../screens/UserListScreen';
 import { useNotifications } from '../lib/notifications';
 import PostScreen from '../screens/PostScreen';
+import TermsOfServiceScreen from '../screens/TermsOfServiceScreen';
 import { IconButton, Badge } from '../components/ui';
 import { useTheme, spacing } from '../theme';
 import { navigationRef } from './navigationRef';
@@ -110,6 +111,7 @@ export default function RootNavigator(){
         <Stack.Screen name="Signup" component={SignupScreen} options={{ title: 'Sign up' }} />
         <Stack.Screen name="ConfirmCode" component={ConfirmCodeScreen} options={{ title: 'Confirm' }} />
         <Stack.Screen name="ClaimUsername" component={ClaimUsernameScreen} options={{ title: 'Choose username' }} />
+        <Stack.Screen name="TermsOfService" component={TermsOfServiceScreen} options={{ headerShown: false }} />
         <Stack.Screen
           name="Feed"
           component={FeedScreen}
