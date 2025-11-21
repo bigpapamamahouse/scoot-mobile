@@ -1,6 +1,8 @@
-# IAM Policy for Lambda - Bedrock and DynamoDB Access
+# IAM Policy for Lambda - Bedrock, DynamoDB, and S3 Access
 
 This document contains the IAM policy you need to add to your Lambda execution role.
+
+**Updated**: Now includes S3 GetObject permission for image moderation (Claude 3 Haiku can analyze both text and images).
 
 ---
 
@@ -12,6 +14,7 @@ Replace the following placeholders:
 - `YOUR_AWS_ACCOUNT_ID` - Your AWS account ID (e.g., 123456789012)
 - `YOUR_AWS_REGION` - Your AWS region (e.g., us-east-1)
 - `YOUR_PROJECT_NAME` - Your project name prefix for DynamoDB tables
+- `YOUR_MEDIA_BUCKET_NAME` - Your S3 bucket name for media files (from MEDIA_BUCKET env var)
 
 ```json
 {
@@ -42,6 +45,16 @@ Replace the following placeholders:
       "Resource": [
         "arn:aws:dynamodb:YOUR_AWS_REGION:YOUR_AWS_ACCOUNT_ID:table/YOUR_PROJECT_NAME-reports",
         "arn:aws:dynamodb:YOUR_AWS_REGION:YOUR_AWS_ACCOUNT_ID:table/YOUR_PROJECT_NAME-blocks"
+      ]
+    },
+    {
+      "Sid": "S3ImageModeration",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject"
+      ],
+      "Resource": [
+        "arn:aws:s3:::YOUR_MEDIA_BUCKET_NAME/*"
       ]
     }
   ]
@@ -102,6 +115,16 @@ cat > lambda-moderation-policy.json << 'EOF'
       "Resource": [
         "arn:aws:dynamodb:us-east-1:YOUR_ACCOUNT_ID:table/YOUR_PROJECT-reports",
         "arn:aws:dynamodb:us-east-1:YOUR_ACCOUNT_ID:table/YOUR_PROJECT-blocks"
+      ]
+    },
+    {
+      "Sid": "S3ImageModeration",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject"
+      ],
+      "Resource": [
+        "arn:aws:s3:::YOUR_MEDIA_BUCKET/*"
       ]
     }
   ]
@@ -223,6 +246,16 @@ Here's an example with placeholder values filled in:
       "Resource": [
         "arn:aws:dynamodb:us-east-1:123456789012:table/scooterbooter-reports",
         "arn:aws:dynamodb:us-east-1:123456789012:table/scooterbooter-blocks"
+      ]
+    },
+    {
+      "Sid": "S3ImageModeration",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject"
+      ],
+      "Resource": [
+        "arn:aws:s3:::scooterbooter-media/*"
       ]
     }
   ]
