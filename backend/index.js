@@ -340,6 +340,8 @@ Respond ONLY with a JSON object in this exact format:
     // Add image if provided
     if (imageKey) {
       try {
+        console.log(`[Moderation] Fetching image from S3: ${imageKey}`);
+
         // Fetch image from S3
         const getCommand = new GetObjectCommand({
           Bucket: MEDIA_BUCKET,
@@ -355,16 +357,28 @@ Respond ONLY with a JSON object in this exact format:
         const imageBuffer = Buffer.concat(chunks);
         const base64Image = imageBuffer.toString('base64');
 
-        // Determine media type from key extension
-        const ext = imageKey.split('.').pop().toLowerCase();
-        const mediaTypeMap = {
-          'jpg': 'image/jpeg',
-          'jpeg': 'image/jpeg',
-          'png': 'image/png',
-          'gif': 'image/gif',
-          'webp': 'image/webp'
-        };
-        const mediaType = mediaTypeMap[ext] || 'image/jpeg';
+        console.log(`[Moderation] Image fetched, size: ${imageBuffer.length} bytes`);
+
+        // Determine media type from S3 ContentType header or key extension
+        let mediaType = s3Response.ContentType;
+
+        // Fallback: try to determine from key extension
+        if (!mediaType || mediaType === 'application/octet-stream') {
+          const keyLower = imageKey.toLowerCase();
+          if (keyLower.includes('.jpg') || keyLower.includes('.jpeg')) {
+            mediaType = 'image/jpeg';
+          } else if (keyLower.includes('.png')) {
+            mediaType = 'image/png';
+          } else if (keyLower.includes('.gif')) {
+            mediaType = 'image/gif';
+          } else if (keyLower.includes('.webp')) {
+            mediaType = 'image/webp';
+          } else {
+            mediaType = 'image/jpeg'; // Default to JPEG
+          }
+        }
+
+        console.log(`[Moderation] Image media type: ${mediaType}`);
 
         contentParts.push({
           type: "image",
@@ -374,8 +388,12 @@ Respond ONLY with a JSON object in this exact format:
             data: base64Image
           }
         });
+
+        console.log('[Moderation] Image added to content parts for analysis');
       } catch (imageError) {
         console.error('[Moderation] Failed to fetch image from S3:', imageError);
+        console.error('[Moderation] Image key:', imageKey);
+        console.error('[Moderation] Bucket:', MEDIA_BUCKET);
         // Continue with text-only moderation if image fetch fails
       }
     }
@@ -389,6 +407,8 @@ Respond ONLY with a JSON object in this exact format:
       }]
     };
 
+    console.log(`[Moderation] Calling Bedrock with ${contentParts.length} content parts (text: ${!!text}, image: ${!!imageKey})`);
+
     const command = new InvokeModelCommand({
       modelId: "anthropic.claude-3-haiku-20240307-v1:0",
       contentType: "application/json",
@@ -401,12 +421,15 @@ Respond ONLY with a JSON object in this exact format:
 
     // Extract the content from Claude's response
     const content = responseBody.content[0].text;
+    console.log('[Moderation] Bedrock response:', content);
 
     // Try to parse the JSON response
     try {
       const result = JSON.parse(content);
+      const isSafe = result.safe === true;
+      console.log(`[Moderation] Result: ${isSafe ? 'SAFE' : 'BLOCKED'} - ${result.reason || 'no reason'}`);
       return {
-        safe: result.safe === true,
+        safe: isSafe,
         reason: result.reason || null
       };
     } catch (parseErr) {
