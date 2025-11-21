@@ -30,31 +30,57 @@ This guide walks you through enabling Amazon Bedrock and installing the required
 
 ### Step 3: Enable Model Access
 
+**🔄 IMPORTANT: AWS updated the Bedrock UI in late 2024. The "Model access" page has been retired.**
+
+#### Method 1: Test via Playground (Fastest)
+
+Many AWS accounts now have automatic access to Claude models. Test first:
+
 1. In the Bedrock console, look at the left sidebar
-2. Click on **"Model access"** (under "Foundation models")
-3. Click the **"Manage model access"** button (orange button on the right)
-4. You'll see a list of available models
+2. Click on **"Playgrounds"** → **"Chat"**
+3. In the model dropdown, look for **"Claude 3 Haiku"**
+4. If you can select it, type a test message: "Hello, test"
+5. If it responds, **you already have access!** ✅ Skip to Part 2
 
-### Step 4: Enable Claude 3 Haiku
+#### Method 2: Request Access via Foundation Models
 
-1. **Find Anthropic models** in the list
-2. Check the box next to **"Claude 3 Haiku"**
-   - Model ID should be: `anthropic.claude-3-haiku-20240307-v1:0`
-3. Scroll down and click **"Request model access"** or **"Save changes"**
+If the playground doesn't work:
 
-### Step 5: Wait for Approval
+1. In the left sidebar, click **"Foundation models"** or **"Base models"**
+2. Find the **"Anthropic"** section
+3. Click on **"Claude 3 Haiku"**
+   - Model ID: `anthropic.claude-3-haiku-20240307-v1:0`
+4. Look for a button like:
+   - **"Request model access"**
+   - **"Enable"**
+   - **"Get started"**
+5. Click it and follow any prompts
+
+#### Method 3: Check via AWS CLI
+
+```bash
+# List all Anthropic models you have access to
+aws bedrock list-foundation-models \
+  --region us-east-1 \
+  --by-provider anthropic
+
+# If you see Claude 3 Haiku in the list, you have access
+```
+
+### Step 4: Wait for Approval (if needed)
 
 - **For most accounts**: Approval is **instant** ✅
-- You'll see the status change from "Requested" to "Available" (green checkmark)
-- If approval is pending, it usually takes 5-10 minutes
+- Some accounts may need to wait 5-10 minutes
+- Enterprise accounts may need AWS Support approval
 
-### Step 6: Verify Access
+### Step 5: Verify Access
 
-1. Once approved, you'll see "Access granted" with a green checkmark
-2. You can test the model using the Bedrock Playground:
-   - Go to **"Playgrounds"** → **"Chat"** in the left sidebar
-   - Select **Claude 3 Haiku** from the dropdown
-   - Type a test message to verify it works
+Test that everything works:
+
+1. Go to **"Playgrounds"** → **"Chat"** in the left sidebar
+2. Select **"Claude 3 Haiku"** from the dropdown
+3. Type: "Respond with just the word SUCCESS"
+4. If you get a response, you're all set! ✅
 
 ---
 

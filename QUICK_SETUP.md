@@ -6,13 +6,36 @@ This is a condensed version of the setup. For detailed instructions, see `BEDROC
 
 ## 1. Enable Amazon Bedrock (2 minutes)
 
+**🔄 UPDATED PROCESS (AWS changed the UI in late 2024)**
+
+### Option A: Test if you already have access (fastest)
+
 1. **Go to Bedrock Console**: https://console.aws.amazon.com/bedrock
 2. **Switch to us-east-1** (top-right corner)
-3. **Click "Model access"** (left sidebar)
-4. **Click "Manage model access"**
-5. **Check the box** for **"Claude 3 Haiku"**
-6. **Click "Save changes"**
-7. **Wait for green checkmark** (usually instant)
+3. **Click "Playgrounds"** → **"Chat"** (left sidebar)
+4. **Select "Claude 3 Haiku"** from the model dropdown
+5. **Type a test message** (e.g., "Hello")
+6. **If it responds**, you already have access! ✅ Skip to Step 2
+
+### Option B: Request access via Base Models
+
+If the playground doesn't work:
+
+1. **Go to Bedrock Console**: https://console.aws.amazon.com/bedrock
+2. **Click "Foundation models"** or **"Base models"** (left sidebar)
+3. **Find "Anthropic Claude"** section
+4. **Click on "Claude 3 Haiku"**
+5. **Click "Request model access"** or **"Enable"** button
+6. **Wait for approval** (usually instant)
+
+### Option C: Try the AWS CLI
+
+```bash
+# Check current access
+aws bedrock list-foundation-models --region us-east-1 --by-provider anthropic
+
+# If you see Claude models listed, you have access
+```
 
 ✅ Done!
 
