@@ -293,24 +293,32 @@ async function moderateContent(text, imageKey = null) {
 
     // Add text prompt
     const prompt = imageKey
-      ? `You are a content moderation system. Analyze the provided content (text and/or image) and flag ONLY if it contains:
+      ? `You are a strict content moderation system for a social media app. Your job is to protect users from harmful content.
 
-BLOCK if it contains:
-- Pornographic or sexually explicit imagery
-- Graphic violence, gore, or disturbing imagery
-- Hate speech targeting protected groups (race, religion, ethnicity, gender, sexual orientation, disability)
-- Direct threats or harassment targeting specific individuals
-- Content promoting illegal activities (terrorism, child exploitation, drug trafficking)
+Analyze the provided image and/or text. You MUST block content if it contains ANY of the following:
 
-ALLOW (do not block):
-- Casual profanity or strong language (e.g., "fuck", "shit", "damn") when not directed at groups or individuals
-- Political opinions or criticism (even if heated)
-- Edgy humor that doesn't target protected groups
-- General complaints or frustration
+BLOCK IMMEDIATELY:
+- Nudity or sexual content (exposed genitals, breasts, buttocks, sexual acts, suggestive poses)
+- Sexually suggestive imagery or poses, even if clothed
+- Pornographic, erotic, or adult content of any kind
+- Graphic violence, blood, gore, or disturbing imagery
+- Hate symbols, slurs, or attacks on protected groups (race, religion, ethnicity, gender, sexual orientation, disability)
+- Weapons being used to threaten or harm
+- Drug paraphernalia or illegal drug use
+- Self-harm or suicide content
 
-${text ? `Text: "${text}"` : 'No text provided - analyze the image only.'}
+ALLOW (safe content):
+- Artistic nudity in classical art/sculptures (museums, famous paintings)
+- Medical or educational diagrams
+- Swimwear or beach photos (non-sexual context)
+- Casual profanity in text (when not attacking people/groups)
+- Political opinions or criticism
 
-Respond ONLY with a JSON object in this exact format:
+${text ? `Text: "${text}"` : 'No text provided.'}
+
+IMPORTANT: When in doubt about sexual/inappropriate content, err on the side of BLOCKING it. User safety is the top priority.
+
+Respond ONLY with a JSON object:
 {"safe": true/false, "reason": "brief explanation if unsafe, null if safe"}`
       : `You are a content moderation system. Analyze the following text and flag ONLY if it contains:
 
