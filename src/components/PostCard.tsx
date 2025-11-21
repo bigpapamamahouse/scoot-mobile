@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Post, Reaction, ReactionWithUsers, Comment } from '../types';
 import { mediaUrlFromKey } from '../lib/media';
 import { Avatar } from './Avatar';
-import { CommentsAPI, ReactionsAPI, PostsAPI } from '../api';
+import { CommentsAPI, ReactionsAPI, PostsAPI, ModerationAPI } from '../api';
 import { resolveHandle } from '../lib/resolveHandle';
 import { useCurrentUser, isOwner } from '../hooks/useCurrentUser';
 import { IconButton, Badge } from './ui';
@@ -147,12 +147,81 @@ function PostCard({
     );
   };
 
+  const handleReport = () => {
+    Alert.prompt(
+      'Report Post',
+      'Please describe why you are reporting this post:',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Submit Report',
+          style: 'destructive',
+          onPress: async (reason) => {
+            if (!reason || !reason.trim()) {
+              Alert.alert('Error', 'Please provide a reason for reporting');
+              return;
+            }
+            try {
+              await ModerationAPI.reportContent({
+                contentType: 'post',
+                contentId: localPost.id,
+                reason: reason.trim(),
+              });
+              Alert.alert('Success', 'Thank you for your report. We will review it within 24 hours.');
+            } catch (error) {
+              console.error('Failed to report post:', error);
+              Alert.alert('Error', 'Failed to submit report. Please try again.');
+            }
+          },
+        },
+      ],
+      'plain-text'
+    );
+  };
+
+  const handleBlock = () => {
+    Alert.alert(
+      'Block User',
+      `Are you sure you want to block @${localPost.handle || 'this user'}? You will no longer see their content.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Block',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await ModerationAPI.blockUser(localPost.userId);
+              Alert.alert(
+                'User Blocked',
+                `You have blocked @${localPost.handle || 'this user'}. You will no longer see their content.`
+              );
+              onPostDeleted?.(localPost.id); // Remove from feed
+            } catch (error) {
+              console.error('Failed to block user:', error);
+              Alert.alert('Error', 'Failed to block user. Please try again.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const handleOptionsPress = () => {
-    Alert.alert('Post Options', 'Choose an action:', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Edit', onPress: handleEdit },
-      { text: 'Delete', onPress: handleDelete, style: 'destructive' },
-    ]);
+    if (userOwnsPost) {
+      // Show edit/delete options for own posts
+      Alert.alert('Post Options', 'Choose an action:', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Edit', onPress: handleEdit },
+        { text: 'Delete', onPress: handleDelete, style: 'destructive' },
+      ]);
+    } else {
+      // Show report/block options for other users' posts
+      Alert.alert('Post Options', 'Choose an action:', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Report Post', onPress: handleReport, style: 'destructive' },
+        { text: 'Block User', onPress: handleBlock, style: 'destructive' },
+      ]);
+    }
   };
 
   // Load image dimensions with caching to prevent repeated S3 lookups

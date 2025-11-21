@@ -7,6 +7,7 @@ interface CurrentUser {
   email?: string;
   avatarKey?: string | null;
   fullName?: string;
+  termsAccepted?: boolean;
 }
 
 interface CurrentUserContextType {
@@ -40,6 +41,7 @@ export function CurrentUserProvider({ children }: { children: ReactNode }) {
           email: (user as any)?.email,
           avatarKey: (user as any)?.avatarKey,
           fullName: (user as any)?.fullName,
+          termsAccepted: (user as any)?.termsAccepted,
         });
       }
     } catch (error) {
