@@ -9,7 +9,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useCurrentUser } from '../contexts/CurrentUserContext';
-import { apiFetch } from '../api/apiFetch';
+import { api } from '../api/client';
 
 export default function TermsOfServiceScreen({ navigation }: any) {
   const [agreed, setAgreed] = useState(false);
@@ -19,7 +19,7 @@ export default function TermsOfServiceScreen({ navigation }: any) {
   const handleAccept = async () => {
     setLoading(true);
     try {
-      await apiFetch('/me/accept-terms', {
+      await api('/me/accept-terms', {
         method: 'POST',
       });
       await refreshCurrentUser();
