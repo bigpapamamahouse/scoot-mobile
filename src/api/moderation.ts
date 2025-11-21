@@ -1,9 +1,9 @@
-import { apiFetch } from './apiFetch';
+import { api } from './client';
 
 export const ModerationAPI = {
   // Block a user
   async blockUser(userId: string): Promise<{ success: boolean; blocked: boolean }> {
-    return apiFetch('/block', {
+    return api('/block', {
       method: 'POST',
       body: JSON.stringify({ userId }),
     });
@@ -11,7 +11,7 @@ export const ModerationAPI = {
 
   // Unblock a user
   async unblockUser(userId: string): Promise<{ success: boolean; blocked: boolean }> {
-    return apiFetch('/unblock', {
+    return api('/unblock', {
       method: 'POST',
       body: JSON.stringify({ userId }),
     });
@@ -26,7 +26,7 @@ export const ModerationAPI = {
       avatarKey: string | null;
     }>;
   }> {
-    return apiFetch('/blocked');
+    return api('/blocked');
   },
 
   // Report content
@@ -35,7 +35,7 @@ export const ModerationAPI = {
     contentId: string;
     reason: string;
   }): Promise<{ success: boolean; reportId: string }> {
-    return apiFetch('/report', {
+    return api('/report', {
       method: 'POST',
       body: JSON.stringify(params),
     });
@@ -43,14 +43,14 @@ export const ModerationAPI = {
 
   // Check if there's a block between two users
   async isBlocked(userId: string): Promise<{ blocked: boolean }> {
-    return apiFetch(`/is-blocked?userId=${userId}`);
+    return api(`/is-blocked?userId=${userId}`);
   },
 
   // Admin: Get all reports
   async getReports(status: 'pending' | 'resolved' = 'pending'): Promise<{
     items: Array<any>;
   }> {
-    return apiFetch(`/reports?status=${status}`);
+    return api(`/reports?status=${status}`);
   },
 
   // Admin: Take action on a report
@@ -58,7 +58,7 @@ export const ModerationAPI = {
     reportId: string,
     action: 'delete_content' | 'ban_user' | 'dismiss'
   ): Promise<{ success: boolean; action: string }> {
-    return apiFetch(`/reports/${reportId}/action`, {
+    return api(`/reports/${reportId}/action`, {
       method: 'POST',
       body: JSON.stringify({ action }),
     });
