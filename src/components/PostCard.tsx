@@ -403,15 +403,13 @@ function PostCard({
           <Text style={styles.timestamp}>
             {new Date(localPost.createdAt).toLocaleString()}
           </Text>
-          {userOwnsPost && (
-            <IconButton
-              icon="ellipsis-horizontal"
-              onPress={handleOptionsPress}
-              variant="ghost"
-              size="sm"
-              color={colors.text.secondary}
-            />
-          )}
+          <IconButton
+            icon="ellipsis-horizontal"
+            onPress={handleOptionsPress}
+            variant="ghost"
+            size="sm"
+            color={colors.text.secondary}
+          />
         </View>
       </View>
 
