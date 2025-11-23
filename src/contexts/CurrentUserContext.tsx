@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { UsersAPI } from '../api';
 
 interface CurrentUser {
@@ -28,7 +28,7 @@ export function CurrentUserProvider({ children }: { children: ReactNode }) {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchUser = async () => {
+  const fetchUser = useCallback(async () => {
     try {
       const user = await UsersAPI.me();
 
@@ -51,16 +51,16 @@ export function CurrentUserProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const refreshUser = async () => {
+  const refreshUser = useCallback(async () => {
     setLoading(true);
     await fetchUser();
-  };
+  }, [fetchUser]);
 
   useEffect(() => {
     fetchUser();
-  }, []);
+  }, [fetchUser]);
 
   return (
     <CurrentUserContext.Provider value={{ currentUser, loading, refreshUser, setCurrentUser }}>
