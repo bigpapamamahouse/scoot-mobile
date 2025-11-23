@@ -4,9 +4,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { signInFn, checkAuthStatus } from '../../api/auth';
 import { useTheme } from '../../theme/ThemeContext';
 import { UsersAPI } from '../../api';
+import { useCurrentUser } from '../../contexts/CurrentUserContext';
 
 export default function LoginScreen({ navigation }: any) {
   const { colors } = useTheme();
+  const { refreshUser } = useCurrentUser();
   const [user, setUser] = React.useState('');
   const [pass, setPass] = React.useState('');
   const [checking, setChecking] = React.useState(true);
@@ -17,6 +19,8 @@ export default function LoginScreen({ navigation }: any) {
       if (isAuthenticated) {
         console.log('User already authenticated, checking TOS acceptance');
         try {
+          // Refresh user context to ensure we have latest data
+          await refreshUser();
           const user = await UsersAPI.me();
           if (!(user as any)?.termsAccepted) {
             console.log('User has not accepted TOS, navigating to TermsOfService');
@@ -35,7 +39,7 @@ export default function LoginScreen({ navigation }: any) {
     }).catch(() => {
       setChecking(false);
     });
-  }, [navigation]);
+  }, [navigation, refreshUser]);
 
   if (checking) {
     return (
@@ -52,6 +56,8 @@ export default function LoginScreen({ navigation }: any) {
       case 'SIGNED_IN':
         // Check if user has accepted terms of service
         try {
+          // Refresh user context to ensure we have latest data
+          await refreshUser();
           const userData = await UsersAPI.me();
           if (!(userData as any)?.termsAccepted) {
             navigation.reset({ index: 0, routes: [{ name: 'TermsOfService' }] });
