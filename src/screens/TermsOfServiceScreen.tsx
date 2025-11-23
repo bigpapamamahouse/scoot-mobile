@@ -23,7 +23,7 @@ export default function TermsOfServiceScreen({ navigation }: any) {
         method: 'POST',
       });
       await refreshUser();
-      navigation.replace('Main');
+      navigation.replace('Feed');
     } catch (error) {
       console.error('Error accepting terms:', error);
       alert('Failed to accept terms. Please try again.');
