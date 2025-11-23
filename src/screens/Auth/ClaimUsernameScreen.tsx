@@ -6,9 +6,11 @@ import { useTheme } from '../../theme/ThemeContext';
 import { signInFn } from '../../api/auth';
 import { updateMe, updateAvatar } from '../../api/users';
 import { uploadMedia } from '../../lib/upload';
+import { useCurrentUser } from '../../contexts/CurrentUserContext';
 
 export default function ClaimUsernameScreen({ route, navigation }: any) {
   const { colors } = useTheme();
+  const { refreshUser } = useCurrentUser();
   const email = route?.params?.email || '';
   const password = route?.params?.password || '';
   const [username, setUsername] = React.useState('');
@@ -149,8 +151,22 @@ export default function ClaimUsernameScreen({ route, navigation }: any) {
         }
       }
 
-      // Navigate to the main app only if profile update succeeded
-      navigation.reset({ index: 0, routes: [{ name: 'Feed' }] });
+      // Refresh the current user context to get updated profile data
+      console.log('[ClaimUsername] Refreshing user context...');
+      await refreshUser();
+      console.log('[ClaimUsername] User context refreshed');
+
+      // Check if user has accepted terms of service (new users likely haven't)
+      // We need to fetch user data again to check termsAccepted status
+      const { UsersAPI } = await import('../../api');
+      const userData = await UsersAPI.me();
+      if (!(userData as any)?.termsAccepted) {
+        console.log('[ClaimUsername] User has not accepted TOS, navigating to TermsOfService');
+        navigation.reset({ index: 0, routes: [{ name: 'TermsOfService' }] });
+      } else {
+        console.log('[ClaimUsername] User authenticated and TOS accepted, navigating to Feed');
+        navigation.reset({ index: 0, routes: [{ name: 'Feed' }] });
+      }
     } catch (e: any) {
       Alert.alert('Error', e?.message || String(e));
       setIsLoading(false);
