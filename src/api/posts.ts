@@ -88,32 +88,27 @@ export async function getUserPosts(options: GetUserPostsOptions = {}){
     }
   };
 
+  // Only try POSTS endpoints, not FEED endpoints (feed returns all followed users' posts)
   push('/me/posts');
-  push('/me/feed');
   push('/posts/me');
   push('/users/me/posts');
-  push('/users/me/feed');
 
   if (handle) {
     const encodedHandle = encodeURIComponent(handle);
     push(`/u/${encodedHandle}/posts`);
-    push(`/u/${encodedHandle}/feed`);
+    push(`/u/${encodedHandle}`); // Profile endpoint that includes posts
     push(`/users/${encodedHandle}/posts`);
-    push(`/users/${encodedHandle}/feed`);
     push(`/profiles/${encodedHandle}/posts`);
     push(`/posts?handle=${encodedHandle}`);
     push(`/posts?user=${encodedHandle}`);
-    push(`/feed?handle=${encodedHandle}`);
   }
 
   if (userId) {
     const encodedUserId = encodeURIComponent(userId);
     push(`/u/${encodedUserId}/posts`);
-    push(`/u/${encodedUserId}/feed`);
+    push(`/u/${encodedUserId}`); // Profile endpoint that includes posts
     push(`/users/${encodedUserId}/posts`);
-    push(`/users/${encodedUserId}/feed`);
     push(`/posts?userId=${encodedUserId}`);
-    push(`/feed?userId=${encodedUserId}`);
   }
 
   let lastError: unknown;

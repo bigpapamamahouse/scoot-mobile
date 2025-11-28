@@ -5,6 +5,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '../../theme/ThemeContext';
 import { signInFn } from '../../api/auth';
 import { updateMe, updateAvatar } from '../../api/users';
+import { UsersAPI } from '../../api';
 import { uploadMedia } from '../../lib/upload';
 import { useCurrentUser } from '../../contexts/CurrentUserContext';
 
@@ -158,7 +159,6 @@ export default function ClaimUsernameScreen({ route, navigation }: any) {
 
       // Check if user has accepted terms of service (new users likely haven't)
       // We need to fetch user data again to check termsAccepted status
-      const { UsersAPI } = await import('../../api');
       const userData = await UsersAPI.me();
       if (!(userData as any)?.termsAccepted) {
         console.log('[ClaimUsername] User has not accepted TOS, navigating to TermsOfService');

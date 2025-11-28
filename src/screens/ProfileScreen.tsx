@@ -227,13 +227,14 @@ export default function ProfileScreen({ navigation, route }: any) {
   );
 
   const load = React.useCallback(
-    async (options?: { skipSpinner?: boolean; pageNum?: number; append?: boolean }) => {
+    async (options?: { skipSpinner?: boolean; pageNum?: number; append?: boolean; forceRefresh?: boolean }) => {
       if (!options?.skipSpinner) {
         setLoading(true);
       }
 
       const pageNum = options?.pageNum ?? 0;
       const append = options?.append ?? false;
+      const forceRefresh = options?.forceRefresh ?? false;
 
       const normalizeHandle = (value: unknown): string | null => {
         if (typeof value !== 'string') return null;
@@ -253,7 +254,7 @@ export default function ProfileScreen({ navigation, route }: any) {
       // OPTIMIZATION: Check cache FIRST for instant display (before any API calls)
       let hasValidCache = false;
       let shouldSkipAPICall = false;
-      if (!append && pageNum === 0) {
+      if (!append && pageNum === 0 && !forceRefresh) {
         const cacheIdentifier = requestedUserId || requestedHandle || 'unknown';
         const cachedPosts = cache.get<Post[]>(CacheKeys.userPosts(cacheIdentifier, 0));
         const cachedUser = cache.get<ProfileIdentity>(CacheKeys.userProfile(cacheIdentifier));
@@ -281,6 +282,8 @@ export default function ProfileScreen({ navigation, route }: any) {
         if (hasValidCache && !options?.skipSpinner) {
           setLoading(false);
         }
+      } else if (forceRefresh) {
+        console.log('[ProfileScreen] Force refresh - bypassing cache');
       }
 
       let targetIdentity: ProfileIdentity | null = null;
@@ -408,17 +411,21 @@ export default function ProfileScreen({ navigation, route }: any) {
         if (!shouldSkipAPICall) {
           try {
             const offset = pageNum * POSTS_PER_PAGE;
+            console.log(`[ProfileScreen] Fetching posts - page: ${pageNum}, offset: ${offset}, limit: ${POSTS_PER_PAGE}`);
             const postsData = await PostsAPI.getUserPosts({
               handle: targetHandle,
               userId: targetUserId,
               limit: POSTS_PER_PAGE,
               offset,
             });
+            console.log('[ProfileScreen] API response:', JSON.stringify(postsData).substring(0, 200));
             const normalizedPosts = resolvePosts(postsData);
+            console.log(`[ProfileScreen] Normalized ${normalizedPosts.length} posts from API response`);
             const filteredPosts = filterPostsForUser(normalizedPosts, {
               id: targetUserId,
               handle: targetHandle,
             });
+            console.log(`[ProfileScreen] After filtering: ${filteredPosts.length} posts (filtered out ${normalizedPosts.length - filteredPosts.length})`);
             // Only warn if we couldn't extract ANY posts from a non-array response
             // (Empty filteredPosts after filtering is normal - user might not have posts)
             if (!normalizedPosts.length && postsData && !Array.isArray(postsData)) {
@@ -432,9 +439,12 @@ export default function ProfileScreen({ navigation, route }: any) {
                 const existingIds = new Set(prev.map(p => p.id));
                 // Filter out any new posts that already exist
                 const uniqueNewPosts = filteredPosts.filter((post: Post) => !existingIds.has(post.id));
+                const newTotal = prev.length + uniqueNewPosts.length;
+                console.log(`[ProfileScreen] Appending ${uniqueNewPosts.length} new posts (${filteredPosts.length - uniqueNewPosts.length} duplicates), total: ${newTotal}`);
                 return [...prev, ...uniqueNewPosts];
               });
             } else {
+              console.log(`[ProfileScreen] Setting ${filteredPosts.length} posts to state`);
               setPosts(filteredPosts);
               // Cache the first page for instant loads
               if (pageNum === 0 && filteredPosts.length > 0) {
@@ -633,7 +643,7 @@ export default function ProfileScreen({ navigation, route }: any) {
     setRefreshing(true);
     setPage(0);
     setHasMore(true);
-    load({ skipSpinner: true, pageNum: 0, append: false }).finally(() => setRefreshing(false));
+    load({ skipSpinner: true, pageNum: 0, append: false, forceRefresh: true }).finally(() => setRefreshing(false));
   }, [load]);
 
   const handlePostUpdated = React.useCallback((updatedPost: Post) => {
