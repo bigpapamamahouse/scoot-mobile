@@ -277,14 +277,13 @@ export default function ProfileScreen({ navigation, route }: any) {
           shouldSkipAPICall = true;
           console.log('[ProfileScreen] Using cached posts, will only fetch counts');
         }
-      } else if (forceRefresh) {
-        console.log('[ProfileScreen] Force refresh - bypassing cache');
-      }
 
         // If we have valid cache, hide loading spinner immediately
         if (hasValidCache && !options?.skipSpinner) {
           setLoading(false);
         }
+      } else if (forceRefresh) {
+        console.log('[ProfileScreen] Force refresh - bypassing cache');
       }
 
       let targetIdentity: ProfileIdentity | null = null;
