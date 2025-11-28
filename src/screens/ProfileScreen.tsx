@@ -227,13 +227,14 @@ export default function ProfileScreen({ navigation, route }: any) {
   );
 
   const load = React.useCallback(
-    async (options?: { skipSpinner?: boolean; pageNum?: number; append?: boolean }) => {
+    async (options?: { skipSpinner?: boolean; pageNum?: number; append?: boolean; forceRefresh?: boolean }) => {
       if (!options?.skipSpinner) {
         setLoading(true);
       }
 
       const pageNum = options?.pageNum ?? 0;
       const append = options?.append ?? false;
+      const forceRefresh = options?.forceRefresh ?? false;
 
       const normalizeHandle = (value: unknown): string | null => {
         if (typeof value !== 'string') return null;
@@ -253,7 +254,7 @@ export default function ProfileScreen({ navigation, route }: any) {
       // OPTIMIZATION: Check cache FIRST for instant display (before any API calls)
       let hasValidCache = false;
       let shouldSkipAPICall = false;
-      if (!append && pageNum === 0) {
+      if (!append && pageNum === 0 && !forceRefresh) {
         const cacheIdentifier = requestedUserId || requestedHandle || 'unknown';
         const cachedPosts = cache.get<Post[]>(CacheKeys.userPosts(cacheIdentifier, 0));
         const cachedUser = cache.get<ProfileIdentity>(CacheKeys.userProfile(cacheIdentifier));
@@ -276,6 +277,9 @@ export default function ProfileScreen({ navigation, route }: any) {
           shouldSkipAPICall = true;
           console.log('[ProfileScreen] Using cached posts, will only fetch counts');
         }
+      } else if (forceRefresh) {
+        console.log('[ProfileScreen] Force refresh - bypassing cache');
+      }
 
         // If we have valid cache, hide loading spinner immediately
         if (hasValidCache && !options?.skipSpinner) {
@@ -633,7 +637,7 @@ export default function ProfileScreen({ navigation, route }: any) {
     setRefreshing(true);
     setPage(0);
     setHasMore(true);
-    load({ skipSpinner: true, pageNum: 0, append: false }).finally(() => setRefreshing(false));
+    load({ skipSpinner: true, pageNum: 0, append: false, forceRefresh: true }).finally(() => setRefreshing(false));
   }, [load]);
 
   const handlePostUpdated = React.useCallback((updatedPost: Post) => {
