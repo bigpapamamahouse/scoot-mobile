@@ -3,7 +3,7 @@ module.exports = {
     name: "ScooterBooter",
     slug: "scooterbooter-mobile",
     scheme: "scooterbooter",
-    version: "0.4.1",
+    version: "0.4.2",
     orientation: "portrait",
     userInterfaceStyle: "automatic",
     icon: "./assets/icon.png",
@@ -15,7 +15,7 @@ module.exports = {
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.scooterbooter.scoot",
-      buildNumber: "5",
+      buildNumber: "6",
       infoPlist: {
         NSCameraUsageDescription: "This app uses the camera to take photos for creating posts.",
         NSPhotoLibraryUsageDescription: "This app needs access to your photo library to select photos for posts."
