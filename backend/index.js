@@ -1976,6 +1976,10 @@ module.exports.handler = async (event) => {
     if (route === 'GET /feed') {
       if (!userId) return bad('Unauthorized', 401);
 
+      const qs = event?.queryStringParameters || {};
+      const limit = Math.min(parseInt(qs.limit) || 20, 100); // Default 20, max 100
+      const offset = Math.max(parseInt(qs.offset) || 0, 0);
+
       try {
         if (FOLLOWS_TABLE) {
           const following = await ddb.send(new QueryCommand({
@@ -1997,14 +2001,14 @@ module.exports.handler = async (event) => {
                 KeyConditionExpression: 'pk = :p',
                 ExpressionAttributeValues: { ':p': `USER#${fid}` },
                 ScanIndexForward: false,
-                Limit: 20,
+                Limit: 50, // Fetch more per user to ensure we have enough for pagination
                 ConsistentRead: true,
               }));
               (r.Items || []).forEach(i => results.push(i));
             }
             results.sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
 
-            let items = results.slice(0, 50).map(i => ({
+            let items = results.slice(offset, offset + limit).map(i => ({
               id: i.id, userId: i.userId, username: i.username || 'unknown',
               handle: i.handle || null,
               text: i.text || '', imageKey: i.imageKey || null,
@@ -2114,11 +2118,11 @@ module.exports.handler = async (event) => {
           KeyConditionExpression: 'gsi1pk = :g',
           ExpressionAttributeValues: { ':g': 'FEED' },
           ScanIndexForward: false,
-          Limit: 50,
+          Limit: limit + offset, // Fetch enough to support pagination
           // Note: GSIs do not support ConsistentRead - only eventually consistent
         }));
 
-        let items = (gf.Items || []).map(i => ({
+        let items = (gf.Items || []).slice(offset, offset + limit).map(i => ({
           id: i.id, userId: i.userId, username: i.username || 'unknown',
           handle: i.handle || null,
           text: i.text || '', imageKey: i.imageKey || null,
@@ -2447,6 +2451,10 @@ module.exports.handler = async (event) => {
     if (method === 'GET' && userRoute) {
       if (!userId) return bad('Unauthorized', 401);
 
+      const qs = event?.queryStringParameters || {};
+      const limit = Math.min(parseInt(qs.limit) || 20, 100); // Default 20, max 100
+      const offset = Math.max(parseInt(qs.offset) || 0, 0);
+
       const h = userRoute.handle.toLowerCase();
       const u = await ddb.send(new GetCommand({
         TableName: USERS_TABLE,
@@ -2472,7 +2480,7 @@ module.exports.handler = async (event) => {
 
         let isFollowPending = false;
         try { if (!iFollow) { isFollowPending = await hasPendingFollow(userId, targetId); } } catch (e) { console.error('compute isFollowPending', e); }
-const items = await listPostsByUserId(targetId, 50);
+const items = await listPostsByUserId(targetId, limit + offset).then(posts => posts.slice(offset));
 
         // Hydrate profile posts with fresh avatar/handle
         try {
@@ -2565,7 +2573,7 @@ const items = await listPostsByUserId(targetId, 50);
       }
 
       if (userRoute.kind === 'posts') {
-        const items = await listPostsByUserId(targetId, 50);
+        const items = await listPostsByUserId(targetId, limit + offset).then(posts => posts.slice(offset));
         try {
           const summaries = await fetchUserSummaries([targetId]);
           const fresh = (summaries[0] && summaries[0].avatarKey) || null;
