@@ -698,7 +698,7 @@ function matchUserRoutes(path) {
   return null;
 }
 
-async function listPostsByUserId(targetId, limit = 50) {
+async function listPostsByUserId(targetId, limit = 1000) {
   const r = await ddb.send(new QueryCommand({
     TableName: POSTS_TABLE,
     KeyConditionExpression: 'pk = :p',
@@ -2480,7 +2480,10 @@ module.exports.handler = async (event) => {
 
         let isFollowPending = false;
         try { if (!iFollow) { isFollowPending = await hasPendingFollow(userId, targetId); } } catch (e) { console.error('compute isFollowPending', e); }
-const items = await listPostsByUserId(targetId, limit + offset).then(posts => posts.slice(offset));
+
+        // Fetch posts with pagination
+        const allPosts = await listPostsByUserId(targetId);
+        const items = allPosts.slice(offset, offset + limit);
 
         // Hydrate profile posts with fresh avatar/handle
         try {
@@ -2573,7 +2576,8 @@ const items = await listPostsByUserId(targetId, limit + offset).then(posts => po
       }
 
       if (userRoute.kind === 'posts') {
-        const items = await listPostsByUserId(targetId, limit + offset).then(posts => posts.slice(offset));
+        const allPosts = await listPostsByUserId(targetId);
+        const items = allPosts.slice(offset, offset + limit);
         try {
           const summaries = await fetchUserSummaries([targetId]);
           const fresh = (summaries[0] && summaries[0].avatarKey) || null;
