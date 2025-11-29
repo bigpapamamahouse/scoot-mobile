@@ -293,14 +293,13 @@ async function moderateContent(text, imageKey = null) {
 
     // Add text prompt
     const prompt = imageKey
-      ? `You are a strict content moderation system for a social media app. Your job is to protect users from harmful content.
+      ? `You are a content moderation system for a social media app. Your job is to protect users from harmful content while allowing normal everyday content.
 
 Analyze the provided image and/or text. You MUST block content if it contains ANY of the following:
 
 BLOCK IMMEDIATELY:
-- Nudity or sexual content (exposed genitals, breasts, buttocks, sexual acts, suggestive poses)
-- Sexually suggestive imagery or poses, even if clothed
-- Pornographic, erotic, or adult content of any kind
+- Explicit nudity showing genitals, exposed breasts, or buttocks in a sexual context
+- Pornographic content or explicit sexual acts
 - Graphic violence, blood, gore, or disturbing imagery
 - Hate symbols, slurs, or attacks on protected groups (race, religion, ethnicity, gender, sexual orientation, disability)
 - Weapons being used to threaten or harm
@@ -310,13 +309,16 @@ BLOCK IMMEDIATELY:
 ALLOW (safe content):
 - Artistic nudity in classical art/sculptures (museums, famous paintings)
 - Medical or educational diagrams
-- Swimwear or beach photos (non-sexual context)
+- Swimwear, beachwear, or beach photos
+- Clothing products (lingerie, sleepwear, etc.) shown in non-sexual product photos
+- Sleep masks, eye masks, and similar everyday items
+- Fashion photography and modeling (even if revealing, as long as not pornographic)
 - Casual profanity in text (when not attacking people/groups)
 - Political opinions or criticism
 
 ${text ? `Text: "${text}"` : 'No text provided.'}
 
-IMPORTANT: When in doubt about sexual/inappropriate content, err on the side of BLOCKING it. User safety is the top priority.
+IMPORTANT: Only block content that is clearly and explicitly pornographic or harmful. Everyday items, clothing products, and non-sexual content should be allowed even if they might be considered mildly suggestive. When in doubt, allow the content.
 
 Respond ONLY with a JSON object:
 {"safe": true/false, "reason": "brief explanation if unsafe, null if safe"}`
