@@ -198,8 +198,8 @@ export const CacheKeys = {
 
 // Default TTL values (in milliseconds)
 export const CacheTTL = {
-  feed: 2 * 60 * 1000,        // 2 minutes for feed (frequently updated)
-  userPosts: 3 * 60 * 1000,   // 3 minutes for user posts
-  userProfile: 5 * 60 * 1000, // 5 minutes for user profiles
-  post: 5 * 60 * 1000,        // 5 minutes for individual posts
+  feed: 2 * 60 * 1000,         // 2 minutes for feed (frequently updated)
+  userPosts: 15 * 60 * 1000,   // 15 minutes for user posts
+  userProfile: 15 * 60 * 1000, // 15 minutes for user profiles
+  post: 5 * 60 * 1000,         // 5 minutes for individual posts
 };

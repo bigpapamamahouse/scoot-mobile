@@ -615,16 +615,26 @@ export default function ProfileScreen({ navigation, route }: any) {
         return;
       }
 
-      // Check if cache is stale before reloading
+      // OPTIMIZATION: Stale-while-revalidate pattern
+      // Always show cached data immediately (even if stale), then refresh in background
       const cacheIdentifier = routeUserId || routeUserHandle || 'unknown';
       const cachedPosts = cache.get<Post[]>(CacheKeys.userPosts(cacheIdentifier, 0));
       const cachedUser = cache.get<ProfileIdentity>(CacheKeys.userProfile(cacheIdentifier));
 
-      // Only reload if we don't have cached data (cache is stale or missing)
-      if (!cachedPosts || !cachedUser) {
+      // If we have cached data, display it immediately for instant navigation
+      if (cachedPosts || cachedUser) {
+        if (cachedPosts) {
+          setPosts(cachedPosts);
+        }
+        if (cachedUser) {
+          setUser(cachedUser);
+        }
+        // Refresh data in background without showing loading spinner
+        load({ skipSpinner: true });
+      } else {
+        // No cache available - show loading spinner
         load();
       }
-      // If cache exists, user can manually refresh with pull-to-refresh
     });
     return unsubscribe;
   }, [navigation, load, routeUserId, routeUserHandle]);
