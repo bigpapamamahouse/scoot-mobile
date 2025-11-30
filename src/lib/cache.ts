@@ -112,6 +112,26 @@ class CacheManager {
   }
 
   /**
+   * Get stale data from cache (ignores TTL expiration)
+   * Useful for stale-while-revalidate pattern where you want to show
+   * old data immediately while fetching fresh data in the background
+   * @param key - Cache key
+   * @returns Cached data or null if not found (regardless of expiration)
+   */
+  getStale<T>(key: string): T | null {
+    const entry = this.cache.get(key);
+
+    if (!entry) {
+      return null;
+    }
+
+    // Update last accessed time for LRU tracking
+    entry.lastAccessed = Date.now();
+
+    return entry.data as T;
+  }
+
+  /**
    * Check if a key exists and is not expired
    * @param key - Cache key
    * @returns true if key exists and is valid

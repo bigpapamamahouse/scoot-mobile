@@ -618,11 +618,12 @@ export default function ProfileScreen({ navigation, route }: any) {
       // OPTIMIZATION: Stale-while-revalidate pattern
       // Always show cached data immediately (even if stale), then refresh in background
       const cacheIdentifier = routeUserId || routeUserHandle || 'unknown';
-      const cachedPosts = cache.get<Post[]>(CacheKeys.userPosts(cacheIdentifier, 0));
-      const cachedUser = cache.get<ProfileIdentity>(CacheKeys.userProfile(cacheIdentifier));
+      const cachedPosts = cache.getStale<Post[]>(CacheKeys.userPosts(cacheIdentifier, 0));
+      const cachedUser = cache.getStale<ProfileIdentity>(CacheKeys.userProfile(cacheIdentifier));
 
-      // If we have cached data, display it immediately for instant navigation
+      // If we have cached data (even if stale), display it immediately for instant navigation
       if (cachedPosts || cachedUser) {
+        console.log('[ProfileScreen] Focus: showing stale cache, posts:', cachedPosts?.length, 'user:', cachedUser?.handle);
         if (cachedPosts) {
           setPosts(cachedPosts);
         }
@@ -632,7 +633,8 @@ export default function ProfileScreen({ navigation, route }: any) {
         // Refresh data in background without showing loading spinner
         load({ skipSpinner: true });
       } else {
-        // No cache available - show loading spinner
+        // No cache available at all - show loading spinner
+        console.log('[ProfileScreen] Focus: no cache found, showing loading spinner');
         load();
       }
     });
