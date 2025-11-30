@@ -2060,6 +2060,17 @@ module.exports.handler = async (event) => {
             // Fetch comment previews for all posts
             try {
               for (const post of items) {
+                // First, get the total count of comments
+                const countResult = await ddb.send(new QueryCommand({
+                  TableName: COMMENTS_TABLE,
+                  KeyConditionExpression: 'pk = :p',
+                  ExpressionAttributeValues: { ':p': `POST#${post.id}` },
+                  Select: 'COUNT',
+                  ConsistentRead: true,
+                }));
+                const totalCommentCount = countResult.Count || 0;
+
+                // Then fetch first 4 comments for preview
                 const commentsResult = await ddb.send(new QueryCommand({
                   TableName: COMMENTS_TABLE,
                   KeyConditionExpression: 'pk = :p',
@@ -2101,8 +2112,7 @@ module.exports.handler = async (event) => {
                 }
 
                 post.comments = comments;
-                // If we got 4 comments, there are at least 4. Otherwise use actual count.
-                post.commentCount = allComments.length >= 4 ? 4 : allComments.length;
+                post.commentCount = totalCommentCount;
               }
             } catch (e) {
               console.error('Failed to fetch comment previews for feed:', e);
@@ -2173,6 +2183,17 @@ module.exports.handler = async (event) => {
         // Fetch comment previews for all posts (fallback path)
         try {
           for (const post of items) {
+            // First, get the total count of comments
+            const countResult = await ddb.send(new QueryCommand({
+              TableName: COMMENTS_TABLE,
+              KeyConditionExpression: 'pk = :p',
+              ExpressionAttributeValues: { ':p': `POST#${post.id}` },
+              Select: 'COUNT',
+              ConsistentRead: true,
+            }));
+            const totalCommentCount = countResult.Count || 0;
+
+            // Then fetch first 4 comments for preview
             const commentsResult = await ddb.send(new QueryCommand({
               TableName: COMMENTS_TABLE,
               KeyConditionExpression: 'pk = :p',
@@ -2214,8 +2235,7 @@ module.exports.handler = async (event) => {
             }
 
             post.comments = comments;
-            // If we got 4 comments, there are at least 4. Otherwise use actual count.
-            post.commentCount = allComments.length >= 4 ? 4 : allComments.length;
+            post.commentCount = totalCommentCount;
           }
         } catch (e) {
           console.error('Failed to fetch comment previews for feed (fallback):', e);
@@ -2496,6 +2516,68 @@ module.exports.handler = async (event) => {
           if (freshHandle) { for (const it of items) { it.username = (it.username && it.username !== 'unknown') ? it.username : freshHandle; it.handle = freshHandle; } }
         } catch (e) { console.error('PROFILE avatar/handle hydrate failed', e); }
 
+        // Fetch comment previews for all posts
+        try {
+          for (const post of items) {
+            // First, get the total count of comments
+            const countResult = await ddb.send(new QueryCommand({
+              TableName: COMMENTS_TABLE,
+              KeyConditionExpression: 'pk = :p',
+              ExpressionAttributeValues: { ':p': `POST#${post.id}` },
+              Select: 'COUNT',
+              ConsistentRead: true,
+            }));
+            const totalCommentCount = countResult.Count || 0;
+
+            // Then fetch first 4 comments for preview
+            const commentsResult = await ddb.send(new QueryCommand({
+              TableName: COMMENTS_TABLE,
+              KeyConditionExpression: 'pk = :p',
+              ExpressionAttributeValues: { ':p': `POST#${post.id}` },
+              ScanIndexForward: true,
+              Limit: 4, // Fetch 4 to detect if there are more than 3
+              ConsistentRead: true,
+            }));
+
+            const allComments = (commentsResult.Items || []).map(it => ({
+              id: it.id,
+              userId: it.userId,
+              handle: it.userHandle || null,
+              text: it.text || '',
+              createdAt: it.createdAt || 0,
+            }));
+
+            // Take only first 3 for preview
+            const comments = allComments.slice(0, 3);
+
+            // Fetch avatarKey for comment authors
+            if (comments.length > 0) {
+              try {
+                const userIds = [...new Set(comments.map(c => c.userId).filter(Boolean))];
+                if (userIds.length > 0) {
+                  const summaries = await fetchUserSummaries(userIds);
+                  const avatarMap = Object.fromEntries(
+                    summaries.map(u => [u.userId, u.avatarKey || null])
+                  );
+                  for (const comment of comments) {
+                    if (comment.userId && avatarMap[comment.userId]) {
+                      comment.avatarKey = avatarMap[comment.userId];
+                    }
+                  }
+                }
+              } catch (e) {
+                console.error('Failed to fetch comment avatars:', e);
+              }
+            }
+
+            post.comments = comments;
+            post.commentCount = totalCommentCount;
+          }
+        } catch (e) {
+          console.error('Failed to fetch comment previews for profile:', e);
+          // Continue without comment previews if this fails
+        }
+
         return ok({ handle: h,
           userId: targetId,
           exists: !!profile.Item,
@@ -2585,6 +2667,69 @@ module.exports.handler = async (event) => {
           const fresh = (summaries[0] && summaries[0].avatarKey) || null;
           if (fresh) { for (const it of items) it.avatarKey = fresh; }
         } catch (e) { console.error('USER POSTS avatar hydrate failed', e); }
+
+        // Fetch comment previews for all posts
+        try {
+          for (const post of items) {
+            // First, get the total count of comments
+            const countResult = await ddb.send(new QueryCommand({
+              TableName: COMMENTS_TABLE,
+              KeyConditionExpression: 'pk = :p',
+              ExpressionAttributeValues: { ':p': `POST#${post.id}` },
+              Select: 'COUNT',
+              ConsistentRead: true,
+            }));
+            const totalCommentCount = countResult.Count || 0;
+
+            // Then fetch first 4 comments for preview
+            const commentsResult = await ddb.send(new QueryCommand({
+              TableName: COMMENTS_TABLE,
+              KeyConditionExpression: 'pk = :p',
+              ExpressionAttributeValues: { ':p': `POST#${post.id}` },
+              ScanIndexForward: true,
+              Limit: 4, // Fetch 4 to detect if there are more than 3
+              ConsistentRead: true,
+            }));
+
+            const allComments = (commentsResult.Items || []).map(it => ({
+              id: it.id,
+              userId: it.userId,
+              handle: it.userHandle || null,
+              text: it.text || '',
+              createdAt: it.createdAt || 0,
+            }));
+
+            // Take only first 3 for preview
+            const comments = allComments.slice(0, 3);
+
+            // Fetch avatarKey for comment authors
+            if (comments.length > 0) {
+              try {
+                const userIds = [...new Set(comments.map(c => c.userId).filter(Boolean))];
+                if (userIds.length > 0) {
+                  const summaries = await fetchUserSummaries(userIds);
+                  const avatarMap = Object.fromEntries(
+                    summaries.map(u => [u.userId, u.avatarKey || null])
+                  );
+                  for (const comment of comments) {
+                    if (comment.userId && avatarMap[comment.userId]) {
+                      comment.avatarKey = avatarMap[comment.userId];
+                    }
+                  }
+                }
+              } catch (e) {
+                console.error('Failed to fetch comment avatars:', e);
+              }
+            }
+
+            post.comments = comments;
+            post.commentCount = totalCommentCount;
+          }
+        } catch (e) {
+          console.error('Failed to fetch comment previews for user posts:', e);
+          // Continue without comment previews if this fails
+        }
+
         return ok({ items });
       }
     }

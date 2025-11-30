@@ -934,6 +934,7 @@ export default function ProfileScreen({ navigation, route }: any) {
         renderItem={({ item }) => (
           <PostCard
             post={item}
+            onPress={() => navigation.navigate('Post', { post: item })}
             onPressUser={(userId, userHandle) => {
               navigation.push('Profile', {
                 userHandle: userHandle,
