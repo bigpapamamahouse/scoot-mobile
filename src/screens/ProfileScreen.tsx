@@ -620,8 +620,15 @@ export default function ProfileScreen({ navigation, route }: any) {
 
       // OPTIMIZATION: Stale-while-revalidate pattern
       // Always show cached data immediately (even if stale), then refresh in background
-      const cacheIdentifier = routeUserId || routeUserHandle || 'unknown';
-      console.log('[ProfileScreen] Focus: looking for cache with identifier:', cacheIdentifier, 'routeUserId:', routeUserId, 'routeUserHandle:', routeUserHandle);
+
+      // When viewing own profile (no route params), use current user's ID/handle for cache key
+      let cacheIdentifier = routeUserId || routeUserHandle;
+      if (!cacheIdentifier && currentUser) {
+        cacheIdentifier = currentUser.id || currentUser.handle;
+      }
+      cacheIdentifier = cacheIdentifier || 'unknown';
+
+      console.log('[ProfileScreen] Focus: looking for cache with identifier:', cacheIdentifier, 'routeUserId:', routeUserId, 'routeUserHandle:', routeUserHandle, 'currentUser.id:', currentUser?.id);
       const cachedPosts = cache.getStale<Post[]>(CacheKeys.userPosts(cacheIdentifier, 0));
       const cachedUser = cache.getStale<ProfileIdentity>(CacheKeys.userProfile(cacheIdentifier));
 
@@ -643,7 +650,7 @@ export default function ProfileScreen({ navigation, route }: any) {
       }
     });
     return unsubscribe;
-  }, [navigation, load, routeUserId, routeUserHandle]);
+  }, [navigation, load, routeUserId, routeUserHandle, currentUser]);
 
   const loadMore = React.useCallback(async () => {
     if (loadingMore || !hasMore) return;
