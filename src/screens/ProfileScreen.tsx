@@ -404,6 +404,7 @@ export default function ProfileScreen({ navigation, route }: any) {
 
         // Generate cache key based on user identifier
         const cacheIdentifier = targetUserId || targetHandle || 'unknown';
+        console.log('[ProfileScreen] Cache identifier for this load:', cacheIdentifier);
 
         let resolvedIdentity = targetIdentity;
 
@@ -448,6 +449,7 @@ export default function ProfileScreen({ navigation, route }: any) {
               setPosts(filteredPosts);
               // Cache the first page for instant loads
               if (pageNum === 0 && filteredPosts.length > 0) {
+                console.log('[ProfileScreen] Caching posts with identifier:', cacheIdentifier);
                 cache.set(CacheKeys.userPosts(cacheIdentifier, 0), filteredPosts, CacheTTL.userPosts);
               }
             }
@@ -484,8 +486,9 @@ export default function ProfileScreen({ navigation, route }: any) {
 
             // Cache user profile (only on first page load)
             if (pageNum === 0 && finalUserToSet) {
-              const cacheIdentifier = finalUserToSet.id || finalUserToSet.handle || 'unknown';
-              cache.set(CacheKeys.userProfile(cacheIdentifier), finalUserToSet, CacheTTL.userProfile);
+              const userCacheIdentifier = finalUserToSet.id || finalUserToSet.handle || 'unknown';
+              console.log('[ProfileScreen] Caching user profile with identifier:', userCacheIdentifier, 'user:', finalUserToSet.handle);
+              cache.set(CacheKeys.userProfile(userCacheIdentifier), finalUserToSet, CacheTTL.userProfile);
             }
           } catch (postsError: any) {
             // If posts fail to load, log it but don't fail the entire profile load
@@ -618,6 +621,7 @@ export default function ProfileScreen({ navigation, route }: any) {
       // OPTIMIZATION: Stale-while-revalidate pattern
       // Always show cached data immediately (even if stale), then refresh in background
       const cacheIdentifier = routeUserId || routeUserHandle || 'unknown';
+      console.log('[ProfileScreen] Focus: looking for cache with identifier:', cacheIdentifier, 'routeUserId:', routeUserId, 'routeUserHandle:', routeUserHandle);
       const cachedPosts = cache.getStale<Post[]>(CacheKeys.userPosts(cacheIdentifier, 0));
       const cachedUser = cache.getStale<ProfileIdentity>(CacheKeys.userProfile(cacheIdentifier));
 
