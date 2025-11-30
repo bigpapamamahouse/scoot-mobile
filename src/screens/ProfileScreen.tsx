@@ -404,6 +404,7 @@ export default function ProfileScreen({ navigation, route }: any) {
 
         // Generate cache key based on user identifier
         const cacheIdentifier = targetUserId || targetHandle || 'unknown';
+        console.log('[ProfileScreen] Cache identifier for this load:', cacheIdentifier);
 
         let resolvedIdentity = targetIdentity;
 
@@ -448,6 +449,7 @@ export default function ProfileScreen({ navigation, route }: any) {
               setPosts(filteredPosts);
               // Cache the first page for instant loads
               if (pageNum === 0 && filteredPosts.length > 0) {
+                console.log('[ProfileScreen] Caching posts with identifier:', cacheIdentifier);
                 cache.set(CacheKeys.userPosts(cacheIdentifier, 0), filteredPosts, CacheTTL.userPosts);
               }
             }
@@ -484,8 +486,9 @@ export default function ProfileScreen({ navigation, route }: any) {
 
             // Cache user profile (only on first page load)
             if (pageNum === 0 && finalUserToSet) {
-              const cacheIdentifier = finalUserToSet.id || finalUserToSet.handle || 'unknown';
-              cache.set(CacheKeys.userProfile(cacheIdentifier), finalUserToSet, CacheTTL.userProfile);
+              const userCacheIdentifier = finalUserToSet.id || finalUserToSet.handle || 'unknown';
+              console.log('[ProfileScreen] Caching user profile with identifier:', userCacheIdentifier, 'user:', finalUserToSet.handle);
+              cache.set(CacheKeys.userProfile(userCacheIdentifier), finalUserToSet, CacheTTL.userProfile);
             }
           } catch (postsError: any) {
             // If posts fail to load, log it but don't fail the entire profile load
@@ -615,19 +618,39 @@ export default function ProfileScreen({ navigation, route }: any) {
         return;
       }
 
-      // Check if cache is stale before reloading
-      const cacheIdentifier = routeUserId || routeUserHandle || 'unknown';
-      const cachedPosts = cache.get<Post[]>(CacheKeys.userPosts(cacheIdentifier, 0));
-      const cachedUser = cache.get<ProfileIdentity>(CacheKeys.userProfile(cacheIdentifier));
+      // OPTIMIZATION: Stale-while-revalidate pattern
+      // Always show cached data immediately (even if stale), then refresh in background
 
-      // Only reload if we don't have cached data (cache is stale or missing)
-      if (!cachedPosts || !cachedUser) {
+      // When viewing own profile (no route params), use current user's ID/handle for cache key
+      let cacheIdentifier = routeUserId || routeUserHandle;
+      if (!cacheIdentifier && currentUser) {
+        cacheIdentifier = currentUser.id || currentUser.handle;
+      }
+      cacheIdentifier = cacheIdentifier || 'unknown';
+
+      console.log('[ProfileScreen] Focus: looking for cache with identifier:', cacheIdentifier, 'routeUserId:', routeUserId, 'routeUserHandle:', routeUserHandle, 'currentUser.id:', currentUser?.id);
+      const cachedPosts = cache.getStale<Post[]>(CacheKeys.userPosts(cacheIdentifier, 0));
+      const cachedUser = cache.getStale<ProfileIdentity>(CacheKeys.userProfile(cacheIdentifier));
+
+      // If we have cached data (even if stale), display it immediately for instant navigation
+      if (cachedPosts || cachedUser) {
+        console.log('[ProfileScreen] Focus: showing stale cache, posts:', cachedPosts?.length, 'user:', cachedUser?.handle);
+        if (cachedPosts) {
+          setPosts(cachedPosts);
+        }
+        if (cachedUser) {
+          setUser(cachedUser);
+        }
+        // Refresh data in background without showing loading spinner
+        load({ skipSpinner: true });
+      } else {
+        // No cache available at all - show loading spinner
+        console.log('[ProfileScreen] Focus: no cache found, showing loading spinner');
         load();
       }
-      // If cache exists, user can manually refresh with pull-to-refresh
     });
     return unsubscribe;
-  }, [navigation, load, routeUserId, routeUserHandle]);
+  }, [navigation, load, routeUserId, routeUserHandle, currentUser]);
 
   const loadMore = React.useCallback(async () => {
     if (loadingMore || !hasMore) return;
