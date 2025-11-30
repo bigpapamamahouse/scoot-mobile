@@ -2060,6 +2060,17 @@ module.exports.handler = async (event) => {
             // Fetch comment previews for all posts
             try {
               for (const post of items) {
+                // First, get the total count of comments
+                const countResult = await ddb.send(new QueryCommand({
+                  TableName: COMMENTS_TABLE,
+                  KeyConditionExpression: 'pk = :p',
+                  ExpressionAttributeValues: { ':p': `POST#${post.id}` },
+                  Select: 'COUNT',
+                  ConsistentRead: true,
+                }));
+                const totalCommentCount = countResult.Count || 0;
+
+                // Then fetch first 4 comments for preview
                 const commentsResult = await ddb.send(new QueryCommand({
                   TableName: COMMENTS_TABLE,
                   KeyConditionExpression: 'pk = :p',
@@ -2101,8 +2112,7 @@ module.exports.handler = async (event) => {
                 }
 
                 post.comments = comments;
-                // If we got 4 comments, there are at least 4. Otherwise use actual count.
-                post.commentCount = allComments.length >= 4 ? 4 : allComments.length;
+                post.commentCount = totalCommentCount;
               }
             } catch (e) {
               console.error('Failed to fetch comment previews for feed:', e);
@@ -2173,6 +2183,17 @@ module.exports.handler = async (event) => {
         // Fetch comment previews for all posts (fallback path)
         try {
           for (const post of items) {
+            // First, get the total count of comments
+            const countResult = await ddb.send(new QueryCommand({
+              TableName: COMMENTS_TABLE,
+              KeyConditionExpression: 'pk = :p',
+              ExpressionAttributeValues: { ':p': `POST#${post.id}` },
+              Select: 'COUNT',
+              ConsistentRead: true,
+            }));
+            const totalCommentCount = countResult.Count || 0;
+
+            // Then fetch first 4 comments for preview
             const commentsResult = await ddb.send(new QueryCommand({
               TableName: COMMENTS_TABLE,
               KeyConditionExpression: 'pk = :p',
@@ -2214,8 +2235,7 @@ module.exports.handler = async (event) => {
             }
 
             post.comments = comments;
-            // If we got 4 comments, there are at least 4. Otherwise use actual count.
-            post.commentCount = allComments.length >= 4 ? 4 : allComments.length;
+            post.commentCount = totalCommentCount;
           }
         } catch (e) {
           console.error('Failed to fetch comment previews for feed (fallback):', e);
@@ -2499,6 +2519,17 @@ module.exports.handler = async (event) => {
         // Fetch comment previews for all posts
         try {
           for (const post of items) {
+            // First, get the total count of comments
+            const countResult = await ddb.send(new QueryCommand({
+              TableName: COMMENTS_TABLE,
+              KeyConditionExpression: 'pk = :p',
+              ExpressionAttributeValues: { ':p': `POST#${post.id}` },
+              Select: 'COUNT',
+              ConsistentRead: true,
+            }));
+            const totalCommentCount = countResult.Count || 0;
+
+            // Then fetch first 4 comments for preview
             const commentsResult = await ddb.send(new QueryCommand({
               TableName: COMMENTS_TABLE,
               KeyConditionExpression: 'pk = :p',
@@ -2540,8 +2571,7 @@ module.exports.handler = async (event) => {
             }
 
             post.comments = comments;
-            // If we got 4 comments, there are at least 4. Otherwise use actual count.
-            post.commentCount = allComments.length >= 4 ? 4 : allComments.length;
+            post.commentCount = totalCommentCount;
           }
         } catch (e) {
           console.error('Failed to fetch comment previews for profile:', e);
@@ -2641,6 +2671,17 @@ module.exports.handler = async (event) => {
         // Fetch comment previews for all posts
         try {
           for (const post of items) {
+            // First, get the total count of comments
+            const countResult = await ddb.send(new QueryCommand({
+              TableName: COMMENTS_TABLE,
+              KeyConditionExpression: 'pk = :p',
+              ExpressionAttributeValues: { ':p': `POST#${post.id}` },
+              Select: 'COUNT',
+              ConsistentRead: true,
+            }));
+            const totalCommentCount = countResult.Count || 0;
+
+            // Then fetch first 4 comments for preview
             const commentsResult = await ddb.send(new QueryCommand({
               TableName: COMMENTS_TABLE,
               KeyConditionExpression: 'pk = :p',
@@ -2682,8 +2723,7 @@ module.exports.handler = async (event) => {
             }
 
             post.comments = comments;
-            // If we got 4 comments, there are at least 4. Otherwise use actual count.
-            post.commentCount = allComments.length >= 4 ? 4 : allComments.length;
+            post.commentCount = totalCommentCount;
           }
         } catch (e) {
           console.error('Failed to fetch comment previews for user posts:', e);
