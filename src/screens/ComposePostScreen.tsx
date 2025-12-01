@@ -2,7 +2,6 @@ import React from 'react';
 import {
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   StyleSheet,
   Alert,
@@ -17,6 +16,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { PostsAPI } from '../api';
 import { uploadMedia } from '../lib/upload';
 import { Button, IconButton } from '../components/ui';
+import { MentionTextInput } from '../components/MentionTextInput';
 import { useTheme, spacing, typography, borderRadius, shadows } from '../theme';
 
 export default function ComposePostScreen({ navigation }: any) {
@@ -141,7 +141,7 @@ export default function ComposePostScreen({ navigation }: any) {
           />
         </View>
 
-        <TextInput
+        <MentionTextInput
           style={styles.textInput}
           placeholder="What's on your mind?"
           placeholderTextColor={colors.text.tertiary}
