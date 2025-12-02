@@ -9,6 +9,7 @@ import {
   Platform,
   ActivityIndicator,
   Image,
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -119,29 +120,33 @@ export default function ComposePostScreen({ navigation }: any) {
 
   return (
     <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <Button
+          title="Cancel"
+          onPress={() => navigation.goBack()}
+          variant="ghost"
+          size="sm"
+        />
+        <Text style={styles.title}>New Post</Text>
+        <Button
+          title="Post"
+          onPress={handlePost}
+          disabled={loading || uploading || (!text.trim() && !imageKey)}
+          loading={loading}
+          variant="primary"
+          size="sm"
+        />
+      </View>
+
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
       >
-        <View style={styles.header}>
-          <Button
-            title="Cancel"
-            onPress={() => navigation.goBack()}
-            variant="ghost"
-            size="sm"
-          />
-          <Text style={styles.title}>New Post</Text>
-          <Button
-            title="Post"
-            onPress={handlePost}
-            disabled={loading || uploading || (!text.trim() && !imageKey)}
-            loading={loading}
-            variant="primary"
-            size="sm"
-          />
-        </View>
-
-        <View style={styles.content}>
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+        >
           <MentionTextInput
             style={styles.textInput}
             placeholder="What's on your mind?"
@@ -175,7 +180,7 @@ export default function ComposePostScreen({ navigation }: any) {
               />
             </View>
           )}
-        </View>
+        </ScrollView>
 
         <View style={styles.footer}>
           <TouchableOpacity
@@ -215,8 +220,11 @@ const createStyles = (colors: any) => StyleSheet.create({
     ...typography.styles.h5,
     color: colors.text.primary,
   },
-  content: {
+  scrollView: {
     flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
   },
   textInput: {
     padding: spacing[4],
