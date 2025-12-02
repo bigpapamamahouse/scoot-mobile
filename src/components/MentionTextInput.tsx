@@ -205,6 +205,6 @@ const styles = StyleSheet.create({
     elevation: 1000, // For Android
   },
   autocompleteInline: {
-    marginTop: 4,
+    marginTop: 2,
   },
 });
