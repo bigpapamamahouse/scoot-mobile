@@ -141,39 +141,41 @@ export default function ComposePostScreen({ navigation }: any) {
           />
         </View>
 
-        <MentionTextInput
-          style={styles.textInput}
-          placeholder="What's on your mind?"
-          placeholderTextColor={colors.text.tertiary}
-          value={text}
-          onChangeText={setText}
-          multiline
-          maxLength={500}
-          autoFocus
-          placement="below"
-          autocompleteMaxHeight={250}
-        />
+        <View style={styles.content}>
+          <MentionTextInput
+            style={styles.textInput}
+            placeholder="What's on your mind?"
+            placeholderTextColor={colors.text.tertiary}
+            value={text}
+            onChangeText={setText}
+            multiline
+            maxLength={500}
+            autoFocus
+            placement="below"
+            autocompleteMaxHeight={250}
+          />
 
-        {imageUri && (
-          <View style={styles.imageContainer}>
-            <Image source={{ uri: imageUri }} style={styles.imagePreview} />
-            {uploading && (
-              <View style={styles.uploadingOverlay}>
-                <ActivityIndicator size="large" color="white" />
-                <Text style={styles.uploadingText}>Uploading...</Text>
-              </View>
-            )}
-            <IconButton
-              icon="close"
-              onPress={removeImage}
-              variant="solid"
-              size="sm"
-              style={styles.removeImageButton}
-              backgroundColor="rgba(0,0,0,0.6)"
-              color={colors.text.inverse}
-            />
-          </View>
-        )}
+          {imageUri && (
+            <View style={styles.imageContainer}>
+              <Image source={{ uri: imageUri }} style={styles.imagePreview} />
+              {uploading && (
+                <View style={styles.uploadingOverlay}>
+                  <ActivityIndicator size="large" color="white" />
+                  <Text style={styles.uploadingText}>Uploading...</Text>
+                </View>
+              )}
+              <IconButton
+                icon="close"
+                onPress={removeImage}
+                variant="solid"
+                size="sm"
+                style={styles.removeImageButton}
+                backgroundColor="rgba(0,0,0,0.6)"
+                color={colors.text.inverse}
+              />
+            </View>
+          )}
+        </View>
 
         <View style={styles.footer}>
           <TouchableOpacity
@@ -212,6 +214,9 @@ const createStyles = (colors: any) => StyleSheet.create({
   title: {
     ...typography.styles.h5,
     color: colors.text.primary,
+  },
+  content: {
+    flex: 1,
   },
   textInput: {
     padding: spacing[4],
@@ -257,7 +262,6 @@ const createStyles = (colors: any) => StyleSheet.create({
     padding: spacing[4],
     borderTopWidth: 1,
     borderTopColor: colors.border.light,
-    marginTop: 'auto',
   },
   addPhotoButton: {
     flexDirection: 'row',
