@@ -150,6 +150,8 @@ export default function ComposePostScreen({ navigation }: any) {
           multiline
           maxLength={500}
           autoFocus
+          placement="below"
+          autocompleteMaxHeight={250}
         />
 
         {imageUri && (

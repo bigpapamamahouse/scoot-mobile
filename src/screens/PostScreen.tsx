@@ -445,6 +445,8 @@ export default function PostScreen({ route, navigation }: { route: PostScreenRou
           value={newComment}
           onChangeText={setNewComment}
           multiline
+          placement="above"
+          autocompleteMaxHeight={300}
         />
         <TouchableOpacity
           onPress={handleSubmit}

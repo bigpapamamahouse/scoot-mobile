@@ -12,6 +12,18 @@ import { MentionAutocomplete } from './MentionAutocomplete';
 interface MentionTextInputProps extends TextInputProps {
   value: string;
   onChangeText: (text: string) => void;
+  /**
+   * Where to position the autocomplete dropdown relative to the input
+   * 'above' - appears above the input (useful for inputs at bottom of screen)
+   * 'below' - appears below the input (useful for inputs at top of screen)
+   * @default 'above'
+   */
+  placement?: 'above' | 'below';
+  /**
+   * Maximum height for the autocomplete dropdown in pixels
+   * @default 200
+   */
+  autocompleteMaxHeight?: number;
 }
 
 interface MentionState {
@@ -24,6 +36,8 @@ export function MentionTextInput({
   value,
   onChangeText,
   style,
+  placement = 'above',
+  autocompleteMaxHeight = 200,
   ...otherProps
 }: MentionTextInputProps) {
   const [mentionState, setMentionState] = React.useState<MentionState>({
@@ -127,14 +141,21 @@ export function MentionTextInput({
     };
   }, []);
 
+  const autocompleteContainerStyle = React.useMemo(() => {
+    return placement === 'above'
+      ? styles.autocompleteAbove
+      : styles.autocompleteBelow;
+  }, [placement]);
+
   return (
     <View style={styles.container}>
       {mentionState.isActive && suggestedUsers.length > 0 && (
-        <View style={styles.autocompleteContainer}>
+        <View style={autocompleteContainerStyle}>
           <MentionAutocomplete
             users={suggestedUsers}
             loading={loadingSuggestions}
             onSelectUser={handleSelectUser}
+            maxHeight={autocompleteMaxHeight}
           />
         </View>
       )}
@@ -153,12 +174,20 @@ const styles = StyleSheet.create({
   container: {
     position: 'relative',
   },
-  autocompleteContainer: {
+  autocompleteAbove: {
     position: 'absolute',
     bottom: '100%',
     left: 0,
     right: 0,
     marginBottom: 8,
+    zIndex: 1000,
+  },
+  autocompleteBelow: {
+    position: 'absolute',
+    top: '100%',
+    left: 0,
+    right: 0,
+    marginTop: 8,
     zIndex: 1000,
   },
 });
