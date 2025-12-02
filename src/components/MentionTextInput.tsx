@@ -24,6 +24,13 @@ interface MentionTextInputProps extends TextInputProps {
    * @default 200
    */
   autocompleteMaxHeight?: number;
+  /**
+   * Whether the container should flex to fill available space
+   * Set to true for inputs in row layouts (like comment input)
+   * Set to false for inputs in column layouts (like post composition)
+   * @default true
+   */
+  flex?: boolean;
 }
 
 interface MentionState {
@@ -38,6 +45,7 @@ export function MentionTextInput({
   style,
   placement = 'above',
   autocompleteMaxHeight = 200,
+  flex = true,
   ...otherProps
 }: MentionTextInputProps) {
   const [mentionState, setMentionState] = React.useState<MentionState>({
@@ -147,8 +155,12 @@ export function MentionTextInput({
       : styles.autocompleteBelow;
   }, [placement]);
 
+  const containerStyle = React.useMemo(() => {
+    return flex ? styles.container : styles.containerNoFlex;
+  }, [flex]);
+
   return (
-    <View style={styles.container}>
+    <View style={containerStyle}>
       {placement === 'above' && mentionState.isActive && suggestedUsers.length > 0 && (
         <View style={autocompleteContainerStyle}>
           <MentionAutocomplete
@@ -183,6 +195,10 @@ export function MentionTextInput({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    position: 'relative',
+    overflow: 'visible',
+  },
+  containerNoFlex: {
     position: 'relative',
     overflow: 'visible',
   },

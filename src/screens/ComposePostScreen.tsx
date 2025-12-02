@@ -152,6 +152,7 @@ export default function ComposePostScreen({ navigation }: any) {
           autoFocus
           placement="below"
           autocompleteMaxHeight={250}
+          flex={false}
         />
 
         {imageUri && (
