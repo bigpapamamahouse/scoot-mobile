@@ -175,8 +175,6 @@ export default function ComposePostScreen({ navigation }: any) {
           </View>
         )}
 
-        <View style={styles.spacer} />
-
         <View style={styles.footer}>
           <TouchableOpacity
             style={styles.addPhotoButton}
@@ -222,9 +220,6 @@ const createStyles = (colors: any) => StyleSheet.create({
     minHeight: 44,
     color: colors.text.primary,
   },
-  spacer: {
-    flex: 1,
-  },
   imageContainer: {
     margin: spacing[4],
     position: 'relative',
@@ -262,6 +257,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     padding: spacing[4],
     borderTopWidth: 1,
     borderTopColor: colors.border.light,
+    marginTop: 'auto',
   },
   addPhotoButton: {
     flexDirection: 'row',
