@@ -4,7 +4,6 @@ import {
   Text,
   FlatList,
   StyleSheet,
-  TextInput,
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
@@ -15,6 +14,8 @@ import PostCard from '../components/PostCard';
 import { CommentsAPI, PostsAPI, UsersAPI } from '../api';
 import { Comment, Post } from '../types';
 import { Avatar } from '../components/Avatar';
+import { MentionTextInput } from '../components/MentionTextInput';
+import { MentionText } from '../components/MentionText';
 import { resolveHandle } from '../lib/resolveHandle';
 import { useCurrentUser, isOwner } from '../hooks/useCurrentUser';
 import { useTheme } from '../theme/ThemeContext';
@@ -370,7 +371,15 @@ export default function PostScreen({ route, navigation }: { route: PostScreenRou
               </TouchableOpacity>
             )}
           </View>
-          <Text style={styles.commentText}>{item.text}</Text>
+          <MentionText
+            text={item.text}
+            style={styles.commentText}
+            onPressMention={(handle) => {
+              navigation.push('Profile', {
+                userHandle: handle,
+              });
+            }}
+          />
         </View>
       </View>
     );
@@ -429,13 +438,15 @@ export default function PostScreen({ route, navigation }: { route: PostScreenRou
       />
 
       <View style={styles.inputContainer}>
-        <TextInput
+        <MentionTextInput
           style={styles.input}
           placeholder="Write a comment"
           placeholderTextColor={colors.text.tertiary}
           value={newComment}
           onChangeText={setNewComment}
           multiline
+          placement="above"
+          autocompleteMaxHeight={250}
         />
         <TouchableOpacity
           onPress={handleSubmit}
@@ -538,6 +549,8 @@ const createStyles = (colors: any) => StyleSheet.create({
     backgroundColor: colors.background.primary,
     alignItems: 'flex-end',
     gap: 12,
+    overflow: 'visible',
+    zIndex: 100,
   },
   input: {
     flex: 1,
@@ -551,6 +564,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     backgroundColor: colors.background.secondary,
     color: colors.text.primary,
     fontSize: 15,
+    overflow: 'visible',
   },
   sendButton: {
     backgroundColor: colors.primary[500],

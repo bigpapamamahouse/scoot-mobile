@@ -759,6 +759,63 @@ export function clearFollowerCache() {
   followerCache = null;
 }
 
+/**
+ * Search through users that the current user follows for mention autocomplete
+ */
+export async function searchFollowingForMentions(query: string): Promise<User[]> {
+  try {
+    // Get current user
+    const currentUser = await me();
+    const currentUserHandle = currentUser?.handle;
+
+    if (!currentUserHandle) {
+      return [];
+    }
+
+    // Get following list
+    const followingResponse = await listFollowing(currentUserHandle);
+    const followingList = Array.isArray(followingResponse)
+      ? followingResponse
+      : followingResponse?.items || followingResponse?.users || [];
+
+    // Filter by query (case insensitive)
+    const normalizedQuery = query.toLowerCase();
+    const filtered = followingList.filter((user: any) => {
+      const handle = (user.handle || '').toLowerCase();
+      const fullName = (user.fullName || '').toLowerCase();
+      return handle.includes(normalizedQuery) || fullName.includes(normalizedQuery);
+    });
+
+    // Sort by relevance: exact handle match first, then handle starts with, then name match
+    filtered.sort((a: any, b: any) => {
+      const handleA = (a.handle || '').toLowerCase();
+      const handleB = (b.handle || '').toLowerCase();
+      const nameA = (a.fullName || '').toLowerCase();
+      const nameB = (b.fullName || '').toLowerCase();
+
+      // Exact handle match
+      if (handleA === normalizedQuery && handleB !== normalizedQuery) return -1;
+      if (handleB === normalizedQuery && handleA !== normalizedQuery) return 1;
+
+      // Handle starts with query
+      if (handleA.startsWith(normalizedQuery) && !handleB.startsWith(normalizedQuery)) return -1;
+      if (handleB.startsWith(normalizedQuery) && !handleA.startsWith(normalizedQuery)) return 1;
+
+      // Name starts with query
+      if (nameA.startsWith(normalizedQuery) && !nameB.startsWith(normalizedQuery)) return -1;
+      if (nameB.startsWith(normalizedQuery) && !nameA.startsWith(normalizedQuery)) return 1;
+
+      // Alphabetical by handle
+      return handleA.localeCompare(handleB);
+    });
+
+    return filtered.slice(0, 10); // Limit to 10 results
+  } catch (error) {
+    console.error('Error searching following for mentions:', error);
+    return [];
+  }
+}
+
 export async function followUser(handle: string) {
   const requestBody = { handle };
 

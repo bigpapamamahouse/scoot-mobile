@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Post, Reaction, ReactionWithUsers, Comment } from '../types';
 import { mediaUrlFromKey } from '../lib/media';
 import { Avatar } from './Avatar';
+import { MentionText } from './MentionText';
 import { CommentsAPI, ReactionsAPI, PostsAPI, ModerationAPI } from '../api';
 import { resolveHandle } from '../lib/resolveHandle';
 import { useCurrentUser, isOwner } from '../hooks/useCurrentUser';
@@ -414,7 +415,13 @@ function PostCard({
       </View>
 
       {/* Content */}
-      <Text style={styles.text}>{localPost.text}</Text>
+      <MentionText
+        text={localPost.text}
+        style={styles.text}
+        onPressMention={(handle) => {
+          onPressUser?.(handle, handle);
+        }}
+      />
 
       {/* Image */}
       {imageUri && (
