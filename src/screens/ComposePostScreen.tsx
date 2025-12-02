@@ -218,7 +218,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     padding: spacing[4],
     fontSize: typography.fontSize.base,
     textAlignVertical: 'top',
-    minHeight: 120,
+    minHeight: 44,
     color: colors.text.primary,
   },
   imageContainer: {
