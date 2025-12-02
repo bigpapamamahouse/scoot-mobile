@@ -150,8 +150,8 @@ export default function ComposePostScreen({ navigation }: any) {
           multiline
           maxLength={500}
           autoFocus
-          placement="above"
-          autocompleteMaxHeight={200}
+          placement="below"
+          autocompleteMaxHeight={250}
         />
 
         {imageUri && (
@@ -217,7 +217,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     padding: spacing[4],
     fontSize: typography.fontSize.base,
     textAlignVertical: 'top',
-    minHeight: 120,
+    minHeight: 44,
     color: colors.text.primary,
   },
   imageContainer: {
