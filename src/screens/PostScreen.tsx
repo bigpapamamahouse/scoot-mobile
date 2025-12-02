@@ -554,7 +554,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   input: {
     flex: 1,
-    minHeight: 44,
+    minHeight: 40,
     maxHeight: 120,
     borderWidth: 1,
     borderColor: colors.border.main,

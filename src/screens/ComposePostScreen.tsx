@@ -150,7 +150,7 @@ export default function ComposePostScreen({ navigation }: any) {
           multiline
           maxLength={500}
           autoFocus
-          placement="below"
+          placement="above"
           autocompleteMaxHeight={250}
         />
 
