@@ -104,7 +104,7 @@ export function SearchScreen({ navigation }: Props) {
         <Text style={styles.userHandle}>@{item.handle || 'unknown'}</Text>
         {item.mutualFriendCount && item.mutualFriendCount > 0 && (
           <Text style={styles.mutualFriendsText}>
-            Followed by {item.mutualFriendCount} friend{item.mutualFriendCount !== 1 ? 's' : ''}
+            Followed by {item.mutualFriendCount}+ friend{item.mutualFriendCount !== 1 ? 's' : ''}
           </Text>
         )}
       </View>
