@@ -796,26 +796,43 @@ export async function getSuggestedUsers(): Promise<User[]> {
     const suggestedUsersMap = new Map<string, { user: any; mutualFriendCount: number }>();
 
     // Fetch who each of my friends follows (friends of friends)
-    // Limit to first 20 friends to avoid too many API calls
-    const friendsToCheck = myFollowing.slice(0, 20);
+    // Limit to 10 friends and batch requests to avoid overwhelming the API
+    const friendsToCheck = myFollowing.slice(0, 10);
 
-    const friendFollowingPromises = friendsToCheck.map(async (friend: any) => {
-      if (!friend?.handle) return [];
+    // Helper function to add delay between batches
+    const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-      try {
-        const friendFollowingResponse = await listFollowing(friend.handle);
-        const friendFollowing = Array.isArray(friendFollowingResponse)
-          ? friendFollowingResponse
-          : friendFollowingResponse?.items || friendFollowingResponse?.users || [];
+    // Process friends in batches of 3 to reduce concurrent load
+    const batchSize = 3;
+    const allFriendFollowing: Array<{ friendHandle: string; following: any[] }> = [];
 
-        return { friendHandle: friend.handle, following: friendFollowing };
-      } catch (error) {
-        console.error(`Failed to fetch following for ${friend.handle}:`, error);
-        return { friendHandle: friend.handle, following: [] };
+    for (let i = 0; i < friendsToCheck.length; i += batchSize) {
+      const batch = friendsToCheck.slice(i, i + batchSize);
+
+      const batchPromises = batch.map(async (friend: any) => {
+        if (!friend?.handle) return { friendHandle: '', following: [] };
+
+        try {
+          const friendFollowingResponse = await listFollowing(friend.handle);
+          const friendFollowing = Array.isArray(friendFollowingResponse)
+            ? friendFollowingResponse
+            : friendFollowingResponse?.items || friendFollowingResponse?.users || [];
+
+          return { friendHandle: friend.handle, following: friendFollowing };
+        } catch (error) {
+          console.error(`Failed to fetch following for ${friend.handle}:`, error);
+          return { friendHandle: friend.handle, following: [] };
+        }
+      });
+
+      const batchResults = await Promise.all(batchPromises);
+      allFriendFollowing.push(...batchResults);
+
+      // Add a small delay between batches to avoid rate limiting
+      if (i + batchSize < friendsToCheck.length) {
+        await delay(300);
       }
-    });
-
-    const allFriendFollowing = await Promise.all(friendFollowingPromises);
+    }
 
     // Aggregate suggested users from all friends' following lists
     allFriendFollowing.forEach(({ friendHandle, following }) => {
