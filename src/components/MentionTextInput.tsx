@@ -149,7 +149,7 @@ export function MentionTextInput({
 
   return (
     <View style={styles.container}>
-      {mentionState.isActive && suggestedUsers.length > 0 && (
+      {placement === 'above' && mentionState.isActive && suggestedUsers.length > 0 && (
         <View style={autocompleteContainerStyle}>
           <MentionAutocomplete
             users={suggestedUsers}
@@ -166,6 +166,16 @@ export function MentionTextInput({
         onChangeText={handleTextChange}
         onSelectionChange={handleSelectionChange}
       />
+      {placement === 'below' && mentionState.isActive && suggestedUsers.length > 0 && (
+        <View style={styles.autocompleteInline}>
+          <MentionAutocomplete
+            users={suggestedUsers}
+            loading={loadingSuggestions}
+            onSelectUser={handleSelectUser}
+            maxHeight={autocompleteMaxHeight}
+          />
+        </View>
+      )}
     </View>
   );
 }
@@ -193,5 +203,8 @@ const styles = StyleSheet.create({
     marginTop: 8,
     zIndex: 1000,
     elevation: 1000, // For Android
+  },
+  autocompleteInline: {
+    marginTop: 8,
   },
 });
