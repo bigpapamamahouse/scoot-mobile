@@ -173,14 +173,16 @@ export function MentionTextInput({
 const styles = StyleSheet.create({
   container: {
     position: 'relative',
+    overflow: 'visible',
   },
   autocompleteAbove: {
     position: 'absolute',
     bottom: '100%',
     left: 0,
     right: 0,
-    marginBottom: 8,
+    marginBottom: 12,
     zIndex: 1000,
+    elevation: 1000, // For Android
   },
   autocompleteBelow: {
     position: 'absolute',
@@ -189,5 +191,6 @@ const styles = StyleSheet.create({
     right: 0,
     marginTop: 8,
     zIndex: 1000,
+    elevation: 1000, // For Android
   },
 });

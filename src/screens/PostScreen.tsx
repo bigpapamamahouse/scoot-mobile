@@ -446,7 +446,7 @@ export default function PostScreen({ route, navigation }: { route: PostScreenRou
           onChangeText={setNewComment}
           multiline
           placement="above"
-          autocompleteMaxHeight={300}
+          autocompleteMaxHeight={250}
         />
         <TouchableOpacity
           onPress={handleSubmit}
@@ -549,10 +549,12 @@ const createStyles = (colors: any) => StyleSheet.create({
     backgroundColor: colors.background.primary,
     alignItems: 'flex-end',
     gap: 12,
+    overflow: 'visible',
+    zIndex: 100,
   },
   input: {
     flex: 1,
-    minHeight: 40,
+    minHeight: 44,
     maxHeight: 120,
     borderWidth: 1,
     borderColor: colors.border.main,
@@ -562,6 +564,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     backgroundColor: colors.background.secondary,
     color: colors.text.primary,
     fontSize: 15,
+    overflow: 'visible',
   },
   sendButton: {
     backgroundColor: colors.primary[500],

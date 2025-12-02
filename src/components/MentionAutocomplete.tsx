@@ -46,8 +46,9 @@ export function MentionAutocomplete({
     <View style={[styles.container, { maxHeight }]}>
       <FlatList
         data={users}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item, index) => item.id || item.handle || `user-${index}`}
         keyboardShouldPersistTaps="handled"
+        nestedScrollEnabled
         renderItem={({ item }) => (
           <TouchableOpacity
             style={styles.userItem}
