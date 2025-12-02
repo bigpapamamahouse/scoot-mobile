@@ -10,7 +10,7 @@ import {
   SafeAreaView,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { searchUsersWithMutuals } from '../api/users';
+import { searchUsersWithMutuals, getSuggestedUsers } from '../api/users';
 import { Avatar } from '../components/Avatar';
 import type { User } from '../types';
 import { useTheme, spacing, typography, borderRadius } from '../theme';
@@ -26,10 +26,29 @@ export function SearchScreen({ navigation }: Props) {
   const { colors } = useTheme();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<User[]>([]);
+  const [suggestedUsers, setSuggestedUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const styles = React.useMemo(() => createStyles(colors), [colors]);
+
+  // Fetch suggested users on mount
+  useEffect(() => {
+    const fetchSuggestions = async () => {
+      try {
+        setLoadingSuggestions(true);
+        const suggestions = await getSuggestedUsers();
+        setSuggestedUsers(suggestions);
+      } catch (err) {
+        console.error('Failed to fetch suggested users:', err);
+      } finally {
+        setLoadingSuggestions(false);
+      }
+    };
+
+    fetchSuggestions();
+  }, []);
 
   // Debounced search effect
   useEffect(() => {
@@ -83,6 +102,11 @@ export function SearchScreen({ navigation }: Props) {
           )}
         </View>
         <Text style={styles.userHandle}>@{item.handle || 'unknown'}</Text>
+        {item.mutualFriendCount && item.mutualFriendCount > 0 && (
+          <Text style={styles.mutualFriendsText}>
+            Followed by {item.mutualFriendCount} friend{item.mutualFriendCount !== 1 ? 's' : ''}
+          </Text>
+        )}
       </View>
     </TouchableOpacity>
   ), [handleUserPress, styles]);
@@ -123,6 +147,10 @@ export function SearchScreen({ navigation }: Props) {
     );
   };
 
+  // Determine which data to display
+  const displayData = query.trim().length === 0 ? suggestedUsers : results;
+  const showSuggestionsHeader = query.trim().length === 0 && suggestedUsers.length > 0;
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.searchContainer}>
@@ -143,11 +171,24 @@ export function SearchScreen({ navigation }: Props) {
         </View>
       )}
 
+      {loadingSuggestions && query.trim().length === 0 && (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary[500]} />
+        </View>
+      )}
+
       <FlatList
-        data={results}
+        data={displayData}
         renderItem={renderUserItem}
         keyExtractor={(item) => item.id || item.handle || Math.random().toString()}
         contentContainerStyle={styles.listContainer}
+        ListHeaderComponent={
+          showSuggestionsHeader ? (
+            <View style={styles.suggestionsHeader}>
+              <Text style={styles.suggestionsHeaderText}>Suggested for you</Text>
+            </View>
+          ) : null
+        }
         ListEmptyComponent={renderEmptyState}
         keyboardShouldPersistTaps="handled"
       />
@@ -228,5 +269,23 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: typography.fontSize.base,
     color: colors.text.tertiary,
     textAlign: 'center',
+  },
+  suggestionsHeader: {
+    paddingHorizontal: spacing[3],
+    paddingTop: spacing[3],
+    paddingBottom: spacing[2],
+    backgroundColor: colors.background.elevated,
+  },
+  suggestionsHeaderText: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.text.secondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  mutualFriendsText: {
+    fontSize: typography.fontSize.xs,
+    color: colors.text.tertiary,
+    marginTop: spacing[1],
   },
 });

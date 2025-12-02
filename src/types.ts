@@ -22,6 +22,7 @@ export interface User {
   createdAt: string;
   fullName?: string;
   hasMutualConnection?: boolean; // Set to true if user has mutual followers/following with current user
+  mutualFriendCount?: number; // Number of mutual friends (people who follow this user that you also follow)
 }
 
 export interface Notification {

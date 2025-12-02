@@ -760,6 +760,168 @@ export function clearFollowerCache() {
 }
 
 /**
+ * Get suggested users based on mutual follows (friends of friends).
+ * Returns users followed by people you follow, but that you don't follow yet.
+ * Results are randomized but weighted by number of mutual friends.
+ */
+export async function getSuggestedUsers(): Promise<User[]> {
+  try {
+    // Get current user
+    const currentUser = await me();
+    const currentUserHandle = currentUser?.handle;
+
+    if (!currentUserHandle) {
+      return [];
+    }
+
+    // Get list of people the current user follows
+    const followingResponse = await listFollowing(currentUserHandle);
+    const myFollowing = Array.isArray(followingResponse)
+      ? followingResponse
+      : followingResponse?.items || followingResponse?.users || [];
+
+    if (myFollowing.length === 0) {
+      return [];
+    }
+
+    // Create a Set of handles I already follow for quick lookup
+    const myFollowingHandles = new Set<string>();
+    myFollowing.forEach((user: any) => {
+      if (user?.handle) {
+        myFollowingHandles.add(user.handle);
+      }
+    });
+
+    // Map to track suggested users and count of mutual friends
+    const suggestedUsersMap = new Map<string, { user: any; mutualFriendCount: number }>();
+
+    // Fetch who each of my friends follows (friends of friends)
+    // Limit to first 20 friends to avoid too many API calls
+    const friendsToCheck = myFollowing.slice(0, 20);
+
+    const friendFollowingPromises = friendsToCheck.map(async (friend: any) => {
+      if (!friend?.handle) return [];
+
+      try {
+        const friendFollowingResponse = await listFollowing(friend.handle);
+        const friendFollowing = Array.isArray(friendFollowingResponse)
+          ? friendFollowingResponse
+          : friendFollowingResponse?.items || friendFollowingResponse?.users || [];
+
+        return { friendHandle: friend.handle, following: friendFollowing };
+      } catch (error) {
+        console.error(`Failed to fetch following for ${friend.handle}:`, error);
+        return { friendHandle: friend.handle, following: [] };
+      }
+    });
+
+    const allFriendFollowing = await Promise.all(friendFollowingPromises);
+
+    // Aggregate suggested users from all friends' following lists
+    allFriendFollowing.forEach(({ friendHandle, following }) => {
+      following.forEach((user: any) => {
+        const userHandle = user?.handle;
+
+        // Skip if:
+        // - No handle
+        // - It's the current user
+        // - Already following this user
+        if (!userHandle || userHandle === currentUserHandle || myFollowingHandles.has(userHandle)) {
+          return;
+        }
+
+        // Add or update the suggested user
+        if (suggestedUsersMap.has(userHandle)) {
+          const existing = suggestedUsersMap.get(userHandle)!;
+          existing.mutualFriendCount += 1;
+        } else {
+          suggestedUsersMap.set(userHandle, {
+            user,
+            mutualFriendCount: 1
+          });
+        }
+      });
+    });
+
+    // Convert map to array
+    let suggestedUsers = Array.from(suggestedUsersMap.values());
+
+    if (suggestedUsers.length === 0) {
+      return [];
+    }
+
+    // Sort by mutual friend count (descending)
+    suggestedUsers.sort((a, b) => b.mutualFriendCount - a.mutualFriendCount);
+
+    // Add controlled randomization while maintaining general priority
+    // Group users by mutual friend count ranges for weighted random selection
+    const highPriority = suggestedUsers.filter(u => u.mutualFriendCount >= 3); // 3+ mutual friends
+    const mediumPriority = suggestedUsers.filter(u => u.mutualFriendCount === 2); // 2 mutual friends
+    const lowPriority = suggestedUsers.filter(u => u.mutualFriendCount === 1); // 1 mutual friend
+
+    // Shuffle each priority group
+    const shuffleArray = <T>(array: T[]): T[] => {
+      const shuffled = [...array];
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+      return shuffled;
+    };
+
+    const shuffledHigh = shuffleArray(highPriority);
+    const shuffledMedium = shuffleArray(mediumPriority);
+    const shuffledLow = shuffleArray(lowPriority);
+
+    // Combine: high priority first, then medium, then low
+    const randomizedSuggestions = [
+      ...shuffledHigh,
+      ...shuffledMedium,
+      ...shuffledLow
+    ];
+
+    // Take top 10 suggestions
+    const topSuggestions = randomizedSuggestions.slice(0, 10);
+
+    // Enrich user data and add mutualFriendCount
+    const enrichedPromises = topSuggestions.map(async ({ user, mutualFriendCount }) => {
+      try {
+        // Check if user data is incomplete
+        const isIncomplete = !user.fullName || !user.avatarKey;
+
+        if (isIncomplete && user.handle) {
+          const fullUserData = await getUser(user.handle);
+          return {
+            ...user,
+            fullName: fullUserData?.fullName || user.fullName,
+            avatarKey: fullUserData?.avatarKey || user.avatarKey,
+            mutualFriendCount
+          };
+        }
+
+        return {
+          ...user,
+          mutualFriendCount
+        };
+      } catch (error) {
+        console.error(`Failed to enrich suggested user ${user.handle}:`, error);
+        return {
+          ...user,
+          mutualFriendCount
+        };
+      }
+    });
+
+    const enrichedSuggestions = await Promise.all(enrichedPromises);
+    return enrichedSuggestions;
+
+  } catch (error) {
+    console.error('Error fetching suggested users:', error);
+    return [];
+  }
+}
+
+/**
  * Search through users that the current user follows for mention autocomplete
  */
 export async function searchFollowingForMentions(query: string): Promise<User[]> {
