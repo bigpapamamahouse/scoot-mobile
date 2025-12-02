@@ -9,7 +9,6 @@ import {
   Platform,
   ActivityIndicator,
   Image,
-  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -119,68 +118,62 @@ export default function ComposePostScreen({ navigation }: any) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Button
-          title="Cancel"
-          onPress={() => navigation.goBack()}
-          variant="ghost"
-          size="sm"
-        />
-        <Text style={styles.title}>New Post</Text>
-        <Button
-          title="Post"
-          onPress={handlePost}
-          disabled={loading || uploading || (!text.trim() && !imageKey)}
-          loading={loading}
-          variant="primary"
-          size="sm"
-        />
-      </View>
-
+    <SafeAreaView style={styles.container} edges={['bottom']}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
       >
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-        >
-          <MentionTextInput
-            style={styles.textInput}
-            placeholder="What's on your mind?"
-            placeholderTextColor={colors.text.tertiary}
-            value={text}
-            onChangeText={setText}
-            multiline
-            maxLength={500}
-            autoFocus
-            placement="below"
-            autocompleteMaxHeight={250}
+        <View style={styles.header}>
+          <Button
+            title="Cancel"
+            onPress={() => navigation.goBack()}
+            variant="ghost"
+            size="sm"
           />
+          <Text style={styles.title}>New Post</Text>
+          <Button
+            title="Post"
+            onPress={handlePost}
+            disabled={loading || uploading || (!text.trim() && !imageKey)}
+            loading={loading}
+            variant="primary"
+            size="sm"
+          />
+        </View>
 
-          {imageUri && (
-            <View style={styles.imageContainer}>
-              <Image source={{ uri: imageUri }} style={styles.imagePreview} />
-              {uploading && (
-                <View style={styles.uploadingOverlay}>
-                  <ActivityIndicator size="large" color="white" />
-                  <Text style={styles.uploadingText}>Uploading...</Text>
-                </View>
-              )}
-              <IconButton
-                icon="close"
-                onPress={removeImage}
-                variant="solid"
-                size="sm"
-                style={styles.removeImageButton}
-                backgroundColor="rgba(0,0,0,0.6)"
-                color={colors.text.inverse}
-              />
-            </View>
-          )}
-        </ScrollView>
+        <MentionTextInput
+          style={styles.textInput}
+          placeholder="What's on your mind?"
+          placeholderTextColor={colors.text.tertiary}
+          value={text}
+          onChangeText={setText}
+          multiline
+          maxLength={500}
+          autoFocus
+          placement="below"
+          autocompleteMaxHeight={250}
+        />
+
+        {imageUri && (
+          <View style={styles.imageContainer}>
+            <Image source={{ uri: imageUri }} style={styles.imagePreview} />
+            {uploading && (
+              <View style={styles.uploadingOverlay}>
+                <ActivityIndicator size="large" color="white" />
+                <Text style={styles.uploadingText}>Uploading...</Text>
+              </View>
+            )}
+            <IconButton
+              icon="close"
+              onPress={removeImage}
+              variant="solid"
+              size="sm"
+              style={styles.removeImageButton}
+              backgroundColor="rgba(0,0,0,0.6)"
+              color={colors.text.inverse}
+            />
+          </View>
+        )}
 
         <View style={styles.footer}>
           <TouchableOpacity
@@ -219,12 +212,6 @@ const createStyles = (colors: any) => StyleSheet.create({
   title: {
     ...typography.styles.h5,
     color: colors.text.primary,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
   },
   textInput: {
     padding: spacing[4],
