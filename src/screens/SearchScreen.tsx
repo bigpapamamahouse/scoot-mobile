@@ -102,11 +102,6 @@ export function SearchScreen({ navigation }: Props) {
           )}
         </View>
         <Text style={styles.userHandle}>@{item.handle || 'unknown'}</Text>
-        {item.mutualFriendCount && item.mutualFriendCount > 0 && (
-          <Text style={styles.mutualFriendsText}>
-            Followed by {item.mutualFriendCount}+ friend{item.mutualFriendCount !== 1 ? 's' : ''}
-          </Text>
-        )}
       </View>
     </TouchableOpacity>
   ), [handleUserPress, styles]);
@@ -282,10 +277,5 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.text.secondary,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-  },
-  mutualFriendsText: {
-    fontSize: typography.fontSize.xs,
-    color: colors.text.tertiary,
-    marginTop: spacing[1],
   },
 });
