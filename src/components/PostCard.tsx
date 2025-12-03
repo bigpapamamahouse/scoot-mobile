@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet, Alert, Pressable } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import ImageViewing from 'react-native-image-viewing';
 import { Post, Reaction, ReactionWithUsers, Comment } from '../types';
 import { mediaUrlFromKey } from '../lib/media';
@@ -553,20 +553,11 @@ function PostCard({
           ]}
           activeOpacity={0.6}
         >
-          <View style={styles.clapIconContainer}>
-            <Ionicons
-              name={getReactionInfo('👏').hasReacted ? 'hand-left' : 'hand-left-outline'}
-              size={16}
-              color={getReactionInfo('👏').hasReacted ? colors.social.celebrate : colors.text.secondary}
-              style={styles.clapIconLeft}
-            />
-            <Ionicons
-              name={getReactionInfo('👏').hasReacted ? 'hand-right' : 'hand-right-outline'}
-              size={16}
-              color={getReactionInfo('👏').hasReacted ? colors.social.celebrate : colors.text.secondary}
-              style={styles.clapIconRight}
-            />
-          </View>
+          <MaterialCommunityIcons
+            name={getReactionInfo('👏').hasReacted ? 'hand-clap' : 'hand-clap-outline'}
+            size={20}
+            color={getReactionInfo('👏').hasReacted ? colors.social.celebrate : colors.text.secondary}
+          />
           {getReactionInfo('👏').count > 0 && (
             <Text style={[
               styles.reactionCount,
@@ -770,19 +761,6 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: typography.fontSize.xs,
     fontWeight: typography.fontWeight.semibold,
     color: colors.text.secondary,
-  },
-  clapIconContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: 20,
-    height: 20,
-  },
-  clapIconLeft: {
-    marginRight: -4,
-  },
-  clapIconRight: {
-    marginLeft: -4,
   },
   commentButton: {
     flexDirection: 'row',
