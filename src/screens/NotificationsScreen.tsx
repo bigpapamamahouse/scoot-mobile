@@ -9,15 +9,20 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NotificationsAPI, PostsAPI } from '../api';
-import { Notification } from '../types';
+import { Notification, Post } from '../types';
 import { isFollowRequestNotification, useNotifications } from '../lib/notifications';
 import { useTheme, spacing, borderRadius, shadows } from '../theme';
+import { mediaUrlFromKey } from '../lib/media';
 
-type NotificationListItem = Notification & { handledAction?: 'accept' | 'decline' };
+type NotificationListItem = Notification & {
+  handledAction?: 'accept' | 'decline';
+  postPreview?: Post | null;
+};
 
 const INITIAL_LOAD_COUNT = 20;
 
@@ -41,9 +46,42 @@ export default function NotificationsScreen(){
     }
     try {
       const response = await NotificationsAPI.listNotifications(true);
-      const nextItems = ((response.items || []) as Notification[]).map(
-        (item) => ({ ...item } as NotificationListItem),
-      );
+      const notifications = (response.items || []) as Notification[];
+
+      // Fetch post previews for notifications with postId
+      const postIds = new Set<string>();
+      notifications.forEach(notification => {
+        const postId = notification.postId || notification.relatedPostId;
+        if (postId) {
+          postIds.add(postId);
+        }
+      });
+
+      // Fetch all posts in parallel
+      const postMap = new Map<string, Post>();
+      if (postIds.size > 0) {
+        const postPromises = Array.from(postIds).map(async (postId) => {
+          try {
+            const postResponse = await PostsAPI.getPost(postId);
+            const post = postResponse?.post || postResponse?.item || postResponse?.data || postResponse;
+            if (post) {
+              postMap.set(postId, post);
+            }
+          } catch (error) {
+            // Silently ignore failed post fetches
+            console.warn(`Failed to fetch post ${postId}`, error);
+          }
+        });
+        await Promise.all(postPromises);
+      }
+
+      // Map notifications with their post previews
+      const nextItems: NotificationListItem[] = notifications.map((item) => {
+        const postId = item.postId || item.relatedPostId;
+        const postPreview = postId ? postMap.get(postId) : undefined;
+        return { ...item, postPreview };
+      });
+
       setAllItems(nextItems);
       // Initially show only the first INITIAL_LOAD_COUNT items
       setDisplayedItems(nextItems.slice(0, INITIAL_LOAD_COUNT));
@@ -193,73 +231,104 @@ export default function NotificationsScreen(){
       // Check for both postId and relatedPostId (backend uses postId)
       const hasRelatedPost = !!(item.postId || item.relatedPostId);
       const postId = item.postId || item.relatedPostId;
+      const postPreview = item.postPreview;
+      const imageUri = postPreview?.imageKey ? mediaUrlFromKey(postPreview.imageKey) : null;
+      const textPreview = postPreview?.text ? postPreview.text.substring(0, 50) + (postPreview.text.length > 50 ? '...' : '') : null;
 
       return (
         <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <TouchableOpacity
-              onPress={() => handleNavigateToProfile(item.fromUserId, item.fromHandle)}
-            >
-              <Text style={styles.sender}>@{sender}</Text>
-            </TouchableOpacity>
-            {followRequest && !handledAction && (
-              <View style={styles.requestBadge}>
-                <Text style={styles.requestBadgeText}>Request</Text>
+          <View style={styles.cardContentRow}>
+            {/* Left side: Main content */}
+            <View style={styles.cardMainContent}>
+              <View style={styles.cardHeader}>
+                <TouchableOpacity
+                  onPress={() => handleNavigateToProfile(item.fromUserId, item.fromHandle)}
+                >
+                  <Text style={styles.sender}>@{sender}</Text>
+                </TouchableOpacity>
+                {followRequest && !handledAction && (
+                  <View style={styles.requestBadge}>
+                    <Text style={styles.requestBadgeText}>Request</Text>
+                  </View>
+                )}
               </View>
+              {renderClickableMessage(item.message || 'Notification')}
+              {hasRelatedPost && postId && (
+                <TouchableOpacity
+                  style={styles.postLinkContainer}
+                  onPress={() => handleNavigateToPost(postId)}
+                  activeOpacity={0.6}
+                >
+                  <Ionicons name="arrow-forward-circle-outline" size={14} color={styles.postLinkIcon.color} />
+                  <Text style={styles.postLink}>View post</Text>
+                </TouchableOpacity>
+              )}
+              {followRequest && handledAction && (
+                <Text
+                  style={[
+                    styles.followStatus,
+                    handledAction === 'decline' && styles.followStatusDeclined,
+                  ]}
+                >
+                  {handledAction === 'accept'
+                    ? 'You accepted this follow request.'
+                    : 'You declined this follow request.'}
+                </Text>
+              )}
+              {followRequest && !handledAction && (
+                <View style={styles.actionsRow}>
+                  <TouchableOpacity
+                    style={[styles.actionButton, styles.acceptButton]}
+                    onPress={() => handleFollowAction(item, 'accept')}
+                    disabled={acceptBusy || declineBusy}
+                  >
+                    {acceptBusy ? (
+                      <ActivityIndicator color="#fff" size="small" />
+                    ) : (
+                      <Text style={styles.actionLabel}>Accept</Text>
+                    )}
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.actionButton, styles.declineButton]}
+                    onPress={() => handleFollowAction(item, 'decline')}
+                    disabled={acceptBusy || declineBusy}
+                  >
+                    {declineBusy ? (
+                      <ActivityIndicator color="#fff" size="small" />
+                    ) : (
+                      <Text style={styles.actionLabel}>Decline</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              )}
+              {timestamp && (
+                <Text style={styles.timestamp}>{timestamp.toLocaleString()}</Text>
+              )}
+            </View>
+
+            {/* Right side: Post preview */}
+            {hasRelatedPost && (imageUri || textPreview) && (
+              <TouchableOpacity
+                style={styles.postPreviewContainer}
+                onPress={() => postId && handleNavigateToPost(postId)}
+                activeOpacity={0.7}
+              >
+                {imageUri ? (
+                  <Image
+                    source={{ uri: imageUri }}
+                    style={styles.postPreviewImage}
+                    resizeMode="cover"
+                  />
+                ) : textPreview ? (
+                  <View style={styles.postPreviewTextContainer}>
+                    <Text style={styles.postPreviewText} numberOfLines={3}>
+                      {textPreview}
+                    </Text>
+                  </View>
+                ) : null}
+              </TouchableOpacity>
             )}
           </View>
-          {renderClickableMessage(item.message || 'Notification')}
-          {hasRelatedPost && postId && (
-            <TouchableOpacity
-              style={styles.postLinkContainer}
-              onPress={() => handleNavigateToPost(postId)}
-              activeOpacity={0.6}
-            >
-              <Ionicons name="arrow-forward-circle-outline" size={14} color={styles.postLinkIcon.color} />
-              <Text style={styles.postLink}>View post</Text>
-            </TouchableOpacity>
-          )}
-          {followRequest && handledAction && (
-            <Text
-              style={[
-                styles.followStatus,
-                handledAction === 'decline' && styles.followStatusDeclined,
-              ]}
-            >
-              {handledAction === 'accept'
-                ? 'You accepted this follow request.'
-                : 'You declined this follow request.'}
-            </Text>
-          )}
-          {followRequest && !handledAction && (
-            <View style={styles.actionsRow}>
-              <TouchableOpacity
-                style={[styles.actionButton, styles.acceptButton]}
-                onPress={() => handleFollowAction(item, 'accept')}
-                disabled={acceptBusy || declineBusy}
-              >
-                {acceptBusy ? (
-                  <ActivityIndicator color="#fff" size="small" />
-                ) : (
-                  <Text style={styles.actionLabel}>Accept</Text>
-                )}
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.actionButton, styles.declineButton]}
-                onPress={() => handleFollowAction(item, 'decline')}
-                disabled={acceptBusy || declineBusy}
-              >
-                {declineBusy ? (
-                  <ActivityIndicator color="#fff" size="small" />
-                ) : (
-                  <Text style={styles.actionLabel}>Decline</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          )}
-          {timestamp && (
-            <Text style={styles.timestamp}>{timestamp.toLocaleString()}</Text>
-          )}
         </View>
       );
     },
@@ -306,6 +375,13 @@ const createStyles = (colors: any) => StyleSheet.create({
     borderRadius: borderRadius.lg,
     padding: spacing[4],
     ...shadows.base,
+  },
+  cardContentRow: {
+    flexDirection: 'row',
+    gap: spacing[3],
+  },
+  cardMainContent: {
+    flex: 1,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -402,5 +478,30 @@ const createStyles = (colors: any) => StyleSheet.create({
   loadingMore: {
     paddingVertical: spacing[4],
     alignItems: 'center',
+  },
+  postPreviewContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: borderRadius.base,
+    overflow: 'hidden',
+    backgroundColor: colors.background.secondary,
+  },
+  postPreviewImage: {
+    width: '100%',
+    height: '100%',
+  },
+  postPreviewTextContainer: {
+    width: '100%',
+    height: '100%',
+    padding: spacing[2],
+    justifyContent: 'center',
+    backgroundColor: colors.background.secondary,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  postPreviewText: {
+    fontSize: 11,
+    color: colors.text.secondary,
+    lineHeight: 14,
   },
 });

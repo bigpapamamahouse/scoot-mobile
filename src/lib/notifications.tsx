@@ -225,9 +225,14 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
 
   React.useEffect(() => {
     refresh();
-    const interval = setInterval(() => {
-      refresh();
-    }, 15_000);
+
+    // Removed 15-second polling interval - it was redundant with push notifications.
+    // Push notifications now handle real-time updates:
+    // - When app is backgrounded: Expo delivers push notifications instantly
+    // - When app is in foreground: addNotificationReceivedListener fires
+    // - When app becomes active: AppState listener triggers a refresh
+    // This saves significant API calls while maintaining real-time updates.
+
     const subscription = Notifications.addNotificationReceivedListener(() => {
       refresh();
     });
@@ -235,28 +240,54 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     // Handle notification taps for deep linking to posts
     const responseSubscription = Notifications.addNotificationResponseReceivedListener(
       async (response) => {
+        console.log('[Notifications] Notification tapped:', JSON.stringify(response.notification.request.content, null, 2));
+
         const data = response.notification.request.content.data;
-        const postId = data?.postId;
+        let postId = data?.postId as string | undefined;
+
+        // Debug logging to help diagnose issues
+        console.log('[Notifications] Extracted postId from data:', postId);
+
+        // If postId not in data, try to get the notification ID and fetch from API
+        if (!postId && data?.notificationId) {
+          console.log('[Notifications] No postId in data, fetching notification details from API');
+          try {
+            const notificationsResponse = await NotificationsAPI.listNotifications(false);
+            const notifications: Notification[] = notificationsResponse.items || [];
+            const matchingNotification = notifications.find(n => n.id === data.notificationId);
+
+            if (matchingNotification) {
+              postId = matchingNotification.postId || matchingNotification.relatedPostId || undefined;
+              console.log('[Notifications] Found postId from API:', postId);
+            }
+          } catch (error) {
+            console.warn('[Notifications] Failed to fetch notification details', error);
+          }
+        }
 
         // If notification has a postId, navigate to that post
         if (postId && navigationRef.isReady()) {
+          console.log('[Notifications] Navigating to post:', postId);
           try {
-            const postResponse = await PostsAPI.getPost(postId as string);
+            const postResponse = await PostsAPI.getPost(postId);
             const post = postResponse?.post || postResponse?.item || postResponse?.data || postResponse;
 
             if (post) {
               // Navigate to the post screen
               navigationRef.navigate('Post' as never, { post } as never);
+              console.log('[Notifications] Successfully navigated to post');
             } else {
+              console.warn('[Notifications] Post not found, navigating to notifications screen');
               // Fallback to notifications screen if post not found
               navigationRef.navigate('Notifications' as never);
             }
           } catch (error) {
-            console.warn('Failed to load post from notification', error);
+            console.warn('[Notifications] Failed to load post from notification', error);
             // Fallback to notifications screen on error
             navigationRef.navigate('Notifications' as never);
           }
         } else if (navigationRef.isReady()) {
+          console.log('[Notifications] No postId available, navigating to notifications screen');
           // No postId, navigate to notifications screen
           navigationRef.navigate('Notifications' as never);
         }
@@ -272,7 +303,6 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
       }
     });
     return () => {
-      clearInterval(interval);
       subscription.remove();
       responseSubscription.remove();
       appStateSubscription.remove();
