@@ -66,6 +66,7 @@ export default function PostScreen({ route, navigation }: { route: PostScreenRou
   const [page, setPage] = React.useState(0);
   const [newComment, setNewComment] = React.useState('');
   const [submitting, setSubmitting] = React.useState(false);
+  const [replyingTo, setReplyingTo] = React.useState<Comment | null>(null);
 
   const openProfile = React.useCallback(
     (targetPost: Post | null) => {
@@ -232,7 +233,8 @@ export default function PostScreen({ route, navigation }: { route: PostScreenRou
     }
     setSubmitting(true);
     try {
-      const result = await CommentsAPI.addComment(postId, trimmed);
+      const parentCommentId = replyingTo?.id;
+      const result = await CommentsAPI.addComment(postId, trimmed, parentCommentId);
 
       const created: Comment | null = (result && (result.comment || result.item || result.data || result)) || null;
       if (created) {
@@ -255,12 +257,13 @@ export default function PostScreen({ route, navigation }: { route: PostScreenRou
         });
       }
       setNewComment('');
+      setReplyingTo(null);
     } catch (err) {
       console.warn('Failed to submit comment', err);
     } finally {
       setSubmitting(false);
     }
-  }, [newComment, postId, submitting, currentUser]);
+  }, [newComment, postId, submitting, currentUser, replyingTo]);
 
   const handleEditComment = (comment: Comment) => {
     Alert.prompt(
@@ -309,10 +312,22 @@ export default function PostScreen({ route, navigation }: { route: PostScreenRou
             if (!postId) return;
             try {
               await CommentsAPI.deleteComment(postId, comment.id);
-              setComments((prev) => prev.filter((c) => c.id !== comment.id));
+              // Remove the comment and all its replies
+              setComments((prev) => {
+                const toRemove = new Set([comment.id]);
+                // Find all replies to this comment
+                prev.forEach(c => {
+                  if (c.parentCommentId === comment.id) {
+                    toRemove.add(c.id);
+                  }
+                });
+                return prev.filter((c) => !toRemove.has(c.id));
+              });
               setPost((prev) => {
                 if (!prev) return prev;
-                const nextCount = Math.max((prev.commentCount || 0) - 1, 0);
+                // Count how many comments were removed (parent + replies)
+                const removedCount = comments.filter(c => c.id === comment.id || c.parentCommentId === comment.id).length;
+                const nextCount = Math.max((prev.commentCount || 0) - removedCount, 0);
                 return { ...prev, commentCount: nextCount };
               });
               Alert.alert('Success', 'Comment deleted successfully');
@@ -344,7 +359,7 @@ export default function PostScreen({ route, navigation }: { route: PostScreenRou
 
   const styles = React.useMemo(() => createStyles(colors), [colors]);
 
-  const renderComment = ({ item }: { item: Comment }) => {
+  const renderComment = ({ item, isReply = false }: { item: Comment; isReply?: boolean }) => {
     const anyComment: any = item;
     const handleCandidate = resolveHandle(anyComment);
     const fallbackId =
@@ -355,9 +370,12 @@ export default function PostScreen({ route, navigation }: { route: PostScreenRou
     const createdAt = item.createdAt ? new Date(item.createdAt).toLocaleString() : '';
     const userOwnsComment = isOwner(item, currentUser);
 
+    // Find replies to this comment
+    const replies = comments.filter(c => c.parentCommentId === item.id);
+
     return (
-      <View style={styles.commentRow}>
-        <Avatar avatarKey={anyComment?.avatarKey} size={28} />
+      <View style={[styles.commentRow, isReply && styles.replyRow]}>
+        <Avatar avatarKey={anyComment?.avatarKey} size={isReply ? 24 : 28} />
         <View style={styles.commentContent}>
           <View style={styles.commentHeader}>
             <Text style={styles.commentHandle}>{handle}</Text>
@@ -380,6 +398,26 @@ export default function PostScreen({ route, navigation }: { route: PostScreenRou
               });
             }}
           />
+          {!isReply && (
+            <TouchableOpacity
+              onPress={() => setReplyingTo(item)}
+              style={styles.replyButton}
+            >
+              <Text style={styles.replyButtonText}>Reply</Text>
+              {replies.length > 0 && (
+                <Text style={styles.replyCount}>({replies.length})</Text>
+              )}
+            </TouchableOpacity>
+          )}
+          {replies.length > 0 && (
+            <View style={styles.repliesContainer}>
+              {replies.map(reply => (
+                <View key={reply.id}>
+                  {renderComment({ item: reply, isReply: true })}
+                </View>
+              ))}
+            </View>
+          )}
         </View>
       </View>
     );
@@ -393,7 +431,7 @@ export default function PostScreen({ route, navigation }: { route: PostScreenRou
     >
       <FlatList
         style={styles.list}
-        data={comments}
+        data={comments.filter(c => !c.parentCommentId)}
         keyExtractor={(item) => item.id}
         renderItem={renderComment}
         keyboardShouldPersistTaps="handled"
@@ -439,26 +477,38 @@ export default function PostScreen({ route, navigation }: { route: PostScreenRou
       />
 
       <View style={styles.inputContainer}>
-        <MentionTextInput
-          style={styles.input}
-          placeholder="Write a comment"
-          placeholderTextColor={colors.text.tertiary}
-          value={newComment}
-          onChangeText={setNewComment}
-          multiline
-          placement="above"
-          autocompleteMaxHeight={250}
-        />
-        <TouchableOpacity
-          onPress={handleSubmit}
-          style={[
-            styles.sendButton,
-            (!newComment.trim() || submitting) && styles.sendButtonDisabled,
-          ]}
-          disabled={!newComment.trim() || submitting}
-        >
-          <Text style={styles.sendButtonText}>{submitting ? '...' : 'Send'}</Text>
-        </TouchableOpacity>
+        {replyingTo && (
+          <View style={styles.replyingToContainer}>
+            <Text style={styles.replyingToText}>
+              Replying to @{resolveHandle(replyingTo) || 'user'}
+            </Text>
+            <TouchableOpacity onPress={() => setReplyingTo(null)}>
+              <Text style={styles.cancelReplyText}>✕</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+        <View style={styles.inputRow}>
+          <MentionTextInput
+            style={styles.input}
+            placeholder={replyingTo ? "Write a reply..." : "Write a comment"}
+            placeholderTextColor={colors.text.tertiary}
+            value={newComment}
+            onChangeText={setNewComment}
+            multiline
+            placement="above"
+            autocompleteMaxHeight={250}
+          />
+          <TouchableOpacity
+            onPress={handleSubmit}
+            style={[
+              styles.sendButton,
+              (!newComment.trim() || submitting) && styles.sendButtonDisabled,
+            ]}
+            disabled={!newComment.trim() || submitting}
+          >
+            <Text style={styles.sendButtonText}>{submitting ? '...' : 'Send'}</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </KeyboardAvoidingView>
   );
@@ -541,17 +591,62 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: 14,
     color: colors.text.primary,
   },
-  inputContainer: {
+  replyRow: {
+    marginLeft: 20,
+    paddingVertical: 8,
+  },
+  replyButton: {
+    marginTop: 4,
     flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  replyButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.primary[500],
+  },
+  replyCount: {
+    fontSize: 12,
+    color: colors.text.tertiary,
+  },
+  repliesContainer: {
+    marginTop: 8,
+  },
+  inputContainer: {
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderTopWidth: 1,
     borderTopColor: colors.border.main,
     backgroundColor: colors.background.primary,
-    alignItems: 'flex-end',
-    gap: 12,
     overflow: 'visible',
     zIndex: 100,
+  },
+  replyingToContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: colors.background.secondary,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  replyingToText: {
+    fontSize: 13,
+    color: colors.text.secondary,
+    fontStyle: 'italic',
+  },
+  cancelReplyText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: colors.text.tertiary,
+    paddingHorizontal: 8,
+  },
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 12,
   },
   input: {
     flex: 1,

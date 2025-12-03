@@ -213,6 +213,10 @@ async function createNotification(targetUserId, type, fromUserId, postId = null,
         title = `Follow request declined`;
         body = `${senderHandle} declined your follow request`;
         break;
+      case 'reply':
+        title = `${senderHandle} replied`;
+        body = 'replied to your comment';
+        break;
       default:
         title = 'New Notification';
         body = message || 'You have a new notification';
@@ -1569,6 +1573,7 @@ module.exports.handler = async (event) => {
     userHandle: it.userHandle || 'unknown',
     text: it.text || '',
     createdAt: it.createdAt || 0,
+    parentCommentId: it.parentCommentId || null,
   }));
 
   // Fetch avatarKey for each comment author
@@ -1594,14 +1599,39 @@ module.exports.handler = async (event) => {
   return ok({ items });
 }
 
-    // POST /posts/{id}/comments  body: { text }
+    // POST /posts/{id}/comments  body: { text, parentCommentId? }
     if (method === 'POST' && path.startsWith('/comments/')) {
       if (!COMMENTS_TABLE) return ok({ message: 'Comments not enabled' }, 501);
       if (!userId) return ok({ message: 'Unauthorized' }, 401);
       const postId = path.split('/')[2];
       const body = JSON.parse(event.body || '{}');
       const text = String(body.text || '').trim().slice(0, 500);
+      const parentCommentId = body.parentCommentId || null;
       if (!text) return ok({ message: 'Text required' }, 400);
+
+      // If replying to a comment, verify parent exists and get its author
+      let parentComment = null;
+      if (parentCommentId) {
+        try {
+          const qr = await ddb.send(new QueryCommand({
+            TableName: COMMENTS_TABLE,
+            KeyConditionExpression: 'pk = :pk',
+            FilterExpression: 'id = :id',
+            ExpressionAttributeValues: {
+              ':pk': `POST#${postId}`,
+              ':id': parentCommentId
+            },
+            Limit: 1
+          }));
+          parentComment = (qr.Items || [])[0];
+          if (!parentComment) {
+            return ok({ message: 'Parent comment not found' }, 404);
+          }
+        } catch (e) {
+          console.error('Failed to fetch parent comment:', e);
+          return ok({ message: 'Failed to verify parent comment' }, 500);
+        }
+      }
 
       // Moderate comment content using Amazon Bedrock
       const moderation = await moderateContent(text);
@@ -1623,23 +1653,35 @@ module.exports.handler = async (event) => {
         text,
         createdAt: now
       };
+
+      // Add parentCommentId if this is a reply
+      if (parentCommentId) {
+        item.parentCommentId = parentCommentId;
+      }
+
       await ddb.send(new PutCommand({ TableName: COMMENTS_TABLE, Item: item }));
 
-      // NEW: notify post owner + mentions
-      try {
-        // find post owner by GSI byId
-        const qr = await ddb.send(new QueryCommand({
-          TableName: POSTS_TABLE,
-          IndexName: 'byId',
-          KeyConditionExpression: 'id = :id',
-          ExpressionAttributeValues: { ':id': postId },
-          Limit: 1,
-        }));
-        const post = (qr.Items || [])[0];
-        if (post && post.userId && post.userId !== userId) {
-          await createNotification(post.userId, 'comment', userId, postId, 'commented on your post');
-        }
-      } catch (e) { console.error('notify comment post owner failed', e); }
+      // NEW: notify parent comment author if this is a reply, otherwise notify post owner
+      if (parentComment && parentComment.userId && parentComment.userId !== userId) {
+        try {
+          await createNotification(parentComment.userId, 'reply', userId, postId, 'replied to your comment');
+        } catch (e) { console.error('notify parent comment author failed', e); }
+      } else if (!parentCommentId) {
+        try {
+          // find post owner by GSI byId
+          const qr = await ddb.send(new QueryCommand({
+            TableName: POSTS_TABLE,
+            IndexName: 'byId',
+            KeyConditionExpression: 'id = :id',
+            ExpressionAttributeValues: { ':id': postId },
+            Limit: 1,
+          }));
+          const post = (qr.Items || [])[0];
+          if (post && post.userId && post.userId !== userId) {
+            await createNotification(post.userId, 'comment', userId, postId, 'commented on your post');
+          }
+        } catch (e) { console.error('notify comment post owner failed', e); }
+      }
 
       try {
         const mentionRegex = /@([a-z0-9_]+)/gi;
@@ -1652,7 +1694,11 @@ module.exports.handler = async (event) => {
         }
       } catch (e) { console.error('notify mentions (comment) failed', e); }
 
-      return ok({ id, userHandle: handle, text, createdAt: now });
+      const response = { id, userHandle: handle, text, createdAt: now };
+      if (parentCommentId) {
+        response.parentCommentId = parentCommentId;
+      }
+      return ok(response);
     }
 
     // PATCH /comments/{postId}  body: { id, text }
@@ -1708,29 +1754,86 @@ module.exports.handler = async (event) => {
       if (!item) return ok({ message: 'Comment not found' }, 404);
       if (item.userId !== userId) return ok({ message: 'Forbidden' }, 403);
 
+      // First, cascade-delete all replies to this comment
+      try {
+        const repliesQr = await ddb.send(new QueryCommand({
+          TableName: COMMENTS_TABLE,
+          KeyConditionExpression: 'pk = :p',
+          FilterExpression: 'parentCommentId = :parentId',
+          ExpressionAttributeValues: {
+            ':p': `POST#${postId}`,
+            ':parentId': id
+          },
+          Limit: 100
+        }));
+
+        const replies = repliesQr.Items || [];
+        for (const reply of replies) {
+          // Delete each reply
+          await ddb.send(new DeleteCommand({
+            TableName: COMMENTS_TABLE,
+            Key: { pk: reply.pk, sk: reply.sk }
+          }));
+
+          // Delete notifications from each reply
+          try {
+            const replyText = String(reply.text || '');
+            const mentionRegex = /@([a-z0-9_]+)/gi;
+            const mentions = [...replyText.matchAll(mentionRegex)].map(m => m[1].toLowerCase());
+            for (const h of mentions) {
+              const mid = await userIdFromHandle(h);
+              if (mid && mid !== reply.userId) {
+                await deleteNotifications(mid, 'mention', reply.userId, postId);
+              }
+            }
+          } catch (e) { console.error('cleanup reply mention notifs failed', e); }
+        }
+      } catch (e) { console.error('cascade delete replies failed', e); }
+
+      // Delete the comment itself
       await ddb.send(new DeleteCommand({
         TableName: COMMENTS_TABLE,
         Key: { pk: item.pk, sk: item.sk },
         ConditionExpression: 'attribute_exists(pk) AND attribute_exists(sk)'
       }));
 
-
       // Cascade-delete notifications created by this comment
       try {
-        // (a) Remove post owner's 'comment' notification from this commenter
-        try {
-          const qrPost = await ddb.send(new QueryCommand({
-            TableName: POSTS_TABLE,
-            IndexName: 'byId',
-            KeyConditionExpression: 'id = :id',
-            ExpressionAttributeValues: { ':id': postId },
-            Limit: 1,
-          }));
-          const post = (qrPost.Items || [])[0];
-          if (post && post.userId && post.userId !== userId) {
-            await deleteNotifications(post.userId, 'comment', userId, postId);
-          }
-        } catch (e) { console.error('cleanup comment notif (owner) failed', e); }
+        // If this is a reply, remove the 'reply' notification to parent comment author
+        if (item.parentCommentId) {
+          try {
+            // Find parent comment to get its author
+            const parentQr = await ddb.send(new QueryCommand({
+              TableName: COMMENTS_TABLE,
+              KeyConditionExpression: 'pk = :p',
+              FilterExpression: 'id = :id',
+              ExpressionAttributeValues: {
+                ':p': `POST#${postId}`,
+                ':id': item.parentCommentId
+              },
+              Limit: 1
+            }));
+            const parentComment = (parentQr.Items || [])[0];
+            if (parentComment && parentComment.userId && parentComment.userId !== userId) {
+              await deleteNotifications(parentComment.userId, 'reply', userId, postId);
+            }
+          } catch (e) { console.error('cleanup reply notif failed', e); }
+        } else {
+          // (a) Remove post owner's 'comment' notification from this commenter
+          try {
+            const qrPost = await ddb.send(new QueryCommand({
+              TableName: POSTS_TABLE,
+              IndexName: 'byId',
+              KeyConditionExpression: 'id = :id',
+              ExpressionAttributeValues: { ':id': postId },
+              Limit: 1,
+            }));
+            const post = (qrPost.Items || [])[0];
+            if (post && post.userId && post.userId !== userId) {
+              await deleteNotifications(post.userId, 'comment', userId, postId);
+            }
+          } catch (e) { console.error('cleanup comment notif (owner) failed', e); }
+        }
 
         // (b) Remove mention notifications that originated from this comment
         try {
