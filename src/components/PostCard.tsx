@@ -24,6 +24,7 @@ function PostCard({
   onPostDeleted,
   initialReactions,
   onReactionsUpdated,
+  allowImageZoom = false,
 }: {
   post: Post;
   onPress?: () => void;
@@ -34,6 +35,7 @@ function PostCard({
   onPostDeleted?: (postId: string) => void;
   initialReactions?: any;
   onReactionsUpdated?: (reactions: any) => void;
+  allowImageZoom?: boolean;
 }) {
   const { colors } = useTheme();
   const { currentUser } = useCurrentUser();
@@ -432,7 +434,20 @@ function PostCard({
 
       {/* Image */}
       {imageUri && (
-        <Pressable onPress={() => setImageViewerVisible(true)}>
+        allowImageZoom ? (
+          <Pressable onPress={() => setImageViewerVisible(true)}>
+            <Image
+              source={{ uri: imageUri }}
+              style={[
+                styles.image,
+                imageAspectRatio
+                  ? { aspectRatio: imageAspectRatio }
+                  : styles.imageFallback,
+              ]}
+              resizeMode="contain"
+            />
+          </Pressable>
+        ) : (
           <Image
             source={{ uri: imageUri }}
             style={[
@@ -443,7 +458,7 @@ function PostCard({
             ]}
             resizeMode="contain"
           />
-        </Pressable>
+        )
       )}
 
       {/* Reactions */}
@@ -603,7 +618,7 @@ function PostCard({
         onUserPress={onPressUser}
       />
 
-      {imageUri && (
+      {allowImageZoom && imageUri && (
         <ImageViewing
           images={[{ uri: imageUri }]}
           imageIndex={0}
