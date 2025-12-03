@@ -325,7 +325,6 @@ Respond ONLY with a JSON object:
       : `You are a content moderation system. Analyze the following text and flag ONLY if it contains:
 
 BLOCK if it contains:
-- Pornographic or sexually explicit content
 - Graphic descriptions of violence or gore
 - Hate speech targeting protected groups (race, religion, ethnicity, gender, sexual orientation, disability)
 - Direct threats or harassment targeting specific individuals
@@ -336,6 +335,7 @@ ALLOW (do not block):
 - Political opinions or criticism (even if heated)
 - Edgy humor that doesn't target protected groups
 - General complaints or frustration
+- Sexual jokes, innuendo, or sexually suggestive text (text-only sexual content is allowed)
 
 Text to analyze: "${text}"
 
