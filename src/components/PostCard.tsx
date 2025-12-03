@@ -643,7 +643,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     backgroundColor: colors.neutral[100],
   },
   imageFallback: {
-    aspectRatio: 1,
+    aspectRatio: 4 / 3, // More natural default than 1:1 square, reduces layout shift
   },
   commentPreviewContainer: {
     marginTop: spacing[2],
