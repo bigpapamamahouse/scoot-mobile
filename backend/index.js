@@ -1987,6 +1987,7 @@ module.exports.handler = async (event) => {
       const prev = current.Item?.emoji || null;
 
       if (prev && prev === emoji) {
+        // User is REMOVING their reaction - decrement count and delete
         await ddb.send(new UpdateCommand({
           TableName: REACTIONS_TABLE,
           Key: { pk: `POST#${postId}`, sk: `COUNT#${emoji}` },
@@ -1998,7 +1999,9 @@ module.exports.handler = async (event) => {
           TableName: REACTIONS_TABLE,
           Key: { pk: `POST#${postId}`, sk: `USER#${userId}` },
         }));
+        // NOTE: No notification sent for reaction removal
       } else {
+        // User is ADDING a new reaction or CHANGING to a different emoji
         await ddb.send(new UpdateCommand({
           TableName: REACTIONS_TABLE,
           Key: { pk: `POST#${postId}`, sk: `COUNT#${emoji}` },
@@ -2019,22 +2022,22 @@ module.exports.handler = async (event) => {
           TableName: REACTIONS_TABLE,
           Item: { pk: `POST#${postId}`, sk: `USER#${userId}`, emoji },
         }));
-      }
 
-      // NEW: notify post owner about reaction
-      try {
-        const qr = await ddb.send(new QueryCommand({
-          TableName: POSTS_TABLE,
-          IndexName: 'byId',
-          KeyConditionExpression: 'id = :id',
-          ExpressionAttributeValues: { ':id': postId },
-          Limit: 1,
-        }));
-        const post = (qr.Items || [])[0];
-        if (post && post.userId && post.userId !== userId) {
-          await createNotification(post.userId, 'reaction', userId, postId, 'reacted to your post');
-        }
-      } catch (e) { console.error('notify reaction post owner failed', e); }
+        // Notify post owner about NEW reaction (only when adding, not removing)
+        try {
+          const qr = await ddb.send(new QueryCommand({
+            TableName: POSTS_TABLE,
+            IndexName: 'byId',
+            KeyConditionExpression: 'id = :id',
+            ExpressionAttributeValues: { ':id': postId },
+            Limit: 1,
+          }));
+          const post = (qr.Items || [])[0];
+          if (post && post.userId && post.userId !== userId) {
+            await createNotification(post.userId, 'reaction', userId, postId, 'reacted to your post');
+          }
+        } catch (e) { console.error('notify reaction post owner failed', e); }
+      }
 
       // Return the caller's current reaction so the UI can refresh accurately
       const self = await ddb.send(new GetCommand({
