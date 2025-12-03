@@ -46,7 +46,18 @@ export default function NotificationsScreen(){
     }
     try {
       const response = await NotificationsAPI.listNotifications(true);
-      const notifications = (response.items || []) as Notification[];
+      let notifications = (response.items || []) as Notification[];
+
+      // Filter out reaction removal notifications (client-side fix for backend issue)
+      notifications = notifications.filter((item) => {
+        const message = (item.message || '').toLowerCase();
+        const type = (item.type || '').toLowerCase();
+        // Filter out notifications about removed/unreacted reactions
+        if (message.includes('removed') || message.includes('unreacted') || type.includes('remove')) {
+          return false;
+        }
+        return true;
+      });
 
       // Fetch post previews for notifications with postId
       const postIds = new Set<string>();
@@ -233,13 +244,13 @@ export default function NotificationsScreen(){
       const postId = item.postId || item.relatedPostId;
       const postPreview = item.postPreview;
       const imageUri = postPreview?.imageKey ? mediaUrlFromKey(postPreview.imageKey) : null;
-      const textPreview = postPreview?.text ? postPreview.text.substring(0, 50) + (postPreview.text.length > 50 ? '...' : '') : null;
+      const textPreview = postPreview?.text ? postPreview.text.substring(0, 100) + (postPreview.text.length > 100 ? '...' : '') : null;
 
       return (
         <View style={styles.card}>
-          <View style={styles.cardContentRow}>
-            {/* Left side: Main content */}
-            <View style={styles.cardMainContent}>
+          <View style={imageUri ? styles.cardContentRow : undefined}>
+            {/* Main content */}
+            <View style={imageUri ? styles.cardMainContent : undefined}>
               <View style={styles.cardHeader}>
                 <TouchableOpacity
                   onPress={() => handleNavigateToProfile(item.fromUserId, item.fromHandle)}
@@ -306,29 +317,34 @@ export default function NotificationsScreen(){
               )}
             </View>
 
-            {/* Right side: Post preview */}
-            {hasRelatedPost && (imageUri || textPreview) && (
+            {/* Right side: Image preview only (images show in 80x80 square) */}
+            {imageUri && (
               <TouchableOpacity
-                style={styles.postPreviewContainer}
+                style={styles.postPreviewImageContainer}
                 onPress={() => postId && handleNavigateToPost(postId)}
                 activeOpacity={0.7}
               >
-                {imageUri ? (
-                  <Image
-                    source={{ uri: imageUri }}
-                    style={styles.postPreviewImage}
-                    resizeMode="cover"
-                  />
-                ) : textPreview ? (
-                  <View style={styles.postPreviewTextContainer}>
-                    <Text style={styles.postPreviewText} numberOfLines={3}>
-                      {textPreview}
-                    </Text>
-                  </View>
-                ) : null}
+                <Image
+                  source={{ uri: imageUri }}
+                  style={styles.postPreviewImage}
+                  resizeMode="cover"
+                />
               </TouchableOpacity>
             )}
           </View>
+
+          {/* Text preview shows below (full width) */}
+          {!imageUri && textPreview && hasRelatedPost && postId && (
+            <TouchableOpacity
+              style={styles.postPreviewTextContainer}
+              onPress={() => handleNavigateToPost(postId)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.postPreviewText} numberOfLines={2}>
+                "{textPreview}"
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       );
     },
@@ -479,7 +495,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     paddingVertical: spacing[4],
     alignItems: 'center',
   },
-  postPreviewContainer: {
+  postPreviewImageContainer: {
     width: 80,
     height: 80,
     borderRadius: borderRadius.base,
@@ -491,17 +507,17 @@ const createStyles = (colors: any) => StyleSheet.create({
     height: '100%',
   },
   postPreviewTextContainer: {
-    width: '100%',
-    height: '100%',
-    padding: spacing[2],
-    justifyContent: 'center',
+    marginTop: spacing[3],
+    padding: spacing[3],
     backgroundColor: colors.background.secondary,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderRadius: borderRadius.base,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.primary[500],
   },
   postPreviewText: {
-    fontSize: 11,
+    fontSize: 13,
     color: colors.text.secondary,
-    lineHeight: 14,
+    lineHeight: 18,
+    fontStyle: 'italic',
   },
 });

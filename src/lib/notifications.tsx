@@ -199,19 +199,36 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
   const refresh = React.useCallback(async () => {
     try {
       const response = await NotificationsAPI.listNotifications(false);
-      const items: Notification[] = response.items || [];
+      let items: Notification[] = response.items || [];
+
+      // Filter out reaction removal notifications (client-side fix for backend issue)
+      items = items.filter((item) => {
+        const message = (item.message || '').toLowerCase();
+        const type = (item.type || '').toLowerCase();
+        // Filter out notifications about removed/unreacted reactions
+        if (message.includes('removed') || message.includes('unreacted') || type.includes('remove')) {
+          return false;
+        }
+        return true;
+      });
+
       const unread = items.filter((item) => !item.read).length;
-      const unseen = items.filter((item) => item.id && !seenIdsRef.current.has(item.id));
       await recordSeen(items);
-      if (initialSyncCompleteRef.current) {
-        await maybeTriggerLocalPushes(unseen);
-      }
+
+      // Disabled local push notification creation - the backend now sends push notifications
+      // directly via Expo, so we don't need to create local notifications on the client.
+      // This prevents duplicate notifications.
+      // const unseen = items.filter((item) => item.id && !seenIdsRef.current.has(item.id));
+      // if (initialSyncCompleteRef.current) {
+      //   await maybeTriggerLocalPushes(unseen);
+      // }
+
       initialSyncCompleteRef.current = true;
       setUnreadCount(unread);
     } catch (error) {
       console.warn('Failed to refresh notifications', error);
     }
-  }, [maybeTriggerLocalPushes, recordSeen]);
+  }, [recordSeen]);
 
   const markAllRead = React.useCallback(() => {
     setUnreadCount(0);
