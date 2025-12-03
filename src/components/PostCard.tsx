@@ -505,10 +505,11 @@ function PostCard({
           ]}
           activeOpacity={0.6}
         >
-          <Ionicons
-            name={getReactionInfo('❤️').hasReacted ? 'heart' : 'heart-outline'}
+          <MaterialCommunityIcons
+            name="heart"
             size={20}
             color={getReactionInfo('❤️').hasReacted ? colors.social.like : colors.text.secondary}
+            style={!getReactionInfo('❤️').hasReacted && { opacity: 0.6 }}
           />
           {getReactionInfo('❤️').count > 0 && (
             <Text style={[
@@ -529,10 +530,11 @@ function PostCard({
           ]}
           activeOpacity={0.6}
         >
-          <Ionicons
-            name={getReactionInfo('👍').hasReacted ? 'thumbs-up' : 'thumbs-up-outline'}
+          <MaterialCommunityIcons
+            name="thumb-up"
             size={20}
             color={getReactionInfo('👍').hasReacted ? colors.primary[500] : colors.text.secondary}
+            style={!getReactionInfo('👍').hasReacted && { opacity: 0.6 }}
           />
           {getReactionInfo('👍').count > 0 && (
             <Text style={[
@@ -578,10 +580,11 @@ function PostCard({
           ]}
           activeOpacity={0.6}
         >
-          <Ionicons
-            name={getReactionInfo('😂').hasReacted ? 'happy' : 'happy-outline'}
+          <MaterialCommunityIcons
+            name="emoticon-lol"
             size={20}
             color={getReactionInfo('😂').hasReacted ? colors.social.laugh : colors.text.secondary}
+            style={!getReactionInfo('😂').hasReacted && { opacity: 0.6 }}
           />
           {getReactionInfo('😂').count > 0 && (
             <Text style={[
@@ -602,10 +605,11 @@ function PostCard({
           ]}
           activeOpacity={0.6}
         >
-          <Ionicons
-            name={getReactionInfo('🔥').hasReacted ? 'flame' : 'flame-outline'}
+          <MaterialCommunityIcons
+            name="fire"
             size={20}
             color={getReactionInfo('🔥').hasReacted ? colors.warning.main : colors.text.secondary}
+            style={!getReactionInfo('🔥').hasReacted && { opacity: 0.6 }}
           />
           {getReactionInfo('🔥').count > 0 && (
             <Text style={[
