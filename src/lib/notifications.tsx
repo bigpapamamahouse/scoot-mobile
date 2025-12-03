@@ -201,21 +201,13 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
       const response = await NotificationsAPI.listNotifications(false);
       let items: Notification[] = response.items || [];
 
-      // Filter out reaction removal notifications (client-side fix for backend issue)
+      // Note: Client-side filtering kept as safety net for any old notifications
+      // in the database from before the backend fix
       items = items.filter((item) => {
         const message = (item.message || '').toLowerCase();
         const type = (item.type || '').toLowerCase();
 
-        // Debug: Log notifications to help identify removal patterns
-        if (type.includes('reaction') || message.includes('react')) {
-          console.log('[Notifications] Reaction notification:', {
-            type: item.type,
-            message: item.message,
-          });
-        }
-
         // Filter out notifications about removed/unreacted reactions
-        // Check for various removal patterns
         if (
           message.includes('removed') ||
           message.includes('unreacted') ||
@@ -225,7 +217,6 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
           type.includes('delete') ||
           type.includes('unreact')
         ) {
-          console.log('[Notifications] Filtering out reaction removal:', item.message);
           return false;
         }
         return true;
