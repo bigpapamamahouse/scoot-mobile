@@ -27,6 +27,7 @@ export default function ComposePostScreen({ navigation }: any) {
   const [text, setText] = React.useState('');
   const [imageUri, setImageUri] = React.useState<string | null>(null);
   const [imageKey, setImageKey] = React.useState<string | null>(null);
+  const [imageAspectRatio, setImageAspectRatio] = React.useState<number | null>(null);
   const [loading, setLoading] = React.useState(false);
   const [uploading, setUploading] = React.useState(false);
 
@@ -75,12 +76,14 @@ export default function ComposePostScreen({ navigation }: any) {
         }
 
         // Cache dimensions immediately for the local URI (for preview)
-        if (width && height) {
+        const aspectRatio = width && height ? width / height : null;
+        if (aspectRatio) {
           imageDimensionCache.set(processedUri, {
             width,
             height,
-            aspectRatio: width / height,
+            aspectRatio,
           });
+          setImageAspectRatio(aspectRatio);
         }
 
         setImageUri(processedUri);
@@ -153,6 +156,7 @@ export default function ComposePostScreen({ navigation }: any) {
   const removeImage = () => {
     setImageUri(null);
     setImageKey(null);
+    setImageAspectRatio(null);
   };
 
   const handlePost = async () => {
@@ -163,7 +167,11 @@ export default function ComposePostScreen({ navigation }: any) {
 
     setLoading(true);
     try {
-      await PostsAPI.createPost(text.trim(), imageKey || undefined);
+      await PostsAPI.createPost(
+        text.trim(),
+        imageKey || undefined,
+        imageAspectRatio || undefined
+      );
       Alert.alert('Success', 'Post created!');
       navigation.goBack();
     } catch (e: any) {

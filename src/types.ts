@@ -7,6 +7,7 @@ export interface Post {
   avatarKey?: string;
   text: string;
   imageKey?: string;
+  imageAspectRatio?: number;
   createdAt: string;
   updatedAt?: string;
   reactionCount?: number;

@@ -225,16 +225,21 @@ function PostCard({
     }
   };
 
-  // Load image dimensions with caching to prevent repeated S3 lookups
+  // Load image dimensions - prefer post data, fallback to cache/fetch for old posts
   React.useEffect(() => {
     if (!imageUri) {
       setImageAspectRatio(null);
       return;
     }
 
-    let cancelled = false;
+    // Use aspect ratio from post data if available (eliminates delay completely!)
+    if (localPost.imageAspectRatio) {
+      setImageAspectRatio(localPost.imageAspectRatio);
+      return;
+    }
 
-    // Use cached dimensions if available
+    // Fallback: fetch dimensions for old posts without aspect ratio
+    let cancelled = false;
     imageDimensionCache.fetch(imageUri).then((dimensions) => {
       if (!cancelled) {
         setImageAspectRatio(dimensions.aspectRatio);
@@ -244,7 +249,7 @@ function PostCard({
     return () => {
       cancelled = true;
     };
-  }, [imageUri]);
+  }, [imageUri, localPost.imageAspectRatio]);
 
   React.useEffect(() => {
     setCommentCount(post.commentCount ?? post.comments?.length ?? 0);
