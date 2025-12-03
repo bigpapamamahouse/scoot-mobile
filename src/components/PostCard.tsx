@@ -1,6 +1,7 @@
 import React from 'react';
-import { View, Text, Image, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, Image, TouchableOpacity, StyleSheet, Alert, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import ImageViewing from 'react-native-image-viewing';
 import { Post, Reaction, ReactionWithUsers, Comment } from '../types';
 import { mediaUrlFromKey } from '../lib/media';
 import { Avatar } from './Avatar';
@@ -49,6 +50,7 @@ function PostCard({
   );
   const [imageAspectRatio, setImageAspectRatio] = React.useState<number | null>(null);
   const [localPost, setLocalPost] = React.useState<Post>(post);
+  const [imageViewerVisible, setImageViewerVisible] = React.useState(false);
 
   const imageUri = React.useMemo(() => mediaUrlFromKey(localPost.imageKey), [localPost.imageKey]);
 
@@ -430,16 +432,18 @@ function PostCard({
 
       {/* Image */}
       {imageUri && (
-        <Image
-          source={{ uri: imageUri }}
-          style={[
-            styles.image,
-            imageAspectRatio
-              ? { aspectRatio: imageAspectRatio }
-              : styles.imageFallback,
-          ]}
-          resizeMode="contain"
-        />
+        <Pressable onPress={() => setImageViewerVisible(true)}>
+          <Image
+            source={{ uri: imageUri }}
+            style={[
+              styles.image,
+              imageAspectRatio
+                ? { aspectRatio: imageAspectRatio }
+                : styles.imageFallback,
+            ]}
+            resizeMode="contain"
+          />
+        </Pressable>
       )}
 
       {/* Reactions */}
@@ -598,6 +602,15 @@ function PostCard({
         loading={loadingReactionDetails}
         onUserPress={onPressUser}
       />
+
+      {imageUri && (
+        <ImageViewing
+          images={[{ uri: imageUri }]}
+          imageIndex={0}
+          visible={imageViewerVisible}
+          onRequestClose={() => setImageViewerVisible(false)}
+        />
+      )}
     </TouchableOpacity>
   );
 }
