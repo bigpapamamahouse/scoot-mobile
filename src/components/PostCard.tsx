@@ -284,20 +284,53 @@ function PostCard({
   }, [post.id, initialReactions]);
 
   const handleReaction = async (emoji: string) => {
+    // Store current state for potential rollback
+    const previousReactions = reactions;
+
+    // Find current reaction state
+    const currentReaction = reactions.find(r => r.emoji === emoji);
+    const wasReacted = currentReaction?.userReacted || false;
+    const currentCount = currentReaction?.count || 0;
+
+    // Calculate optimistic update
+    const newCount = wasReacted ? currentCount - 1 : currentCount + 1;
+    const newUserReacted = !wasReacted;
+
+    // Apply optimistic update immediately for instant UI feedback
+    let optimisticReactions: Reaction[];
+    if (currentReaction) {
+      // Update existing reaction
+      optimisticReactions = reactions
+        .map(r => r.emoji === emoji
+          ? { ...r, count: newCount, userReacted: newUserReacted }
+          : r
+        )
+        .filter(r => r.count > 0); // Remove reactions with 0 count
+    } else {
+      // Add new reaction
+      optimisticReactions = [
+        ...reactions,
+        { emoji, count: newCount, userReacted: newUserReacted }
+      ];
+    }
+
+    setReactions(optimisticReactions);
+
     try {
-      const response = await ReactionsAPI.toggleReaction(post.id, emoji);
+      // Send toggle request to backend
+      await ReactionsAPI.toggleReaction(post.id, emoji);
 
-      // Reload reactions
+      // Fetch fresh data to ensure sync with server
       const data = await ReactionsAPI.getReactions(post.id);
-
       const reactionsData = parseReactionsResponse(data);
-
       setReactions(reactionsData);
 
       // Notify parent component of reaction update
       onReactionsUpdated?.(data);
     } catch (e: any) {
       console.error('Failed to toggle reaction:', e);
+      // Revert optimistic update on error
+      setReactions(previousReactions);
     }
   };
 
