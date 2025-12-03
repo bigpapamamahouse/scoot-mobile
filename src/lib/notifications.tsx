@@ -205,8 +205,27 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
       items = items.filter((item) => {
         const message = (item.message || '').toLowerCase();
         const type = (item.type || '').toLowerCase();
+
+        // Debug: Log notifications to help identify removal patterns
+        if (type.includes('reaction') || message.includes('react')) {
+          console.log('[Notifications] Reaction notification:', {
+            type: item.type,
+            message: item.message,
+          });
+        }
+
         // Filter out notifications about removed/unreacted reactions
-        if (message.includes('removed') || message.includes('unreacted') || type.includes('remove')) {
+        // Check for various removal patterns
+        if (
+          message.includes('removed') ||
+          message.includes('unreacted') ||
+          message.includes('un-reacted') ||
+          message.includes('no longer') ||
+          type.includes('remove') ||
+          type.includes('delete') ||
+          type.includes('unreact')
+        ) {
+          console.log('[Notifications] Filtering out reaction removal:', item.message);
           return false;
         }
         return true;

@@ -52,8 +52,18 @@ export default function NotificationsScreen(){
       notifications = notifications.filter((item) => {
         const message = (item.message || '').toLowerCase();
         const type = (item.type || '').toLowerCase();
+
         // Filter out notifications about removed/unreacted reactions
-        if (message.includes('removed') || message.includes('unreacted') || type.includes('remove')) {
+        // Check for various removal patterns
+        if (
+          message.includes('removed') ||
+          message.includes('unreacted') ||
+          message.includes('un-reacted') ||
+          message.includes('no longer') ||
+          type.includes('remove') ||
+          type.includes('delete') ||
+          type.includes('unreact')
+        ) {
           return false;
         }
         return true;
