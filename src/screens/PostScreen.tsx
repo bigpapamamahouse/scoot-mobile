@@ -415,6 +415,7 @@ export default function PostScreen({ route, navigation }: { route: PostScreenRou
                   });
                 }}
                 showCommentPreview={false}
+                allowImageZoom={true}
               />
               <Text style={styles.commentHeaderLabel}>Comments</Text>
             </View>
