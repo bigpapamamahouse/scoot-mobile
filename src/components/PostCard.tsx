@@ -554,9 +554,10 @@ function PostCard({
           activeOpacity={0.6}
         >
           <MaterialCommunityIcons
-            name={getReactionInfo('👏').hasReacted ? 'hand-clap' : 'hand-clap-outline'}
+            name="hand-clap"
             size={20}
             color={getReactionInfo('👏').hasReacted ? colors.social.celebrate : colors.text.secondary}
+            style={!getReactionInfo('👏').hasReacted && { opacity: 0.6 }}
           />
           {getReactionInfo('👏').count > 0 && (
             <Text style={[
