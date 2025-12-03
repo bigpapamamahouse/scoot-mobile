@@ -17,8 +17,12 @@ export async function listComments(
   return api(url);
 }
 
-export async function addComment(postId: string, text: string){
-  return api(`/comments/${encodeURIComponent(postId)}`, { method: 'POST', body: JSON.stringify({ text }) });
+export async function addComment(postId: string, text: string, parentCommentId?: string){
+  const body: { text: string; parentCommentId?: string } = { text };
+  if (parentCommentId) {
+    body.parentCommentId = parentCommentId;
+  }
+  return api(`/comments/${encodeURIComponent(postId)}`, { method: 'POST', body: JSON.stringify(body) });
 }
 
 export async function updateComment(postId: string, id: string, text: string){

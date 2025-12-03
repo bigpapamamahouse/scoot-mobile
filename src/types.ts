@@ -50,6 +50,8 @@ export interface Comment {
   avatarKey?: string;
   text: string;
   createdAt?: string;
+  parentCommentId?: string | null;
+  replyCount?: number;
 }
 
 export interface Reaction {
