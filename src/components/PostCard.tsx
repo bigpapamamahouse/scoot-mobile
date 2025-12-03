@@ -553,11 +553,20 @@ function PostCard({
           ]}
           activeOpacity={0.6}
         >
-          <Ionicons
-            name={getReactionInfo('👏').hasReacted ? 'hand-right' : 'hand-right-outline'}
-            size={20}
-            color={getReactionInfo('👏').hasReacted ? colors.social.celebrate : colors.text.secondary}
-          />
+          <View style={styles.clapIconContainer}>
+            <Ionicons
+              name={getReactionInfo('👏').hasReacted ? 'hand-left' : 'hand-left-outline'}
+              size={16}
+              color={getReactionInfo('👏').hasReacted ? colors.social.celebrate : colors.text.secondary}
+              style={styles.clapIconLeft}
+            />
+            <Ionicons
+              name={getReactionInfo('👏').hasReacted ? 'hand-right' : 'hand-right-outline'}
+              size={16}
+              color={getReactionInfo('👏').hasReacted ? colors.social.celebrate : colors.text.secondary}
+              style={styles.clapIconRight}
+            />
+          </View>
           {getReactionInfo('👏').count > 0 && (
             <Text style={[
               styles.reactionCount,
@@ -761,6 +770,19 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: typography.fontSize.xs,
     fontWeight: typography.fontWeight.semibold,
     color: colors.text.secondary,
+  },
+  clapIconContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 20,
+    height: 20,
+  },
+  clapIconLeft: {
+    marginRight: -4,
+  },
+  clapIconRight: {
+    marginLeft: -4,
   },
   commentButton: {
     flexDirection: 'row',
