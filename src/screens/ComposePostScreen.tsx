@@ -13,17 +13,21 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
 import { PostsAPI } from '../api';
 import { uploadMedia } from '../lib/upload';
 import { Button, IconButton } from '../components/ui';
 import { MentionTextInput } from '../components/MentionTextInput';
 import { useTheme, spacing, typography, borderRadius, shadows } from '../theme';
+import { imageDimensionCache } from '../lib/imageCache';
+import { mediaUrlFromKey } from '../lib/media';
 
 export default function ComposePostScreen({ navigation }: any) {
   const { colors } = useTheme();
   const [text, setText] = React.useState('');
   const [imageUri, setImageUri] = React.useState<string | null>(null);
   const [imageKey, setImageKey] = React.useState<string | null>(null);
+  const [imageAspectRatio, setImageAspectRatio] = React.useState<number | null>(null);
   const [loading, setLoading] = React.useState(false);
   const [uploading, setUploading] = React.useState(false);
 
@@ -57,8 +61,33 @@ export default function ComposePostScreen({ navigation }: any) {
 
       if (!result.canceled && result.assets[0]) {
         const uri = result.assets[0].uri;
-        setImageUri(uri);
-        await uploadImage(uri);
+        let { width, height } = result.assets[0];
+
+        // Compress and resize image before uploading
+        let processedUri = uri;
+        try {
+          const compressed = await compressImage(uri, width, height);
+          processedUri = compressed.uri;
+          width = compressed.width;
+          height = compressed.height;
+        } catch (error) {
+          console.warn('Image compression failed, using original:', error);
+          // Continue with original image if compression fails
+        }
+
+        // Cache dimensions immediately for the local URI (for preview)
+        const aspectRatio = width && height ? width / height : null;
+        if (aspectRatio) {
+          imageDimensionCache.set(processedUri, {
+            width,
+            height,
+            aspectRatio,
+          });
+          setImageAspectRatio(aspectRatio);
+        }
+
+        setImageUri(processedUri);
+        await uploadImage(processedUri, width, height);
       }
     } catch (error: any) {
       console.error('Error picking image:', error);
@@ -66,11 +95,54 @@ export default function ComposePostScreen({ navigation }: any) {
     }
   };
 
-  const uploadImage = async (uri: string) => {
+  const compressImage = async (uri: string, width: number, height: number) => {
+    const MAX_WIDTH = 1920;
+    const MAX_HEIGHT = 1920;
+
+    let resize: { width?: number; height?: number } | undefined;
+
+    // Only resize if image exceeds max dimensions
+    if (width > MAX_WIDTH || height > MAX_HEIGHT) {
+      const aspectRatio = width / height;
+
+      if (width > height) {
+        // Landscape or square
+        resize = { width: MAX_WIDTH };
+      } else {
+        // Portrait
+        resize = { height: MAX_HEIGHT };
+      }
+    }
+
+    const manipResult = await ImageManipulator.manipulateAsync(
+      uri,
+      resize ? [{ resize }] : [],
+      {
+        compress: 0.8, // Good balance between quality and file size
+        format: ImageManipulator.SaveFormat.JPEG,
+      }
+    );
+
+    return manipResult;
+  };
+
+  const uploadImage = async (uri: string, width?: number, height?: number) => {
     setUploading(true);
     try {
       const key = await uploadMedia({ uri, intent: 'post-image' });
       setImageKey(key);
+
+      // Cache dimensions for the S3 URL so it's available when viewing the post
+      if (key && width && height) {
+        const s3Url = mediaUrlFromKey(key);
+        if (s3Url) {
+          imageDimensionCache.set(s3Url, {
+            width,
+            height,
+            aspectRatio: width / height,
+          });
+        }
+      }
     } catch (error: any) {
       console.error('Error uploading image:', error);
       Alert.alert('Error', error?.message ? `Failed to upload image: ${error.message}` : 'Failed to upload image');
@@ -84,6 +156,7 @@ export default function ComposePostScreen({ navigation }: any) {
   const removeImage = () => {
     setImageUri(null);
     setImageKey(null);
+    setImageAspectRatio(null);
   };
 
   const handlePost = async () => {
@@ -94,7 +167,11 @@ export default function ComposePostScreen({ navigation }: any) {
 
     setLoading(true);
     try {
-      await PostsAPI.createPost(text.trim(), imageKey || undefined);
+      await PostsAPI.createPost(
+        text.trim(),
+        imageKey || undefined,
+        imageAspectRatio || undefined
+      );
       Alert.alert('Success', 'Post created!');
       navigation.goBack();
     } catch (e: any) {

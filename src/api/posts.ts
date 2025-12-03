@@ -149,8 +149,8 @@ export async function getUserPosts(options: GetUserPostsOptions = {}){
   throw new Error('No user post endpoints responded');
 }
 
-export async function createPost(text: string, imageKey?: string){
-  return api('/posts', { method: 'POST', body: JSON.stringify({ text, imageKey }) });
+export async function createPost(text: string, imageKey?: string, imageAspectRatio?: number){
+  return api('/posts', { method: 'POST', body: JSON.stringify({ text, imageKey, imageAspectRatio }) });
 }
 
 export async function deletePost(id: string){

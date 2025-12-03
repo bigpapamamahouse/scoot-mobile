@@ -5,6 +5,7 @@ export type Post = {
   handle?: string | null;
   text: string;
   imageKey?: string | null;
+  imageAspectRatio?: number | null;
   avatarKey?: string | null;
   createdAt: number;
 };
