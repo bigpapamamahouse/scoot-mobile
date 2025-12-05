@@ -2458,9 +2458,11 @@ module.exports.handler = async (event) => {
     if (method === 'DELETE' && path.startsWith('/media/')) {
       if (!userId) return bad('Unauthorized', 401);
 
-      // Extract the key from the path (everything after /media/)
-      const key = path.substring('/media/'.length);
-      if (!key) return bad('Missing media key', 400);
+      // Extract the key from the path (everything after /media/) and decode it
+      const encodedKey = path.substring('/media/'.length);
+      if (!encodedKey) return bad('Missing media key', 400);
+
+      const key = decodeURIComponent(encodedKey);
 
       // Verify user owns this media - key should start with u/{userId}/ or a/{userId}/
       const userPrefix = `u/${userId}/`;
