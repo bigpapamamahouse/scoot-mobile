@@ -20,7 +20,7 @@ import { Button, IconButton } from '../components/ui';
 import { MentionTextInput } from '../components/MentionTextInput';
 import { useTheme, spacing, typography, borderRadius, shadows } from '../theme';
 import { imageDimensionCache } from '../lib/imageCache';
-import { mediaUrlFromKey } from '../lib/media';
+import { mediaUrlFromKey, deleteMedia } from '../lib/media';
 
 export default function ComposePostScreen({ navigation }: any) {
   const { colors } = useTheme();
@@ -30,8 +30,21 @@ export default function ComposePostScreen({ navigation }: any) {
   const [imageAspectRatio, setImageAspectRatio] = React.useState<number | null>(null);
   const [loading, setLoading] = React.useState(false);
   const [uploading, setUploading] = React.useState(false);
+  const [posted, setPosted] = React.useState(false);
 
   const styles = React.useMemo(() => createStyles(colors), [colors]);
+
+  // Cleanup: Delete uploaded image if user navigates away without posting
+  React.useEffect(() => {
+    return () => {
+      // Only delete if there's an uploaded image and the post wasn't created
+      if (imageKey && !posted) {
+        deleteMedia(imageKey)
+          .then(() => console.log('Cleaned up unused uploaded image:', imageKey))
+          .catch((error) => console.warn('Failed to cleanup unused image:', error));
+      }
+    };
+  }, [imageKey, posted]);
 
   const pickImage = async (fromCamera: boolean) => {
     try {
@@ -129,6 +142,17 @@ export default function ComposePostScreen({ navigation }: any) {
   const uploadImage = async (uri: string, width?: number, height?: number) => {
     setUploading(true);
     try {
+      // If there's already an uploaded image, delete it first
+      if (imageKey) {
+        try {
+          await deleteMedia(imageKey);
+          console.log('Deleted previous uploaded image:', imageKey);
+        } catch (error) {
+          console.warn('Failed to delete previous image:', error);
+          // Continue with new upload even if deletion fails
+        }
+      }
+
       const key = await uploadMedia({ uri, intent: 'post-image' });
       setImageKey(key);
 
@@ -153,7 +177,18 @@ export default function ComposePostScreen({ navigation }: any) {
     }
   };
 
-  const removeImage = () => {
+  const removeImage = async () => {
+    // Delete from S3 if it was uploaded
+    if (imageKey) {
+      try {
+        await deleteMedia(imageKey);
+        console.log('Deleted unused uploaded image:', imageKey);
+      } catch (error) {
+        console.warn('Failed to delete image from S3:', error);
+        // Continue with local removal even if S3 deletion fails
+      }
+    }
+
     setImageUri(null);
     setImageKey(null);
     setImageAspectRatio(null);
@@ -172,6 +207,7 @@ export default function ComposePostScreen({ navigation }: any) {
         imageKey || undefined,
         imageAspectRatio || undefined
       );
+      setPosted(true); // Mark as posted so cleanup doesn't delete the image
       Alert.alert('Success', 'Post created!');
       navigation.goBack();
     } catch (e: any) {
