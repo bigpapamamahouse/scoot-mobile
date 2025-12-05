@@ -1,5 +1,6 @@
 
 import { ENV } from '../lib/env';
+import { api } from '../api/client';
 
 const ABSOLUTE_URI_REGEX = /^(https?:\/\/|data:|blob:)/i;
 
@@ -34,4 +35,17 @@ export function mediaUrlFromKey(key?: string | null) {
   const base = ENV.MEDIA_BASE.replace(/^https?:\/\//, '');
   const encodedKey = encodeKeySafely(trimmed);
   return `https://${base}/${encodedKey}`;
+}
+
+/**
+ * Delete an uploaded media file from S3
+ * @param key The S3 key of the media to delete
+ */
+export async function deleteMedia(key: string): Promise<void> {
+  if (!key || typeof key !== 'string') {
+    throw new Error('Invalid media key');
+  }
+
+  const encodedKey = encodeURIComponent(key);
+  await api(`/media/${encodedKey}`, { method: 'DELETE' });
 }
