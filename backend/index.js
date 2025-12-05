@@ -2454,6 +2454,37 @@ module.exports.handler = async (event) => {
       return ok({ url, key });
     }
 
+    // ----- DELETE /media/{key} - Delete unused uploaded media -----
+    if (method === 'DELETE' && path.startsWith('/media/')) {
+      if (!userId) return bad('Unauthorized', 401);
+
+      // Extract the key from the path (everything after /media/)
+      const key = path.substring('/media/'.length);
+      if (!key) return bad('Missing media key', 400);
+
+      // Verify user owns this media - key should start with u/{userId}/ or a/{userId}/
+      const userPrefix = `u/${userId}/`;
+      const avatarPrefix = `a/${userId}/`;
+
+      if (!key.startsWith(userPrefix) && !key.startsWith(avatarPrefix)) {
+        console.log(`[DELETE /media] User ${userId} attempted to delete unauthorized key: ${key}`);
+        return bad('Forbidden: You can only delete your own media', 403);
+      }
+
+      // Delete from S3
+      try {
+        await s3.send(new DeleteObjectCommand({
+          Bucket: MEDIA_BUCKET,
+          Key: key,
+        }));
+        console.log(`[DELETE /media] Deleted S3 object: ${key} for user ${userId}`);
+        return ok({ deleted: true, key });
+      } catch (e) {
+        console.error('[DELETE /media] Failed to delete S3 object:', e);
+        return bad('Failed to delete media', 500);
+      }
+    }
+
     // ----- PATCH /posts/{id} -----
     if (method === 'PATCH' && path.startsWith('/posts/')) {
       if (!userId) return bad('Unauthorized', 401);

@@ -17,7 +17,7 @@ import { signOutFn } from '../api/auth';
 import { UsersAPI, InvitesAPI } from '../api';
 import { Avatar } from '../components/Avatar';
 import { uploadMedia } from '../lib/upload';
-import { mediaUrlFromKey } from '../lib/media';
+import { mediaUrlFromKey, deleteMedia } from '../lib/media';
 import { readStoredInviteCode, writeStoredInviteCode } from '../lib/storage';
 import { useTheme } from '../theme';
 
@@ -42,6 +42,7 @@ export default function SettingsScreen({ navigation }: any) {
   const [initialFullName, setInitialFullName] = React.useState('');
   const [initialAvatarKey, setInitialAvatarKey] = React.useState<string | null>(null);
   const [avatarPreviewUri, setAvatarPreviewUri] = React.useState<string | null>(null);
+  const [saved, setSaved] = React.useState(false);
 
   const ensureInviteCode = React.useCallback(
     async (viewerId?: string | null): Promise<string | null> => {
@@ -148,6 +149,18 @@ export default function SettingsScreen({ navigation }: any) {
   React.useEffect(() => {
     loadViewer();
   }, [loadViewer]);
+
+  // Cleanup: Delete newly uploaded avatar if user navigates away without saving
+  React.useEffect(() => {
+    return () => {
+      const hasNewAvatar = avatarKey && avatarKey !== initialAvatarKey;
+      if (hasNewAvatar && !saved) {
+        deleteMedia(avatarKey)
+          .then(() => console.log('Cleaned up unused uploaded avatar:', avatarKey))
+          .catch((error) => console.warn('Failed to cleanup unused avatar:', error));
+      }
+    };
+  }, [avatarKey, initialAvatarKey, saved]);
 
   const handleLogout = async () => {
     try {
@@ -297,6 +310,17 @@ export default function SettingsScreen({ navigation }: any) {
     try {
       // Update avatar using dedicated endpoint if changed
       if (hasAvatarChange) {
+        // Delete old avatar from S3 if it's being replaced with a new one
+        if (initialAvatarKey && avatarKey && initialAvatarKey !== avatarKey) {
+          try {
+            await deleteMedia(initialAvatarKey);
+            console.log('Deleted old avatar from S3:', initialAvatarKey);
+          } catch (error) {
+            console.warn('Failed to delete old avatar:', error);
+            // Continue with save even if deletion fails
+          }
+        }
+
         await UsersAPI.updateAvatar(avatarKey ?? null);
       }
 
@@ -305,6 +329,7 @@ export default function SettingsScreen({ navigation }: any) {
         await UsersAPI.updateMe({ fullName: trimmedName.length ? trimmedName : null });
       }
 
+      setSaved(true); // Mark as saved so cleanup doesn't delete the new avatar
       await loadViewer({ silent: true });
 
       // Navigate back to profile after successful save
