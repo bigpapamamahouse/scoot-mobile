@@ -47,5 +47,15 @@ export async function deleteMedia(key: string): Promise<void> {
   }
 
   const encodedKey = encodeURIComponent(key);
-  await api(`/media/${encodedKey}`, { method: 'DELETE' });
+  console.log('[deleteMedia] Deleting key:', key);
+  console.log('[deleteMedia] Encoded key:', encodedKey);
+  console.log('[deleteMedia] Request path:', `/media/${encodedKey}`);
+
+  try {
+    const result = await api(`/media/${encodedKey}`, { method: 'DELETE' });
+    console.log('[deleteMedia] Success:', result);
+  } catch (error) {
+    console.error('[deleteMedia] Failed:', error);
+    throw error;
+  }
 }
