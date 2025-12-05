@@ -15,7 +15,7 @@ const {
   BatchGetCommand,
 } = require('@aws-sdk/lib-dynamodb');
 
-const { S3Client, PutObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3');
+const { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 
 const { CognitoIdentityProviderClient, AdminDeleteUserCommand } = require('@aws-sdk/client-cognito-identity-provider');
@@ -1034,12 +1034,23 @@ module.exports.handler = async (event) => {
         ConsistentRead: true,
       }));
 
-      // Get or generate invite code for this user
-      let inviteCode = null;
-      try {
-        inviteCode = await generateUserInviteCode(userId);
-      } catch (e) {
-        console.error('[Invites] Failed to get invite code for user:', e);
+      // Get invite code from user record, or generate if not present
+      let inviteCode = r.Item?.inviteCode ?? null;
+      if (!inviteCode) {
+        try {
+          inviteCode = await generateUserInviteCode(userId);
+          // Store the invite code in the user record for future requests
+          if (inviteCode) {
+            await ddb.send(new UpdateCommand({
+              TableName: USERS_TABLE,
+              Key: { pk: `USER#${userId}` },
+              UpdateExpression: 'SET inviteCode = :code',
+              ExpressionAttributeValues: { ':code': inviteCode },
+            }));
+          }
+        } catch (e) {
+          console.error('[Invites] Failed to get invite code for user:', e);
+        }
       }
 
       return ok({
@@ -2395,6 +2406,7 @@ module.exports.handler = async (event) => {
         createdAt: now,
       };
       if (body.imageKey) item.imageKey = body.imageKey;
+      if (body.imageAspectRatio) item.imageAspectRatio = body.imageAspectRatio;
 
       await ddb.send(new PutCommand({ TableName: POSTS_TABLE, Item: item }));
 
@@ -2522,6 +2534,20 @@ module.exports.handler = async (event) => {
       const post = (qr.Items || [])[0];
       if (!post) return bad('Not found', 404);
       if (post.userId !== userId) return bad('Forbidden', 403);
+
+      // Delete photo from S3 if it exists
+      if (post.imageKey && MEDIA_BUCKET) {
+        try {
+          await s3.send(new DeleteObjectCommand({
+            Bucket: MEDIA_BUCKET,
+            Key: post.imageKey,
+          }));
+          console.log(`[DELETE /posts] Deleted S3 object: ${post.imageKey}`);
+        } catch (e) {
+          console.error('[DELETE /posts] Failed to delete S3 object:', e);
+          // Continue with post deletion even if S3 deletion fails
+        }
+      }
 
       await ddb.send(new DeleteCommand({
         TableName: POSTS_TABLE,
