@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { signOutFn } from '../api/auth';
 import { UsersAPI, InvitesAPI } from '../api';
+import type { NotificationPreferences } from '../api/users';
 import { Avatar } from '../components/Avatar';
 import { uploadMedia } from '../lib/upload';
 import { mediaUrlFromKey, deleteMedia } from '../lib/media';
@@ -43,6 +44,12 @@ export default function SettingsScreen({ navigation }: any) {
   const [initialAvatarKey, setInitialAvatarKey] = React.useState<string | null>(null);
   const [avatarPreviewUri, setAvatarPreviewUri] = React.useState<string | null>(null);
   const [saved, setSaved] = React.useState(false);
+  const [notificationPrefs, setNotificationPrefs] = React.useState<NotificationPreferences>({
+    mentions: true,
+    comments: true,
+    reactions: true,
+  });
+  const [loadingPrefs, setLoadingPrefs] = React.useState(false);
 
   const ensureInviteCode = React.useCallback(
     async (viewerId?: string | null): Promise<string | null> => {
@@ -148,7 +155,36 @@ export default function SettingsScreen({ navigation }: any) {
 
   React.useEffect(() => {
     loadViewer();
+    loadNotificationPreferences();
   }, [loadViewer]);
+
+  const loadNotificationPreferences = React.useCallback(async () => {
+    try {
+      const prefs = await UsersAPI.getNotificationPreferences();
+      setNotificationPrefs(prefs);
+    } catch (error: any) {
+      console.error('Failed to load notification preferences:', error);
+      // Keep default values on error
+    }
+  }, []);
+
+  const handlePreferenceChange = React.useCallback(async (key: keyof NotificationPreferences, value: boolean) => {
+    // Optimistic update
+    setNotificationPrefs(prev => ({ ...prev, [key]: value }));
+    setLoadingPrefs(true);
+
+    try {
+      const updated = await UsersAPI.updateNotificationPreferences({ [key]: value });
+      setNotificationPrefs(updated);
+    } catch (error: any) {
+      console.error('Failed to update notification preference:', error);
+      Alert.alert('Error', 'Failed to update notification preferences. Please try again.');
+      // Revert on error
+      await loadNotificationPreferences();
+    } finally {
+      setLoadingPrefs(false);
+    }
+  }, [loadNotificationPreferences]);
 
   // Cleanup: Delete newly uploaded avatar if user navigates away without saving
   React.useEffect(() => {
@@ -456,6 +492,58 @@ export default function SettingsScreen({ navigation }: any) {
           </TouchableOpacity>
         </View>
 
+        <View style={styles.section}>
+          <Text style={[styles.sectionLabel, { color: colors.text.primary }]}>Notifications</Text>
+
+          <View style={[styles.settingRow, { backgroundColor: colors.background.elevated, borderColor: colors.border.main }]}>
+            <View style={styles.settingTextContainer}>
+              <Text style={[styles.settingLabel, { color: colors.text.primary }]}>Mentions</Text>
+              <Text style={[styles.settingDescription, { color: colors.text.secondary }]}>
+                Notify me when someone mentions me
+              </Text>
+            </View>
+            <Switch
+              value={notificationPrefs.mentions}
+              onValueChange={(value) => handlePreferenceChange('mentions', value)}
+              disabled={loadingPrefs}
+              trackColor={{ false: colors.neutral[300], true: colors.primary[500] }}
+              thumbColor={colors.background.primary}
+            />
+          </View>
+
+          <View style={[styles.settingRow, { backgroundColor: colors.background.elevated, borderColor: colors.border.main }]}>
+            <View style={styles.settingTextContainer}>
+              <Text style={[styles.settingLabel, { color: colors.text.primary }]}>Comments</Text>
+              <Text style={[styles.settingDescription, { color: colors.text.secondary }]}>
+                Notify me when someone comments on my posts
+              </Text>
+            </View>
+            <Switch
+              value={notificationPrefs.comments}
+              onValueChange={(value) => handlePreferenceChange('comments', value)}
+              disabled={loadingPrefs}
+              trackColor={{ false: colors.neutral[300], true: colors.primary[500] }}
+              thumbColor={colors.background.primary}
+            />
+          </View>
+
+          <View style={[styles.settingRow, { backgroundColor: colors.background.elevated, borderColor: colors.border.main }]}>
+            <View style={styles.settingTextContainer}>
+              <Text style={[styles.settingLabel, { color: colors.text.primary }]}>Reactions</Text>
+              <Text style={[styles.settingDescription, { color: colors.text.secondary }]}>
+                Notify me when someone reacts to my posts
+              </Text>
+            </View>
+            <Switch
+              value={notificationPrefs.reactions}
+              onValueChange={(value) => handlePreferenceChange('reactions', value)}
+              disabled={loadingPrefs}
+              trackColor={{ false: colors.neutral[300], true: colors.primary[500] }}
+              thumbColor={colors.background.primary}
+            />
+          </View>
+        </View>
+
         <TouchableOpacity
           style={[styles.primaryButton, (saving || uploading) && styles.primaryButtonDisabled]}
           onPress={handleSave}
@@ -512,11 +600,23 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 12,
+  },
+  settingTextContainer: {
+    flex: 1,
+    marginRight: 12,
+  },
+  settingLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+    marginBottom: 4,
   },
   settingDescription: {
     fontSize: 14,
     color: '#666',
-    marginTop: 4,
   },
   themeOption: {
     flexDirection: 'row',

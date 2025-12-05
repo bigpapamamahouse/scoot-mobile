@@ -1053,3 +1053,33 @@ export async function deleteAccount() {
     throw err;
   }
 }
+
+export interface NotificationPreferences {
+  mentions: boolean;
+  comments: boolean;
+  reactions: boolean;
+}
+
+export async function getNotificationPreferences(): Promise<NotificationPreferences> {
+  const result = await api('/me/notification-preferences');
+
+  // Ensure we return a valid preferences object with defaults
+  return {
+    mentions: result?.mentions ?? true,
+    comments: result?.comments ?? true,
+    reactions: result?.reactions ?? true,
+  };
+}
+
+export async function updateNotificationPreferences(preferences: Partial<NotificationPreferences>): Promise<NotificationPreferences> {
+  const result = await api('/me/notification-preferences', {
+    method: 'PATCH',
+    body: JSON.stringify(preferences),
+  });
+
+  return {
+    mentions: result?.mentions ?? true,
+    comments: result?.comments ?? true,
+    reactions: result?.reactions ?? true,
+  };
+}
