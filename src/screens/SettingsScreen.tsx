@@ -330,49 +330,57 @@ export default function SettingsScreen({ navigation }: any) {
     ]);
   };
 
-  const handleSave = async () => {
-    const trimmedName = fullName.trim();
-    const normalizedName = trimmedName.length ? trimmedName : '';
-
-    const hasNameChange = normalizedName !== initialFullName.trim();
+  const handleSaveAvatar = async () => {
     const hasAvatarChange = (avatarKey ?? null) !== (initialAvatarKey ?? null);
 
-    if (!hasNameChange && !hasAvatarChange) {
-      Alert.alert('No changes', 'Update your profile before saving.');
+    if (!hasAvatarChange) {
+      Alert.alert('No changes', 'Please update your profile photo first.');
       return;
     }
 
     setSaving(true);
     try {
-      // Update avatar using dedicated endpoint if changed
-      if (hasAvatarChange) {
-        // Delete old avatar from S3 if it's being replaced with a new one
-        if (initialAvatarKey && avatarKey && initialAvatarKey !== avatarKey) {
-          try {
-            await deleteMedia(initialAvatarKey);
-            console.log('Deleted old avatar from S3:', initialAvatarKey);
-          } catch (error) {
-            console.warn('Failed to delete old avatar:', error);
-            // Continue with save even if deletion fails
-          }
+      // Delete old avatar from S3 if it's being replaced with a new one
+      if (initialAvatarKey && avatarKey && initialAvatarKey !== avatarKey) {
+        try {
+          await deleteMedia(initialAvatarKey);
+          console.log('Deleted old avatar from S3:', initialAvatarKey);
+        } catch (error) {
+          console.warn('Failed to delete old avatar:', error);
+          // Continue with save even if deletion fails
         }
-
-        await UsersAPI.updateAvatar(avatarKey ?? null);
       }
 
-      // Update name using PATCH /me if changed
-      if (hasNameChange) {
-        await UsersAPI.updateMe({ fullName: trimmedName.length ? trimmedName : null });
-      }
-
+      await UsersAPI.updateAvatar(avatarKey ?? null);
       setSaved(true); // Mark as saved so cleanup doesn't delete the new avatar
       await loadViewer({ silent: true });
-
-      // Navigate back to profile after successful save
-      navigation.goBack();
+      Alert.alert('Success', 'Profile photo updated successfully');
     } catch (error: any) {
-      console.error('Failed to save profile:', error);
-      Alert.alert('Error', error?.message || 'Failed to update your profile.');
+      console.error('Failed to save avatar:', error);
+      Alert.alert('Error', error?.message || 'Failed to update profile photo.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveName = async () => {
+    const trimmedName = fullName.trim();
+    const normalizedName = trimmedName.length ? trimmedName : '';
+    const hasNameChange = normalizedName !== initialFullName.trim();
+
+    if (!hasNameChange) {
+      Alert.alert('No changes', 'Please update your name first.');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await UsersAPI.updateMe({ fullName: trimmedName.length ? trimmedName : null });
+      await loadViewer({ silent: true });
+      Alert.alert('Success', 'Name updated successfully');
+    } catch (error: any) {
+      console.error('Failed to save name:', error);
+      Alert.alert('Error', error?.message || 'Failed to update your name.');
     } finally {
       setSaving(false);
     }
@@ -419,13 +427,28 @@ export default function SettingsScreen({ navigation }: any) {
                 </Text>
               </TouchableOpacity>
               {(avatarKey || avatarPreviewUri) && (
-                <TouchableOpacity
-                  onPress={removePhoto}
-                  disabled={uploading}
-                  style={styles.linkButton}
-                >
-                  <Text style={[styles.linkButtonText, uploading && styles.linkButtonDisabled]}>Remove photo</Text>
-                </TouchableOpacity>
+                <>
+                  <TouchableOpacity
+                    onPress={removePhoto}
+                    disabled={uploading}
+                    style={styles.linkButton}
+                  >
+                    <Text style={[styles.linkButtonText, uploading && styles.linkButtonDisabled]}>Remove photo</Text>
+                  </TouchableOpacity>
+                  {(avatarKey ?? null) !== (initialAvatarKey ?? null) && (
+                    <TouchableOpacity
+                      style={[styles.inlineSaveButton, (saving || uploading) && styles.disabledButton]}
+                      onPress={handleSaveAvatar}
+                      disabled={saving || uploading}
+                    >
+                      {saving ? (
+                        <ActivityIndicator size="small" color="#fff" />
+                      ) : (
+                        <Text style={styles.inlineSaveButtonText}>Save photo</Text>
+                      )}
+                    </TouchableOpacity>
+                  )}
+                </>
               )}
             </View>
           </View>
@@ -433,15 +456,30 @@ export default function SettingsScreen({ navigation }: any) {
 
         <View style={styles.section}>
           <Text style={[styles.sectionLabel, { color: colors.text.primary }]}>Full name</Text>
-          <TextInput
-            style={[styles.input, { backgroundColor: colors.background.elevated, color: colors.text.primary, borderColor: colors.border.main }]}
-            value={fullName}
-            onChangeText={setFullName}
-            placeholder="Enter your full name"
-            placeholderTextColor={colors.text.tertiary}
-            autoCapitalize="words"
-            editable={!saving && !uploading}
-          />
+          <View style={styles.inputRow}>
+            <TextInput
+              style={[styles.input, { backgroundColor: colors.background.elevated, color: colors.text.primary, borderColor: colors.border.main }]}
+              value={fullName}
+              onChangeText={setFullName}
+              placeholder="Enter your full name"
+              placeholderTextColor={colors.text.tertiary}
+              autoCapitalize="words"
+              editable={!saving && !uploading}
+            />
+            {fullName.trim() !== initialFullName.trim() && (
+              <TouchableOpacity
+                style={[styles.inlineSaveButton, saving && styles.disabledButton]}
+                onPress={handleSaveName}
+                disabled={saving}
+              >
+                {saving ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.inlineSaveButtonText}>Save</Text>
+                )}
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
 
         <View style={styles.section}>
@@ -546,18 +584,6 @@ export default function SettingsScreen({ navigation }: any) {
             />
           </View>
         </View>
-
-        <TouchableOpacity
-          style={[styles.primaryButton, (saving || uploading) && styles.primaryButtonDisabled]}
-          onPress={handleSave}
-          disabled={saving || uploading}
-        >
-          {saving ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.primaryButtonText}>Save changes</Text>
-          )}
-        </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.deleteAccountButton}
@@ -699,7 +725,13 @@ const styles = StyleSheet.create({
   linkButtonDisabled: {
     color: '#e57373',
   },
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   input: {
+    flex: 1,
     borderWidth: 1,
     borderColor: '#d0d7de',
     borderRadius: 10,
@@ -707,6 +739,20 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     backgroundColor: '#fff',
     fontSize: 16,
+  },
+  inlineSaveButton: {
+    backgroundColor: '#4F46E5',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    minWidth: 80,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  inlineSaveButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
   },
   inviteCodeBox: {
     borderWidth: 1,
@@ -726,21 +772,6 @@ const styles = StyleSheet.create({
     marginTop: 8,
     color: '#607d8b',
     fontSize: 13,
-  },
-  primaryButton: {
-    backgroundColor: '#2196f3',
-    paddingVertical: 14,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginTop: 12,
-  },
-  primaryButtonDisabled: {
-    opacity: 0.7,
-  },
-  primaryButtonText: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: 16,
   },
   deleteAccountButton: {
     marginTop: 32,
