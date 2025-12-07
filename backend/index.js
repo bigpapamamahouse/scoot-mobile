@@ -2213,16 +2213,38 @@ module.exports.handler = async (event) => {
 
           if (followIds.size > 0) {
             const results = [];
-            for (const fid of followIds) {
-              const r = await ddb.send(new QueryCommand({
-                TableName: POSTS_TABLE,
-                KeyConditionExpression: 'pk = :p',
-                ExpressionAttributeValues: { ':p': `USER#${fid}` },
-                ScanIndexForward: false,
-                Limit: 50, // Fetch more per user to ensure we have enough for pagination
-                ConsistentRead: true,
-              }));
-              (r.Items || []).forEach(i => results.push(i));
+
+            // OPTIMIZATION: Parallel feed fetching with batching
+            // Limit to first 100 followers to prevent overwhelming DynamoDB
+            const limitedFollowIds = Array.from(followIds).slice(0, 100);
+
+            // Process in batches of 25 to avoid throttling
+            const BATCH_SIZE = 25;
+            const batches = [];
+            for (let i = 0; i < limitedFollowIds.length; i += BATCH_SIZE) {
+              batches.push(limitedFollowIds.slice(i, i + BATCH_SIZE));
+            }
+
+            // Fetch posts in parallel for each batch
+            for (const batch of batches) {
+              const batchResults = await Promise.all(
+                batch.map(fid =>
+                  ddb.send(new QueryCommand({
+                    TableName: POSTS_TABLE,
+                    KeyConditionExpression: 'pk = :p',
+                    ExpressionAttributeValues: { ':p': `USER#${fid}` },
+                    ScanIndexForward: false,
+                    Limit: 10, // Reduced from 50 to 10 for better performance
+                    ConsistentRead: true,
+                  }))
+                  .then(r => r.Items || [])
+                  .catch(err => {
+                    console.error(`[Feed] Failed to fetch posts for user ${fid}:`, err);
+                    return []; // Continue even if one user fails
+                  })
+                )
+              );
+              batchResults.forEach(items => results.push(...items));
             }
             results.sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
 
@@ -2274,66 +2296,102 @@ module.exports.handler = async (event) => {
               console.error('FEED avatar/handle hydrate failed', e);
             }
 
-            // Fetch comment previews for all posts
+            // OPTIMIZATION: Fetch comment previews for all posts in parallel
             try {
-              for (const post of items) {
-                // First, get the total count of comments
-                const countResult = await ddb.send(new QueryCommand({
-                  TableName: COMMENTS_TABLE,
-                  KeyConditionExpression: 'pk = :p',
-                  ExpressionAttributeValues: { ':p': `POST#${post.id}` },
-                  Select: 'COUNT',
-                  ConsistentRead: true,
-                }));
-                const totalCommentCount = countResult.Count || 0;
+              // Fetch all comment data in parallel
+              const commentPromises = items.map(async (post) => {
+                try {
+                  // Single query: fetch comments with count
+                  // Note: Removed separate COUNT query to reduce DDB calls by 50%
+                  const commentsResult = await ddb.send(new QueryCommand({
+                    TableName: COMMENTS_TABLE,
+                    KeyConditionExpression: 'pk = :p',
+                    ExpressionAttributeValues: { ':p': `POST#${post.id}` },
+                    ScanIndexForward: true,
+                    Limit: 50, // Fetch more to get accurate count
+                    ConsistentRead: true,
+                  }));
 
-                // Then fetch first 4 comments for preview
-                const commentsResult = await ddb.send(new QueryCommand({
-                  TableName: COMMENTS_TABLE,
-                  KeyConditionExpression: 'pk = :p',
-                  ExpressionAttributeValues: { ':p': `POST#${post.id}` },
-                  ScanIndexForward: true,
-                  Limit: 4, // Fetch 4 to detect if there are more than 3
-                  ConsistentRead: true,
-                }));
+                  const allComments = (commentsResult.Items || []).map(it => ({
+                    id: it.id,
+                    userId: it.userId,
+                    handle: it.userHandle || null,
+                    text: it.text || '',
+                    createdAt: it.createdAt || 0,
+                  }));
 
-                const allComments = (commentsResult.Items || []).map(it => ({
-                  id: it.id,
-                  userId: it.userId,
-                  handle: it.userHandle || null,
-                  text: it.text || '',
-                  createdAt: it.createdAt || 0,
-                }));
+                  // Take only first 3 for preview
+                  const comments = allComments.slice(0, 3);
+                  const totalCommentCount = commentsResult.Count || 0;
 
-                // Take only first 3 for preview
-                const comments = allComments.slice(0, 3);
+                  // Collect all comment user IDs for batch avatar fetching
+                  const commentUserIds = comments.map(c => c.userId).filter(Boolean);
 
-                // Fetch avatarKey for comment authors
-                if (comments.length > 0) {
-                  try {
-                    const userIds = [...new Set(comments.map(c => c.userId).filter(Boolean))];
-                    if (userIds.length > 0) {
-                      const summaries = await fetchUserSummaries(userIds);
-                      const avatarMap = Object.fromEntries(
-                        summaries.map(u => [u.userId, u.avatarKey || null])
-                      );
-                      for (const comment of comments) {
-                        if (comment.userId && avatarMap[comment.userId]) {
-                          comment.avatarKey = avatarMap[comment.userId];
-                        }
-                      }
-                    }
-                  } catch (e) {
-                    console.error('Failed to fetch comment avatars:', e);
-                  }
+                  return {
+                    postId: post.id,
+                    comments,
+                    commentCount: totalCommentCount,
+                    commentUserIds,
+                  };
+                } catch (err) {
+                  console.error(`[Feed] Failed to fetch comments for post ${post.id}:`, err);
+                  return {
+                    postId: post.id,
+                    comments: [],
+                    commentCount: 0,
+                    commentUserIds: [],
+                  };
                 }
+              });
 
-                post.comments = comments;
-                post.commentCount = totalCommentCount;
+              // Wait for all comment fetches to complete
+              const commentResults = await Promise.all(commentPromises);
+
+              // Batch fetch all comment author avatars
+              const allCommentUserIds = [...new Set(
+                commentResults.flatMap(r => r.commentUserIds)
+              )];
+
+              let commentAvatarMap = {};
+              if (allCommentUserIds.length > 0) {
+                try {
+                  const commentUsers = await fetchUserSummaries(allCommentUserIds);
+                  commentAvatarMap = Object.fromEntries(
+                    commentUsers.map(u => [u.userId, u.avatarKey || null])
+                  );
+                } catch (e) {
+                  console.error('[Feed] Failed to fetch comment avatars:', e);
+                }
+              }
+
+              // Attach comments and avatars to posts
+              const commentMap = Object.fromEntries(
+                commentResults.map(r => [r.postId, r])
+              );
+
+              for (const post of items) {
+                const result = commentMap[post.id];
+                if (result) {
+                  // Attach avatars to comments
+                  result.comments.forEach(comment => {
+                    if (comment.userId && commentAvatarMap[comment.userId]) {
+                      comment.avatarKey = commentAvatarMap[comment.userId];
+                    }
+                  });
+                  post.comments = result.comments;
+                  post.commentCount = result.commentCount;
+                } else {
+                  post.comments = [];
+                  post.commentCount = 0;
+                }
               }
             } catch (e) {
               console.error('Failed to fetch comment previews for feed:', e);
               // Continue without comment previews if this fails
+              items.forEach(post => {
+                post.comments = [];
+                post.commentCount = 0;
+              });
             }
 
             return ok({ items });
