@@ -2766,9 +2766,23 @@ module.exports.handler = async (event) => {
         let isFollowPending = false;
         try { if (!iFollow) { isFollowPending = await hasPendingFollow(userId, targetId); } } catch (e) { console.error('compute isFollowPending', e); }
 
+        // Check if this is the user's own profile
+        const isSelf = userId === targetId;
+
+        // Private profiles by default: only show posts if viewer is following or viewing own profile
+        const canViewPosts = isSelf || iFollow;
+
         // Fetch posts with pagination
-        const allPosts = await listPostsByUserId(targetId);
-        const items = allPosts.slice(offset, offset + limit);
+        let items = [];
+        let isPrivate = false;
+
+        if (canViewPosts) {
+          const allPosts = await listPostsByUserId(targetId);
+          items = allPosts.slice(offset, offset + limit);
+        } else {
+          // Profile is private and viewer is not following
+          isPrivate = true;
+        }
 
         // Hydrate profile posts with fresh avatar/handle
         try {
@@ -2853,6 +2867,7 @@ module.exports.handler = async (event) => {
           isFollowing: iFollow,
           items,
           posts: items,
+          isPrivate,
           isFollowPending, followStatus: (iFollow ? 'following' : (isFollowPending ? 'pending' : 'none')) });
       }
 
@@ -2923,8 +2938,25 @@ module.exports.handler = async (event) => {
       }
 
       if (userRoute.kind === 'posts') {
-        const allPosts = await listPostsByUserId(targetId);
-        const items = allPosts.slice(offset, offset + limit);
+        // Check if this is the user's own profile
+        const isSelf = userId === targetId;
+
+        // Check if viewer is following the profile owner
+        const iFollow = await isFollowing(userId, targetId);
+
+        // Private profiles by default: only show posts if viewer is following or viewing own profile
+        const canViewPosts = isSelf || iFollow;
+
+        let items = [];
+        let isPrivate = false;
+
+        if (canViewPosts) {
+          const allPosts = await listPostsByUserId(targetId);
+          items = allPosts.slice(offset, offset + limit);
+        } else {
+          // Profile is private and viewer is not following
+          isPrivate = true;
+        }
         try {
           const summaries = await fetchUserSummaries([targetId]);
           const fresh = (summaries[0] && summaries[0].avatarKey) || null;
@@ -2993,7 +3025,7 @@ module.exports.handler = async (event) => {
           // Continue without comment previews if this fails
         }
 
-        return ok({ items });
+        return ok({ items, isPrivate });
       }
     }
 

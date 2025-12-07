@@ -44,6 +44,7 @@ export default function ProfileScreen({ navigation, route }: any) {
   const [followingCount, setFollowingCount] = React.useState(0);
   const [followStatus, setFollowStatus] = React.useState<'none' | 'pending' | 'following'>('none');
   const [followLoading, setFollowLoading] = React.useState(false);
+  const [isPrivate, setIsPrivate] = React.useState(false);
 
   // Extract route params to stable values to prevent unnecessary re-renders
   const routeUserHandle = route?.params?.userHandle || route?.params?.handle || route?.params?.username;
@@ -420,6 +421,12 @@ export default function ProfileScreen({ navigation, route }: any) {
               offset,
             });
             console.log('[ProfileScreen] API response:', JSON.stringify(postsData).substring(0, 200));
+
+            // Check if profile is private
+            if (postsData && typeof postsData === 'object' && 'isPrivate' in postsData) {
+              setIsPrivate(postsData.isPrivate === true);
+            }
+
             const normalizedPosts = resolvePosts(postsData);
             console.log(`[ProfileScreen] Normalized ${normalizedPosts.length} posts from API response`);
             const filteredPosts = filterPostsForUser(normalizedPosts, {
@@ -539,6 +546,11 @@ export default function ProfileScreen({ navigation, route }: any) {
                 fullName: (profileData as any).fullName ?? prev?.fullName ?? null,
                 createdAt: (profileData as any).createdAt ?? prev?.createdAt ?? null,
               }));
+
+              // Check if profile is private
+              if ('isPrivate' in profileData) {
+                setIsPrivate(profileData.isPrivate === true);
+              }
             }
 
             const followers = Array.isArray(followersData) ? followersData :
@@ -973,11 +985,13 @@ export default function ProfileScreen({ navigation, route }: any) {
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>
-              {isViewingSelf
+              {isPrivate
+                ? 'Request to follow this scooter to see their posts!'
+                : isViewingSelf
                 ? 'No posts yet'
                 : 'This user has not posted yet'}
             </Text>
-            {isViewingSelf && (
+            {isViewingSelf && !isPrivate && (
               <TouchableOpacity
                 style={styles.createPostButton}
                 onPress={() => navigation.navigate('ComposePost')}
