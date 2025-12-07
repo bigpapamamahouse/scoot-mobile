@@ -1117,17 +1117,14 @@ module.exports.handler = async (event) => {
 
     // GET /me/notification-preferences - Get user's notification preferences
     if (route === 'GET /me/notification-preferences') {
-      console.log('[NOTIFICATION-PREFS] Matched GET endpoint, userId:', userId);
       if (!userId) return bad('Unauthorized', 401);
 
       const prefs = await getUserNotificationPreferences(userId);
-      console.log('[NOTIFICATION-PREFS] Returning preferences:', prefs);
       return ok(prefs);
     }
 
     // PATCH /me/notification-preferences - Update user's notification preferences
     if (route === 'PATCH /me/notification-preferences') {
-      console.log('[NOTIFICATION-PREFS] Matched PATCH endpoint, userId:', userId);
       if (!userId) return bad('Unauthorized', 401);
 
       const body = JSON.parse(event.body || '{}');
@@ -3433,11 +3430,8 @@ module.exports.handler = async (event) => {
     }
 
     // ----- default -----
-    console.error(`[404] No route matched: method="${method}", route="${route}", path="${path}", rawPath="${rawPath}"`);
-    if (path.includes('notification-preferences')) {
-      console.error(`[404] NOTIFICATION-PREFERENCES REQUEST NOT MATCHED! This means the route check failed.`);
-      console.error(`[404] Expected route to be: "GET /me/notification-preferences" or "PATCH /me/notification-preferences"`);
-      console.error(`[404] Actual route was: "${route}"`);
+    if (method === 'DELETE') {
+      console.error(`[404] DELETE request not matched: route="${route}", path="${path}"`);
     }
     return bad('Not found', 404);
 

@@ -494,6 +494,9 @@ export default function SettingsScreen({ navigation }: any) {
 
         <View style={styles.section}>
           <Text style={[styles.sectionLabel, { color: colors.text.primary }]}>Notifications</Text>
+          <Text style={[styles.inviteHint, { color: colors.text.secondary, marginTop: -8, marginBottom: 12 }]}>
+            Changes are saved automatically
+          </Text>
 
           <View style={[styles.settingRow, { backgroundColor: colors.background.elevated, borderColor: colors.border.main }]}>
             <View style={styles.settingTextContainer}>
