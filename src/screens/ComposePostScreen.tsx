@@ -30,7 +30,9 @@ export default function ComposePostScreen({ navigation }: any) {
   const [imageAspectRatio, setImageAspectRatio] = React.useState<number | null>(null);
   const [loading, setLoading] = React.useState(false);
   const [uploading, setUploading] = React.useState(false);
-  const [posted, setPosted] = React.useState(false);
+
+  // Use ref instead of state to avoid race condition on unmount
+  const postedRef = React.useRef(false);
 
   const styles = React.useMemo(() => createStyles(colors), [colors]);
 
@@ -38,13 +40,13 @@ export default function ComposePostScreen({ navigation }: any) {
   React.useEffect(() => {
     return () => {
       // Only delete if there's an uploaded image and the post wasn't created
-      if (imageKey && !posted) {
+      if (imageKey && !postedRef.current) {
         deleteMedia(imageKey)
           .then(() => console.log('Cleaned up unused uploaded image:', imageKey))
           .catch((error) => console.warn('Failed to cleanup unused image:', error));
       }
     };
-  }, [imageKey, posted]);
+  }, [imageKey]);
 
   const pickImage = async (fromCamera: boolean) => {
     try {
@@ -207,7 +209,7 @@ export default function ComposePostScreen({ navigation }: any) {
         imageKey || undefined,
         imageAspectRatio || undefined
       );
-      setPosted(true); // Mark as posted so cleanup doesn't delete the image
+      postedRef.current = true; // Mark as posted so cleanup doesn't delete the image
       Alert.alert('Success', 'Post created!');
       navigation.goBack();
     } catch (e: any) {

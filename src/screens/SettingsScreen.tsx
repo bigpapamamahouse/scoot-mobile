@@ -42,7 +42,9 @@ export default function SettingsScreen({ navigation }: any) {
   const [initialFullName, setInitialFullName] = React.useState('');
   const [initialAvatarKey, setInitialAvatarKey] = React.useState<string | null>(null);
   const [avatarPreviewUri, setAvatarPreviewUri] = React.useState<string | null>(null);
-  const [saved, setSaved] = React.useState(false);
+
+  // Use ref instead of state to avoid race condition on unmount
+  const savedRef = React.useRef(false);
 
   const ensureInviteCode = React.useCallback(
     async (viewerId?: string | null): Promise<string | null> => {
@@ -154,13 +156,13 @@ export default function SettingsScreen({ navigation }: any) {
   React.useEffect(() => {
     return () => {
       const hasNewAvatar = avatarKey && avatarKey !== initialAvatarKey;
-      if (hasNewAvatar && !saved) {
+      if (hasNewAvatar && !savedRef.current) {
         deleteMedia(avatarKey)
           .then(() => console.log('Cleaned up unused uploaded avatar:', avatarKey))
           .catch((error) => console.warn('Failed to cleanup unused avatar:', error));
       }
     };
-  }, [avatarKey, initialAvatarKey, saved]);
+  }, [avatarKey, initialAvatarKey]);
 
   const handleLogout = async () => {
     try {
@@ -329,7 +331,7 @@ export default function SettingsScreen({ navigation }: any) {
         await UsersAPI.updateMe({ fullName: trimmedName.length ? trimmedName : null });
       }
 
-      setSaved(true); // Mark as saved so cleanup doesn't delete the new avatar
+      savedRef.current = true; // Mark as saved so cleanup doesn't delete the new avatar
       await loadViewer({ silent: true });
 
       // Navigate back to profile after successful save
