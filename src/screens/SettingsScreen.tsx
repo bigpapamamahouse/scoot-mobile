@@ -51,6 +51,9 @@ export default function SettingsScreen({ navigation }: any) {
   });
   const [loadingPrefs, setLoadingPrefs] = React.useState(false);
 
+  // Use ref instead of state to avoid race condition on unmount
+  const savedRef = React.useRef(false);
+
   const ensureInviteCode = React.useCallback(
     async (viewerId?: string | null): Promise<string | null> => {
       const normalizedId = typeof viewerId === 'string' ? viewerId.trim() : '';
@@ -190,13 +193,13 @@ export default function SettingsScreen({ navigation }: any) {
   React.useEffect(() => {
     return () => {
       const hasNewAvatar = avatarKey && avatarKey !== initialAvatarKey;
-      if (hasNewAvatar && !saved) {
+      if (hasNewAvatar && !savedRef.current) {
         deleteMedia(avatarKey)
           .then(() => console.log('Cleaned up unused uploaded avatar:', avatarKey))
           .catch((error) => console.warn('Failed to cleanup unused avatar:', error));
       }
     };
-  }, [avatarKey, initialAvatarKey, saved]);
+  }, [avatarKey, initialAvatarKey]);
 
   const handleLogout = async () => {
     try {
@@ -353,6 +356,7 @@ export default function SettingsScreen({ navigation }: any) {
 
       await UsersAPI.updateAvatar(avatarKey ?? null);
       setSaved(true); // Mark as saved so cleanup doesn't delete the new avatar
+      savedRef.current = true; // Mark as saved so cleanup doesn't delete the new avatar
       await loadViewer({ silent: true });
       Alert.alert('Success', 'Profile photo updated successfully');
     } catch (error: any) {
