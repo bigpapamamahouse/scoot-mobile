@@ -378,7 +378,19 @@ export default function PostScreen({ route, navigation }: { route: PostScreenRou
         <Avatar avatarKey={anyComment?.avatarKey} size={isReply ? 24 : 28} />
         <View style={styles.commentContent}>
           <View style={styles.commentHeader}>
-            <Text style={styles.commentHandle}>{handle}</Text>
+            <TouchableOpacity
+              onPress={() => {
+                if (anyComment?.userId) {
+                  navigation.push('Profile', {
+                    userHandle: handleCandidate,
+                    userId: anyComment.userId,
+                  });
+                }
+              }}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.commentHandle}>{handle}</Text>
+            </TouchableOpacity>
             {!!createdAt && <Text style={styles.commentTimestamp}>{createdAt}</Text>}
             {userOwnsComment && (
               <TouchableOpacity

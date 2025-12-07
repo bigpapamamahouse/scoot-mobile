@@ -404,7 +404,16 @@ function PostCard({
     const displayHandle = handle ? `@${handle}` : fallbackId;
     return (
       <View key={comment.id} style={styles.commentPreviewRow}>
-        <Text style={styles.commentPreviewHandle}>{displayHandle}</Text>
+        <TouchableOpacity
+          onPress={() => {
+            if (comment.userId) {
+              onPressUser?.(comment.userId, handle);
+            }
+          }}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.commentPreviewHandle}>{displayHandle}</Text>
+        </TouchableOpacity>
         <Text style={styles.commentPreviewText}>{comment.text}</Text>
       </View>
     );

@@ -150,9 +150,60 @@ async function userIdFromHandle(handle) {
   return null;
 }
 
+// NEW: Get user notification preferences
+async function getUserNotificationPreferences(userId) {
+  if (!USERS_TABLE || !userId) return null;
+
+  try {
+    const r = await ddb.send(new GetCommand({
+      TableName: USERS_TABLE,
+      Key: { pk: `USER#${userId}` },
+      ProjectionExpression: 'notificationPreferences',
+      ConsistentRead: true,
+    }));
+
+    // Default: all notifications enabled
+    const defaults = {
+      mentions: true,
+      comments: true,
+      reactions: true,
+    };
+
+    return r.Item?.notificationPreferences || defaults;
+  } catch (e) {
+    console.error('[Preferences] Failed to get notification preferences:', e);
+    // Return defaults on error
+    return {
+      mentions: true,
+      comments: true,
+      reactions: true,
+    };
+  }
+}
+
 // NEW: notifications helper
 async function createNotification(targetUserId, type, fromUserId, postId = null, message = '') {
   if (!NOTIFICATIONS_TABLE || !targetUserId || targetUserId === fromUserId) return;
+
+  // Check user's notification preferences
+  const prefs = await getUserNotificationPreferences(targetUserId);
+
+  // Map notification types to preference keys
+  const prefMap = {
+    'mention': 'mentions',
+    'comment': 'comments',
+    'reply': 'comments',
+    'reaction': 'reactions',
+  };
+
+  const prefKey = prefMap[type];
+
+  // If this notification type is mapped to a preference and it's disabled, skip notification
+  if (prefKey && prefs && prefs[prefKey] === false) {
+    console.log(`[Notifications] Skipping ${type} notification for user ${targetUserId} (preference disabled)`);
+    return;
+  }
+
   const now = Date.now();
   const id = randomUUID();
   await ddb.send(new PutCommand({
@@ -1062,6 +1113,53 @@ module.exports.handler = async (event) => {
         termsAccepted: r.Item?.termsAccepted ?? false,
         inviteCode, // Include invite code in response
       });
+    }
+
+    // GET /me/notification-preferences - Get user's notification preferences
+    if (route === 'GET /me/notification-preferences') {
+      if (!userId) return bad('Unauthorized', 401);
+
+      const prefs = await getUserNotificationPreferences(userId);
+      return ok(prefs);
+    }
+
+    // PATCH /me/notification-preferences - Update user's notification preferences
+    if (route === 'PATCH /me/notification-preferences') {
+      if (!userId) return bad('Unauthorized', 401);
+
+      const body = JSON.parse(event.body || '{}');
+
+      // Validate preferences
+      const validKeys = ['mentions', 'comments', 'reactions'];
+      const updates = {};
+
+      for (const key of validKeys) {
+        if (key in body && typeof body[key] === 'boolean') {
+          updates[key] = body[key];
+        }
+      }
+
+      if (Object.keys(updates).length === 0) {
+        return bad('No valid preferences provided', 400);
+      }
+
+      // Get current preferences
+      const currentPrefs = await getUserNotificationPreferences(userId);
+
+      // Merge with updates
+      const newPrefs = { ...currentPrefs, ...updates };
+
+      // Update in database
+      await ddb.send(new UpdateCommand({
+        TableName: USERS_TABLE,
+        Key: { pk: `USER#${userId}` },
+        UpdateExpression: 'SET notificationPreferences = :prefs',
+        ExpressionAttributeValues: {
+          ':prefs': newPrefs,
+        },
+      }));
+
+      return ok(newPrefs);
     }
 
     // POST /me/accept-terms - Accept terms of service
