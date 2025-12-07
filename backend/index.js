@@ -770,6 +770,7 @@ async function listPostsByUserId(targetId, limit = 1000) {
     username: i.username || 'unknown',
     text: i.text || '',
     imageKey: i.imageKey || null,
+    imageAspectRatio: i.imageAspectRatio || null,
     avatarKey: i.avatarKey || null,
     createdAt: i.createdAt,
   }));
@@ -2229,6 +2230,7 @@ module.exports.handler = async (event) => {
               id: i.id, userId: i.userId, username: i.username || 'unknown',
               handle: i.handle || null,
               text: i.text || '', imageKey: i.imageKey || null,
+              imageAspectRatio: i.imageAspectRatio || null,
               avatarKey: i.avatarKey || null,
               createdAt: i.createdAt,
             }));
@@ -2726,6 +2728,7 @@ module.exports.handler = async (event) => {
         handle: post.handle || null,
         text: post.text || '',
         imageKey: post.imageKey || null,
+        imageAspectRatio: post.imageAspectRatio || null,
         avatarKey: post.avatarKey || null,
         createdAt: post.createdAt,
       });
