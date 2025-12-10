@@ -409,6 +409,16 @@ export default function ProfileScreen({ navigation, route }: any) {
 
         let resolvedIdentity = targetIdentity;
 
+        // OPTIMIZATION: Start fetching profile data in parallel with posts for first page load
+        let profileDataPromise: Promise<[any, any, any]> | null = null;
+        if (targetHandle && pageNum === 0 && !shouldSkipAPICall) {
+          profileDataPromise = Promise.all([
+            UsersAPI.getUser(targetHandle),
+            UsersAPI.listFollowers(targetHandle),
+            UsersAPI.listFollowing(targetHandle),
+          ]);
+        }
+
         // Skip posts API call if we already have cached data
         if (!shouldSkipAPICall) {
           try {
@@ -528,12 +538,18 @@ export default function ProfileScreen({ navigation, route }: any) {
         const userHandle = finalIdentity?.handle?.replace(/^@/, '').trim();
         if (userHandle && pageNum === 0) {
           try {
-            // OPTIMIZATION: Parallelize independent API calls for better performance
-            const [profileData, followersData, followingData] = await Promise.all([
-              UsersAPI.getUser(userHandle),
-              UsersAPI.listFollowers(userHandle),
-              UsersAPI.listFollowing(userHandle),
-            ]);
+            // OPTIMIZATION: If we started the profile data fetch earlier, await it now
+            // Otherwise, fetch it now (for cases where shouldSkipAPICall was true)
+            let profileData, followersData, followingData;
+            if (profileDataPromise) {
+              [profileData, followersData, followingData] = await profileDataPromise;
+            } else {
+              [profileData, followersData, followingData] = await Promise.all([
+                UsersAPI.getUser(userHandle),
+                UsersAPI.listFollowers(userHandle),
+                UsersAPI.listFollowing(userHandle),
+              ]);
+            }
 
             // Update user state with complete profile data including fullName
             if (profileData && typeof profileData === 'object') {
@@ -865,7 +881,7 @@ export default function ProfileScreen({ navigation, route }: any) {
 
   const handleFollowersPress = React.useCallback(() => {
     if (user?.handle) {
-      navigation.navigate('UserList', {
+      navigation.push('UserList', {
         handle: user.handle.replace(/^@/, ''),
         type: 'followers'
       });
@@ -874,7 +890,7 @@ export default function ProfileScreen({ navigation, route }: any) {
 
   const handleFollowingPress = React.useCallback(() => {
     if (user?.handle) {
-      navigation.navigate('UserList', {
+      navigation.push('UserList', {
         handle: user.handle.replace(/^@/, ''),
         type: 'following'
       });
