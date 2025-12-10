@@ -754,6 +754,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   quickReactions: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
     gap: spacing[2],
     paddingTop: spacing[2],
     borderTopWidth: 1,
