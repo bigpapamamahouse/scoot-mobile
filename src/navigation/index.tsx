@@ -116,7 +116,8 @@ export default function RootNavigator(){
           name="Feed"
           component={FeedScreen}
           options={({ navigation }) => ({
-            headerTitle: () => <HeaderLogo />,
+            headerLeft: () => <HeaderLogo />,
+            headerTitle: '',
             headerRight: () => <HeaderActions navigation={navigation} />,
           })}
         />
