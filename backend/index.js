@@ -1719,6 +1719,34 @@ module.exports.handler = async (event) => {
       const parentCommentId = body.parentCommentId || null;
       if (!text) return ok({ message: 'Text required' }, 400);
 
+      // Verify the post exists and user has permission to comment
+      let post = null;
+      try {
+        const postQuery = await ddb.send(new QueryCommand({
+          TableName: POSTS_TABLE,
+          IndexName: 'byId',
+          KeyConditionExpression: 'id = :id',
+          ExpressionAttributeValues: { ':id': postId },
+          Limit: 1,
+        }));
+        post = (postQuery.Items || [])[0];
+        if (!post) {
+          return ok({ message: 'Post not found' }, 404);
+        }
+
+        // Check if user has permission to comment on this post
+        // Allow if: 1) user owns the post, or 2) user follows the post author
+        const isOwnPost = post.userId === userId;
+        const followsAuthor = await isFollowing(userId, post.userId);
+
+        if (!isOwnPost && !followsAuthor) {
+          return ok({ message: 'You must follow this user to comment on their posts' }, 403);
+        }
+      } catch (e) {
+        console.error('Failed to verify post access:', e);
+        return ok({ message: 'Failed to verify post access' }, 500);
+      }
+
       // If replying to a comment, verify parent exists and get its author
       let parentComment = null;
       if (parentCommentId) {
