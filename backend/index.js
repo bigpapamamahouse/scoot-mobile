@@ -1776,17 +1776,17 @@ module.exports.handler = async (event) => {
       let parentComment = null;
       if (parentCommentId) {
         try {
+          // Query all comments for this post and find the parent by id
+          // Note: FilterExpression with Limit doesn't work as expected - it limits first, then filters
           const qr = await ddb.send(new QueryCommand({
             TableName: COMMENTS_TABLE,
             KeyConditionExpression: 'pk = :pk',
-            FilterExpression: 'id = :id',
             ExpressionAttributeValues: {
-              ':pk': `POST#${postId}`,
-              ':id': parentCommentId
-            },
-            Limit: 1
+              ':pk': `POST#${postId}`
+            }
           }));
-          parentComment = (qr.Items || [])[0];
+          const allComments = qr.Items || [];
+          parentComment = allComments.find(c => c.id === parentCommentId);
           if (!parentComment) {
             return ok({ message: 'Parent comment not found' }, 404);
           }
