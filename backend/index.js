@@ -1719,21 +1719,74 @@ module.exports.handler = async (event) => {
       const parentCommentId = body.parentCommentId || null;
       if (!text) return ok({ message: 'Text required' }, 400);
 
+      // Verify the post exists and user has permission to comment
+      let post = null;
+      try {
+        const postQuery = await ddb.send(new QueryCommand({
+          TableName: POSTS_TABLE,
+          IndexName: 'byId',
+          KeyConditionExpression: 'id = :id',
+          ExpressionAttributeValues: { ':id': postId },
+          Limit: 1,
+        }));
+        post = (postQuery.Items || [])[0];
+        if (!post) {
+          return ok({ message: 'Post not found' }, 404);
+        }
+
+        // Check if user has permission to comment on this post
+        // Allow if:
+        // 1) user owns the post
+        // 2) user follows the post author
+        // 3) user is mentioned in the post
+        // 4) user already has comments on this post (already participating)
+        const isOwnPost = post.userId === userId;
+        const followsAuthor = await isFollowing(userId, post.userId);
+
+        // Check if user is mentioned in the post
+        const postText = post.text || '';
+        const handle = await getHandleForUserId(userId);
+        const isMentioned = handle && postText.toLowerCase().includes(`@${handle.toLowerCase()}`);
+
+        // Check if user already has comments on this post
+        let isParticipating = false;
+        if (!isOwnPost && !followsAuthor && !isMentioned) {
+          const existingComments = await ddb.send(new QueryCommand({
+            TableName: COMMENTS_TABLE,
+            KeyConditionExpression: 'pk = :pk',
+            FilterExpression: 'userId = :userId',
+            ExpressionAttributeValues: {
+              ':pk': `POST#${postId}`,
+              ':userId': userId
+            },
+            Limit: 1
+          }));
+          isParticipating = (existingComments.Items || []).length > 0;
+        }
+
+        if (!isOwnPost && !followsAuthor && !isMentioned && !isParticipating) {
+          return ok({ message: 'You must follow this user to comment on their posts' }, 403);
+        }
+      } catch (e) {
+        console.error('Failed to verify post access:', e);
+        return ok({ message: 'Failed to verify post access' }, 500);
+      }
+
       // If replying to a comment, verify parent exists and get its author
       let parentComment = null;
       if (parentCommentId) {
         try {
+          // Query all comments for this post and find the parent by id
+          // Note: FilterExpression with Limit doesn't work as expected - it limits first, then filters
           const qr = await ddb.send(new QueryCommand({
             TableName: COMMENTS_TABLE,
             KeyConditionExpression: 'pk = :pk',
-            FilterExpression: 'id = :id',
             ExpressionAttributeValues: {
-              ':pk': `POST#${postId}`,
-              ':id': parentCommentId
-            },
-            Limit: 1
+              ':pk': `POST#${postId}`
+            }
           }));
-          parentComment = (qr.Items || [])[0];
+          const allComments = qr.Items || [];
+          parentComment = allComments.find(c => c.id === parentCommentId);
           if (!parentComment) {
             return ok({ message: 'Parent comment not found' }, 404);
           }
