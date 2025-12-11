@@ -165,7 +165,6 @@ export default function FeedScreen({ navigation }: any){
         updateCellsBatchingPeriod={50}
         initialNumToRender={10}
         windowSize={21}
-        removeClippedSubviews={true}
         keyboardShouldPersistTaps="handled"
         renderItem={({ item }) => (
           <PostCard
