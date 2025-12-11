@@ -1,22 +1,20 @@
 Fight the Algorithm
 
-Tired of endless scrolling? Fed up with invasive ads and creepy tracking? Scoot is social media built for real connection, not addiction.
+Tired of endless scrolling? Fed up with apps that have become advertising platforms instead of social networks? Scoot is social media built for real connection, not addiction.
 
 What Makes Scoot Different:
 
-- No Ads - Ever. Your feed is yours, not ours to monetize.
+- No Ads - Ever. While other platforms have transformed into ad-delivery systems, Scoot will never show you advertisements. Your feed is yours, not ours to monetize.
 
-- No Algorithms - See posts from your friends in chronological order. No hidden manipulation, no engagement tricks.
+- No Algorithms - See posts from your friends in chronological order. No hidden manipulation, no engagement tricks, no content you didn't ask for.
 
-- No Suggested Content - We won't recommend strangers or content you didn't ask for. Your space, your choice.
-
-- Zero Tracking - We don't track your data. We don't sell your information. We don't even want it.
+- We Will Never Sell Your Data - Your privacy isn't negotiable. We don't track you, we don't sell your information, and we don't want it. Period.
 
 - Designed to Let You Go - We built an app that respects your time. Check in, connect with friends, and get back to your life. No dark patterns, no infinite scroll traps.
 
 Just the Good Stuff:
 
-• Share moments with the people who matter • Stay connected without the mental health toll • Enjoy a clean, distraction-free social experience • Take back control of your digital life
+• Share moments with the people who matter • Stay connected without the mental health toll • Discover friends through mutual connections, not algorithmic suggestions • Enjoy a clean, distraction-free social experience • Take back control of your digital life
 
 Scoot proves that social media doesn't have to be toxic. It can be fun, genuine, and respectful of your wellbeing.
 
