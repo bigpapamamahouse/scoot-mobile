@@ -1,12 +1,17 @@
 
 import { api } from './client';
+import { dedupedFetch } from '../lib/requestDeduplication';
 
 export async function getReactions(postId: string){
-  return api(`/reactions/${encodeURIComponent(postId)}`);
+  return dedupedFetch(`getReactions:${postId}`, async () => {
+    return api(`/reactions/${encodeURIComponent(postId)}`);
+  });
 }
 
 export async function getReactionsWho(postId: string){
-  return api(`/reactions/${encodeURIComponent(postId)}?who=1`);
+  return dedupedFetch(`getReactionsWho:${postId}`, async () => {
+    return api(`/reactions/${encodeURIComponent(postId)}?who=1`);
+  });
 }
 
 export async function toggleReaction(postId: string, emoji: string){
