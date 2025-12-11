@@ -1,5 +1,6 @@
 
 import { api } from './client';
+import { dedupedFetch } from '../lib/requestDeduplication';
 
 export interface PaginationOptions {
   limit?: number;
@@ -162,38 +163,40 @@ export async function updatePost(id: string, text: string){
 }
 
 export async function getPost(id: string){
-  const encodedId = encodeURIComponent(id);
+  return dedupedFetch(`getPost:${id}`, async () => {
+    const encodedId = encodeURIComponent(id);
 
-  // Try multiple endpoint patterns
-  const endpoints = [
-    `/p/${encodedId}`,
-    `/posts/${encodedId}`,
-    `/post/${encodedId}`,
-  ];
+    // Try multiple endpoint patterns
+    const endpoints = [
+      `/p/${encodedId}`,
+      `/posts/${encodedId}`,
+      `/post/${encodedId}`,
+    ];
 
-  let lastError: unknown;
-  for (const endpoint of endpoints) {
-    try {
-      return await api(endpoint);
-    } catch (err: any) {
-      lastError = err;
-      const message = String(err?.message || '');
-      const statusMatch = message.match(/HTTP\s+(\d+)/);
-      const statusCode = statusMatch ? parseInt(statusMatch[1], 10) : undefined;
+    let lastError: unknown;
+    for (const endpoint of endpoints) {
+      try {
+        return await api(endpoint);
+      } catch (err: any) {
+        lastError = err;
+        const message = String(err?.message || '');
+        const statusMatch = message.match(/HTTP\s+(\d+)/);
+        const statusCode = statusMatch ? parseInt(statusMatch[1], 10) : undefined;
 
-      // Silently try next endpoint if we get 404/405 (expected during endpoint discovery)
-      if (statusCode === 404 || statusCode === 405) {
-        continue;
+        // Silently try next endpoint if we get 404/405 (expected during endpoint discovery)
+        if (statusCode === 404 || statusCode === 405) {
+          continue;
+        }
+
+        // For other errors, stop trying and throw
+        break;
       }
-
-      // For other errors, stop trying and throw
-      break;
     }
-  }
 
-  if (lastError) {
-    throw lastError;
-  }
+    if (lastError) {
+      throw lastError;
+    }
 
-  throw new Error('No post endpoints responded');
+    throw new Error('No post endpoints responded');
+  });
 }

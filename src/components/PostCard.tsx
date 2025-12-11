@@ -419,14 +419,31 @@ function PostCard({
     );
   };
 
-  // Helper function to get reaction info for a specific emoji
-  const getReactionInfo = (emoji: string) => {
-    const reaction = reactions.find(r => r.emoji === emoji);
-    return {
-      hasReacted: reaction?.userReacted || false,
-      count: reaction?.count || 0,
-    };
-  };
+  // Memoize reaction info for each emoji to avoid repeated calculations
+  const heartInfo = React.useMemo(() => {
+    const reaction = reactions.find(r => r.emoji === '❤️');
+    return { hasReacted: reaction?.userReacted || false, count: reaction?.count || 0 };
+  }, [reactions]);
+
+  const thumbsUpInfo = React.useMemo(() => {
+    const reaction = reactions.find(r => r.emoji === '👍');
+    return { hasReacted: reaction?.userReacted || false, count: reaction?.count || 0 };
+  }, [reactions]);
+
+  const clapInfo = React.useMemo(() => {
+    const reaction = reactions.find(r => r.emoji === '👏');
+    return { hasReacted: reaction?.userReacted || false, count: reaction?.count || 0 };
+  }, [reactions]);
+
+  const laughInfo = React.useMemo(() => {
+    const reaction = reactions.find(r => r.emoji === '😂');
+    return { hasReacted: reaction?.userReacted || false, count: reaction?.count || 0 };
+  }, [reactions]);
+
+  const fireInfo = React.useMemo(() => {
+    const reaction = reactions.find(r => r.emoji === '🔥');
+    return { hasReacted: reaction?.userReacted || false, count: reaction?.count || 0 };
+  }, [reactions]);
 
   const postHandle = resolveHandle(localPost);
   const displayHandle = postHandle ? `@${postHandle}` : `@${localPost.userId.slice(0, 8)}`;
@@ -507,125 +524,125 @@ function PostCard({
       <View style={styles.quickReactions}>
         <TouchableOpacity
           onPress={() => handleReaction('❤️')}
-          onLongPress={() => getReactionInfo('❤️').count > 0 && handleShowReactionDetails('❤️')}
+          onLongPress={() => heartInfo.count > 0 && handleShowReactionDetails('❤️')}
           style={[
             styles.reactionButton,
-            getReactionInfo('❤️').hasReacted && styles.reactionButtonActive,
+            heartInfo.hasReacted && styles.reactionButtonActive,
           ]}
           activeOpacity={0.6}
         >
           <MaterialCommunityIcons
             name="heart"
             size={20}
-            color={getReactionInfo('❤️').hasReacted ? colors.social.like : colors.text.secondary}
-            style={!getReactionInfo('❤️').hasReacted && { opacity: 0.6 }}
+            color={heartInfo.hasReacted ? colors.social.like : colors.text.secondary}
+            style={!heartInfo.hasReacted && { opacity: 0.6 }}
           />
-          {getReactionInfo('❤️').count > 0 && (
+          {heartInfo.count > 0 && (
             <Text style={[
               styles.reactionCount,
-              getReactionInfo('❤️').hasReacted && { color: colors.social.like }
+              heartInfo.hasReacted && { color: colors.social.like }
             ]}>
-              {getReactionInfo('❤️').count}
+              {heartInfo.count}
             </Text>
           )}
         </TouchableOpacity>
 
         <TouchableOpacity
           onPress={() => handleReaction('👍')}
-          onLongPress={() => getReactionInfo('👍').count > 0 && handleShowReactionDetails('👍')}
+          onLongPress={() => thumbsUpInfo.count > 0 && handleShowReactionDetails('👍')}
           style={[
             styles.reactionButton,
-            getReactionInfo('👍').hasReacted && styles.reactionButtonActive,
+            thumbsUpInfo.hasReacted && styles.reactionButtonActive,
           ]}
           activeOpacity={0.6}
         >
           <MaterialCommunityIcons
             name="thumb-up"
             size={20}
-            color={getReactionInfo('👍').hasReacted ? colors.primary[500] : colors.text.secondary}
-            style={!getReactionInfo('👍').hasReacted && { opacity: 0.6 }}
+            color={thumbsUpInfo.hasReacted ? colors.primary[500] : colors.text.secondary}
+            style={!thumbsUpInfo.hasReacted && { opacity: 0.6 }}
           />
-          {getReactionInfo('👍').count > 0 && (
+          {thumbsUpInfo.count > 0 && (
             <Text style={[
               styles.reactionCount,
-              getReactionInfo('👍').hasReacted && { color: colors.primary[500] }
+              thumbsUpInfo.hasReacted && { color: colors.primary[500] }
             ]}>
-              {getReactionInfo('👍').count}
+              {thumbsUpInfo.count}
             </Text>
           )}
         </TouchableOpacity>
 
         <TouchableOpacity
           onPress={() => handleReaction('👏')}
-          onLongPress={() => getReactionInfo('👏').count > 0 && handleShowReactionDetails('👏')}
+          onLongPress={() => clapInfo.count > 0 && handleShowReactionDetails('👏')}
           style={[
             styles.reactionButton,
-            getReactionInfo('👏').hasReacted && styles.reactionButtonActive,
+            clapInfo.hasReacted && styles.reactionButtonActive,
           ]}
           activeOpacity={0.6}
         >
           <MaterialCommunityIcons
             name="hand-clap"
             size={20}
-            color={getReactionInfo('👏').hasReacted ? colors.social.celebrate : colors.text.secondary}
-            style={!getReactionInfo('👏').hasReacted && { opacity: 0.6 }}
+            color={clapInfo.hasReacted ? colors.social.celebrate : colors.text.secondary}
+            style={!clapInfo.hasReacted && { opacity: 0.6 }}
           />
-          {getReactionInfo('👏').count > 0 && (
+          {clapInfo.count > 0 && (
             <Text style={[
               styles.reactionCount,
-              getReactionInfo('👏').hasReacted && { color: colors.social.celebrate }
+              clapInfo.hasReacted && { color: colors.social.celebrate }
             ]}>
-              {getReactionInfo('👏').count}
+              {clapInfo.count}
             </Text>
           )}
         </TouchableOpacity>
 
         <TouchableOpacity
           onPress={() => handleReaction('😂')}
-          onLongPress={() => getReactionInfo('😂').count > 0 && handleShowReactionDetails('😂')}
+          onLongPress={() => laughInfo.count > 0 && handleShowReactionDetails('😂')}
           style={[
             styles.reactionButton,
-            getReactionInfo('😂').hasReacted && styles.reactionButtonActive,
+            laughInfo.hasReacted && styles.reactionButtonActive,
           ]}
           activeOpacity={0.6}
         >
           <MaterialCommunityIcons
             name="emoticon-lol"
             size={20}
-            color={getReactionInfo('😂').hasReacted ? colors.social.laugh : colors.text.secondary}
-            style={!getReactionInfo('😂').hasReacted && { opacity: 0.6 }}
+            color={laughInfo.hasReacted ? colors.social.laugh : colors.text.secondary}
+            style={!laughInfo.hasReacted && { opacity: 0.6 }}
           />
-          {getReactionInfo('😂').count > 0 && (
+          {laughInfo.count > 0 && (
             <Text style={[
               styles.reactionCount,
-              getReactionInfo('😂').hasReacted && { color: colors.social.laugh }
+              laughInfo.hasReacted && { color: colors.social.laugh }
             ]}>
-              {getReactionInfo('😂').count}
+              {laughInfo.count}
             </Text>
           )}
         </TouchableOpacity>
 
         <TouchableOpacity
           onPress={() => handleReaction('🔥')}
-          onLongPress={() => getReactionInfo('🔥').count > 0 && handleShowReactionDetails('🔥')}
+          onLongPress={() => fireInfo.count > 0 && handleShowReactionDetails('🔥')}
           style={[
             styles.reactionButton,
-            getReactionInfo('🔥').hasReacted && styles.reactionButtonActive,
+            fireInfo.hasReacted && styles.reactionButtonActive,
           ]}
           activeOpacity={0.6}
         >
           <MaterialCommunityIcons
             name="fire"
             size={20}
-            color={getReactionInfo('🔥').hasReacted ? colors.warning.main : colors.text.secondary}
-            style={!getReactionInfo('🔥').hasReacted && { opacity: 0.6 }}
+            color={fireInfo.hasReacted ? colors.warning.main : colors.text.secondary}
+            style={!fireInfo.hasReacted && { opacity: 0.6 }}
           />
-          {getReactionInfo('🔥').count > 0 && (
+          {fireInfo.count > 0 && (
             <Text style={[
               styles.reactionCount,
-              getReactionInfo('🔥').hasReacted && { color: colors.warning.main }
+              fireInfo.hasReacted && { color: colors.warning.main }
             ]}>
-              {getReactionInfo('🔥').count}
+              {fireInfo.count}
             </Text>
           )}
         </TouchableOpacity>

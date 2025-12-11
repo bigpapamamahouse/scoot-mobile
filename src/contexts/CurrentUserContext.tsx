@@ -62,8 +62,14 @@ export function CurrentUserProvider({ children }: { children: ReactNode }) {
     fetchUser();
   }, [fetchUser]);
 
+  // Memoize context value to prevent unnecessary re-renders in consumers
+  const contextValue = React.useMemo(
+    () => ({ currentUser, loading, refreshUser, setCurrentUser }),
+    [currentUser, loading, refreshUser, setCurrentUser]
+  );
+
   return (
-    <CurrentUserContext.Provider value={{ currentUser, loading, refreshUser, setCurrentUser }}>
+    <CurrentUserContext.Provider value={contextValue}>
       {children}
     </CurrentUserContext.Provider>
   );

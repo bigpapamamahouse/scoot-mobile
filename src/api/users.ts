@@ -3,6 +3,7 @@ import { api } from './client';
 import type { User } from '../types';
 import { mediaUrlFromKey } from '../lib/media';
 import { ENV } from '../lib/env';
+import { dedupedFetch } from '../lib/requestDeduplication';
 
 const isRecord = (value: unknown): value is Record<string, unknown> => {
   return typeof value === 'object' && value !== null;
@@ -256,45 +257,47 @@ const applyAvatarDetails = (target: Record<string, unknown>, candidates: string[
 };
 
 export async function me(){
-  const result = await api('/me');
+  return dedupedFetch('me', async () => {
+    const result = await api('/me');
 
-  if (!isRecord(result)) {
-    return result;
-  }
-
-  const normalized: Record<string, unknown> = { ...result };
-  const stack: Record<string, unknown>[] = [result];
-  const seen = new Set<Record<string, unknown>>();
-  const allAvatarCandidates: string[] = [];
-
-  while (stack.length) {
-    const current = stack.pop()!;
-    if (seen.has(current)) {
-      continue;
+    if (!isRecord(result)) {
+      return result;
     }
-    seen.add(current);
-    collectAvatarCandidates(current).forEach((value) => allAvatarCandidates.push(value));
-    candidateRecords(current, ['user', 'profile', 'account', 'data', 'attributes', 'result']).forEach((record) => {
-      if (!seen.has(record)) {
-        stack.push(record);
+
+    const normalized: Record<string, unknown> = { ...result };
+    const stack: Record<string, unknown>[] = [result];
+    const seen = new Set<Record<string, unknown>>();
+    const allAvatarCandidates: string[] = [];
+
+    while (stack.length) {
+      const current = stack.pop()!;
+      if (seen.has(current)) {
+        continue;
       }
-    });
-  }
+      seen.add(current);
+      collectAvatarCandidates(current).forEach((value) => allAvatarCandidates.push(value));
+      candidateRecords(current, ['user', 'profile', 'account', 'data', 'attributes', 'result']).forEach((record) => {
+        if (!seen.has(record)) {
+          stack.push(record);
+        }
+      });
+    }
 
-  if (allAvatarCandidates.length > 0) {
-    applyAvatarDetails(normalized, allAvatarCandidates);
-  }
+    if (allAvatarCandidates.length > 0) {
+      applyAvatarDetails(normalized, allAvatarCandidates);
+    }
 
-  ensureId(normalized);
-  ensureCreatedAt(normalized);
-  ensureFullName(normalized);
+    ensureId(normalized);
+    ensureCreatedAt(normalized);
+    ensureFullName(normalized);
 
-  const inviteCode = findInviteCode(result);
-  if (inviteCode) {
-    normalized.inviteCode = inviteCode;
-  }
+    const inviteCode = findInviteCode(result);
+    if (inviteCode) {
+      normalized.inviteCode = inviteCode;
+    }
 
-  return normalized;
+    return normalized;
+  });
 }
 
 export async function updateMe(payload: { fullName?: string | null; avatarKey?: string | null; handle?: string | null }){
@@ -418,8 +421,10 @@ export async function updateAvatar(avatarKey: string | null) {
 }
 
 export async function getUser(handle: string){
-  const result = await api(`/u/${encodeURIComponent(handle)}`);
-  return result;
+  return dedupedFetch(`getUser:${handle}`, async () => {
+    const result = await api(`/u/${encodeURIComponent(handle)}`);
+    return result;
+  });
 }
 
 export interface UserIdentityOptions {
@@ -506,84 +511,91 @@ function extractUserFromPayload(payload: unknown, visited = new Set<unknown>()):
 
 export async function getUserByIdentity(options: UserIdentityOptions = {}): Promise<User | null> {
   const { handle, userId } = options;
+  const cacheKey = `getUserByIdentity:${handle || ''}:${userId || ''}`;
 
-  const attempts: string[] = [];
-  const seen = new Set<string>();
-  const push = (path: string) => {
-    if (!seen.has(path)) {
-      seen.add(path);
-      attempts.push(path);
+  return dedupedFetch(cacheKey, async () => {
+    const attempts: string[] = [];
+    const seen = new Set<string>();
+    const push = (path: string) => {
+      if (!seen.has(path)) {
+        seen.add(path);
+        attempts.push(path);
+      }
+    };
+
+    if (handle) {
+      const normalizedHandle = handle.replace(/^@/, '');
+      const encodedHandle = encodeURIComponent(normalizedHandle);
+      push(`/u/${encodedHandle}`);
+      push(`/users/${encodedHandle}`);
+      push(`/profiles/${encodedHandle}`);
+      push(`/accounts/${encodedHandle}`);
     }
-  };
 
-  if (handle) {
-    const normalizedHandle = handle.replace(/^@/, '');
-    const encodedHandle = encodeURIComponent(normalizedHandle);
-    push(`/u/${encodedHandle}`);
-    push(`/users/${encodedHandle}`);
-    push(`/profiles/${encodedHandle}`);
-    push(`/accounts/${encodedHandle}`);
-  }
+    if (userId) {
+      const encodedUserId = encodeURIComponent(userId);
+      push(`/u/${encodedUserId}`);
+      push(`/users/${encodedUserId}`);
+      push(`/profiles/${encodedUserId}`);
+      push(`/accounts/${encodedUserId}`);
+    }
 
-  if (userId) {
-    const encodedUserId = encodeURIComponent(userId);
-    push(`/u/${encodedUserId}`);
-    push(`/users/${encodedUserId}`);
-    push(`/profiles/${encodedUserId}`);
-    push(`/accounts/${encodedUserId}`);
-  }
+    if (!attempts.length) {
+      return null;
+    }
 
-  if (!attempts.length) {
+    let lastError: unknown;
+    const failedAttempts: string[] = [];
+
+    for (const path of attempts) {
+      try {
+        const payload = await api(path);
+        const user = extractUserFromPayload(payload);
+        if (user) {
+          return user;
+        }
+        // Only log if we get an unexpected response shape (not a 404)
+        console.warn(`User lookup ${path} returned unrecognized shape`, payload);
+      } catch (err: any) {
+        lastError = err;
+        const message = String(err?.message || '');
+        const statusMatch = message.match(/HTTP\s+(\d+)/);
+        const statusCode = statusMatch ? parseInt(statusMatch[1], 10) : undefined;
+        if (statusCode === 404 || statusCode === 405) {
+          // Silently track failed attempts - 404s are expected when trying multiple endpoints
+          failedAttempts.push(path);
+          continue;
+        }
+        // Only warn for non-404/405 errors (unexpected failures)
+        console.warn(`User lookup ${path} failed:`, message || err);
+        break;
+      }
+    }
+
+    // Only log a single warning if all attempts failed with 404s
+    if (failedAttempts.length === attempts.length) {
+      const identifier = handle || userId || 'unknown';
+      console.warn(`User not found: ${identifier} (tried ${failedAttempts.length} endpoints)`);
+    }
+
+    if (lastError) {
+      throw lastError;
+    }
+
     return null;
-  }
-
-  let lastError: unknown;
-  const failedAttempts: string[] = [];
-
-  for (const path of attempts) {
-    try {
-      const payload = await api(path);
-      const user = extractUserFromPayload(payload);
-      if (user) {
-        return user;
-      }
-      // Only log if we get an unexpected response shape (not a 404)
-      console.warn(`User lookup ${path} returned unrecognized shape`, payload);
-    } catch (err: any) {
-      lastError = err;
-      const message = String(err?.message || '');
-      const statusMatch = message.match(/HTTP\s+(\d+)/);
-      const statusCode = statusMatch ? parseInt(statusMatch[1], 10) : undefined;
-      if (statusCode === 404 || statusCode === 405) {
-        // Silently track failed attempts - 404s are expected when trying multiple endpoints
-        failedAttempts.push(path);
-        continue;
-      }
-      // Only warn for non-404/405 errors (unexpected failures)
-      console.warn(`User lookup ${path} failed:`, message || err);
-      break;
-    }
-  }
-
-  // Only log a single warning if all attempts failed with 404s
-  if (failedAttempts.length === attempts.length) {
-    const identifier = handle || userId || 'unknown';
-    console.warn(`User not found: ${identifier} (tried ${failedAttempts.length} endpoints)`);
-  }
-
-  if (lastError) {
-    throw lastError;
-  }
-
-  return null;
+  });
 }
 
 export async function listFollowers(handle: string){
-  return api(`/u/${encodeURIComponent(handle)}/followers`);
+  return dedupedFetch(`listFollowers:${handle}`, async () => {
+    return api(`/u/${encodeURIComponent(handle)}/followers`);
+  });
 }
 
 export async function listFollowing(handle: string){
-  return api(`/u/${encodeURIComponent(handle)}/following`);
+  return dedupedFetch(`listFollowing:${handle}`, async () => {
+    return api(`/u/${encodeURIComponent(handle)}/following`);
+  });
 }
 
 export async function searchUsers(query: string): Promise<User[]> {
