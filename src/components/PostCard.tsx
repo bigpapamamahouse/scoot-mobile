@@ -3,7 +3,7 @@ import { View, Text, Image, TouchableOpacity, StyleSheet, Alert, Pressable } fro
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import ImageViewing from 'react-native-image-viewing';
 import { Post, Reaction, ReactionWithUsers, Comment } from '../types';
-import { mediaUrlFromKey } from '../lib/media';
+import { optimizedMediaUrl, ImagePresets } from '../lib/media';
 import { Avatar } from './Avatar';
 import { MentionText } from './MentionText';
 import { CommentsAPI, ReactionsAPI, PostsAPI, ModerationAPI } from '../api';
@@ -54,7 +54,17 @@ function PostCard({
   const [localPost, setLocalPost] = React.useState<Post>(post);
   const [imageViewerVisible, setImageViewerVisible] = React.useState(false);
 
-  const imageUri = React.useMemo(() => mediaUrlFromKey(localPost.imageKey), [localPost.imageKey]);
+  // Use optimized image URL for feed display (800px wide, 85% quality)
+  const imageUri = React.useMemo(
+    () => optimizedMediaUrl(localPost.imageKey, ImagePresets.feedFull),
+    [localPost.imageKey]
+  );
+
+  // For full-screen viewer, use higher quality (1200px wide, 90% quality)
+  const fullScreenImageUri = React.useMemo(
+    () => optimizedMediaUrl(localPost.imageKey, ImagePresets.fullScreen),
+    [localPost.imageKey]
+  );
 
   // Helper function to parse reactions API response
   const parseReactionsResponse = (data: any): Reaction[] => {
@@ -682,9 +692,9 @@ function PostCard({
         onUserPress={onPressUser}
       />
 
-      {allowImageZoom && imageUri && (
+      {allowImageZoom && fullScreenImageUri && (
         <ImageViewing
-          images={[{ uri: imageUri }]}
+          images={[{ uri: fullScreenImageUri }]}
           imageIndex={0}
           visible={imageViewerVisible}
           onRequestClose={() => setImageViewerVisible(false)}
