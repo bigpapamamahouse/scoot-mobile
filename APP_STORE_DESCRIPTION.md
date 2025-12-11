@@ -18,4 +18,6 @@ Just the Good Stuff:
 
 Scoot proves that social media doesn't have to be toxic. It can be fun, genuine, and respectful of your wellbeing.
 
+Invite-Only for Quality: Scoot is currently invite-only to maintain an authentic community and prevent bot spam. This ensures everyone on the platform is a real person connected through trusted networks, not an algorithm-generated account.
+
 Download Scoot today and experience social media the way it should be.
