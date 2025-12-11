@@ -161,11 +161,11 @@ export default function FeedScreen({ navigation }: any){
         style={{ padding: spacing[3] }}
         data={items}
         keyExtractor={(it)=>it.id}
-        maxToRenderPerBatch={10}
-        updateCellsBatchingPeriod={50}
         initialNumToRender={10}
-        windowSize={10}
-        removeClippedSubviews={true}
+        windowSize={21}
+        maintainVisibleContentPosition={{
+          minIndexForVisible: 0,
+        }}
         keyboardShouldPersistTaps="handled"
         renderItem={({ item }) => (
           <PostCard
