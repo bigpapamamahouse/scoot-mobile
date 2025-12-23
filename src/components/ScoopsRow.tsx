@@ -10,8 +10,8 @@ import {
 import { ScoopRing } from './ScoopRing';
 import { useTheme } from '../theme';
 import { getScoopsFeed } from '../api/scoops';
+import { UsersAPI } from '../api';
 import { ScoopFeedItem } from '../types';
-import { useAuth } from '../auth/AuthContext';
 
 interface ScoopsRowProps {
   onScoopPress: (item: ScoopFeedItem, userIndex: number, allItems: ScoopFeedItem[]) => void;
@@ -20,12 +20,21 @@ interface ScoopsRowProps {
 
 export const ScoopsRow = ({ onScoopPress, onCreatePress }: ScoopsRowProps) => {
   const { colors } = useTheme();
-  const { user } = useAuth();
+  const [currentUser, setCurrentUser] = React.useState<any>(null);
   const [scoops, setScoops] = React.useState<ScoopFeedItem[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [refreshing, setRefreshing] = React.useState(false);
 
   const styles = React.useMemo(() => createStyles(colors), [colors]);
+
+  const loadCurrentUser = async () => {
+    try {
+      const user = await UsersAPI.me();
+      setCurrentUser(user);
+    } catch (error) {
+      console.error('Error loading current user:', error);
+    }
+  };
 
   const loadScoops = async (isRefresh = false) => {
     if (isRefresh) {
@@ -46,6 +55,7 @@ export const ScoopsRow = ({ onScoopPress, onCreatePress }: ScoopsRowProps) => {
   };
 
   React.useEffect(() => {
+    loadCurrentUser();
     loadScoops();
   }, []);
 
@@ -61,7 +71,7 @@ export const ScoopsRow = ({ onScoopPress, onCreatePress }: ScoopsRowProps) => {
     );
   }
 
-  if (scoops.length === 0 && !user) {
+  if (scoops.length === 0 && !currentUser) {
     return null; // Don't show empty state if no scoops and no user
   }
 
@@ -79,10 +89,10 @@ export const ScoopsRow = ({ onScoopPress, onCreatePress }: ScoopsRowProps) => {
       }
     >
       {/* Your Scoop button (always first if user is logged in) */}
-      {user && (
+      {currentUser && (
         <ScoopRing
-          avatarKey={user.avatarKey}
-          handle={user.handle || 'You'}
+          avatarKey={currentUser.avatarKey}
+          handle={currentUser.handle || 'You'}
           hasNew={false}
           isOwn={true}
           onPress={onCreatePress}
@@ -101,7 +111,7 @@ export const ScoopsRow = ({ onScoopPress, onCreatePress }: ScoopsRowProps) => {
       ))}
 
       {/* Empty state */}
-      {scoops.length === 0 && user && (
+      {scoops.length === 0 && currentUser && (
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyText}>
             No scoops yet. Follow users to see their scoops!
