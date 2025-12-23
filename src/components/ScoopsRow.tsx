@@ -109,15 +109,6 @@ export const ScoopsRow = ({ onScoopPress, onCreatePress }: ScoopsRowProps) => {
           onPress={() => onScoopPress(item, index, scoops)}
         />
       ))}
-
-      {/* Empty state */}
-      {scoops.length === 0 && currentUser && (
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>
-            No scoops yet. Follow users to see their scoops!
-          </Text>
-        </View>
-      )}
     </ScrollView>
   );
 };

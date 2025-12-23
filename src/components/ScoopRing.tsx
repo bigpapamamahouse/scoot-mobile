@@ -42,13 +42,13 @@ export const ScoopRing = React.memo(({
           <View style={styles.ringInner}>
             {isOwn ? (
               <View style={styles.ownAvatarContainer}>
-                <Avatar avatarKey={avatarKey} size={avatarSize - 8} />
+                <Avatar avatarKey={avatarKey} size={size - 14} />
                 <View style={styles.plusIconContainer}>
                   <Text style={styles.plusIcon}>+</Text>
                 </View>
               </View>
             ) : (
-              <Avatar avatarKey={avatarKey} size={avatarSize - 8} />
+              <Avatar avatarKey={avatarKey} size={size - 14} />
             )}
           </View>
         </LinearGradient>
@@ -88,16 +88,16 @@ const createStyles = (colors: any, size: number) =>
       alignItems: 'center',
     },
     ownAvatarContainer: {
-      width: '100%',
-      height: '100%',
+      position: 'relative',
+      width: size - 14,
+      height: size - 14,
       justifyContent: 'center',
       alignItems: 'center',
-      position: 'relative',
     },
     plusIconContainer: {
       position: 'absolute',
-      bottom: -2,
-      right: -2,
+      bottom: 0,
+      right: 0,
       width: 20,
       height: 20,
       borderRadius: 10,

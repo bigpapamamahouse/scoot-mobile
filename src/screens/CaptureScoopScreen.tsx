@@ -29,14 +29,19 @@ export default function CaptureScoopScreen({ navigation }: any) {
   const cameraRef = React.useRef<CameraView>(null);
   const recordingTimerRef = React.useRef<NodeJS.Timeout | null>(null);
   const recordingStartTimeRef = React.useRef<number>(0);
+  const pressTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+  const shouldTakePhotoRef = React.useRef<boolean>(false);
 
   const styles = React.useMemo(() => createStyles(colors), [colors]);
 
-  // Cleanup timer on unmount
+  // Cleanup timers on unmount
   React.useEffect(() => {
     return () => {
       if (recordingTimerRef.current) {
         clearInterval(recordingTimerRef.current);
+      }
+      if (pressTimerRef.current) {
+        clearTimeout(pressTimerRef.current);
       }
     };
   }, []);
@@ -73,10 +78,7 @@ export default function CaptureScoopScreen({ navigation }: any) {
     setFacing(current => (current === 'back' ? 'front' : 'back'));
   };
 
-  const handleShutterPressIn = async () => {
-    if (isRecording || isProcessing || !isCameraReady) return;
-
-    // Start recording video
+  const startVideoRecording = async () => {
     setIsRecording(true);
     setRecordingTime(0);
     recordingStartTimeRef.current = Date.now();
@@ -113,46 +115,62 @@ export default function CaptureScoopScreen({ navigation }: any) {
     }
   };
 
-  const handleShutterPressOut = async () => {
-    if (!isRecording) return;
-
-    // Stop recording
-    if (recordingTimerRef.current) {
-      clearInterval(recordingTimerRef.current);
-    }
-
-    try {
-      if (cameraRef.current) {
-        await cameraRef.current.stopRecording();
-      }
-    } catch (error) {
-      console.error('Error stopping recording:', error);
-    }
-
-    setIsRecording(false);
-    setRecordingTime(0);
-  };
-
-  const handleShutterPress = async () => {
+  const handleShutterPressIn = () => {
     if (isRecording || isProcessing || !isCameraReady) return;
 
-    // Take photo
-    setIsProcessing(true);
-    try {
-      if (cameraRef.current) {
-        const photo = await cameraRef.current.takePictureAsync({
-          quality: 0.8,
-        });
+    shouldTakePhotoRef.current = true;
 
-        if (photo && photo.uri) {
-          await processMedia(photo.uri, 'photo');
-        }
+    // Start timer - if held for 150ms, start video recording
+    pressTimerRef.current = setTimeout(() => {
+      shouldTakePhotoRef.current = false;
+      startVideoRecording();
+    }, 150);
+  };
+
+  const handleShutterPressOut = async () => {
+    // Clear the press timer
+    if (pressTimerRef.current) {
+      clearTimeout(pressTimerRef.current);
+      pressTimerRef.current = null;
+    }
+
+    if (isRecording) {
+      // Stop video recording
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current);
       }
-    } catch (error) {
-      console.error('Error taking photo:', error);
-      Alert.alert('Error', 'Failed to take photo');
-    } finally {
-      setIsProcessing(false);
+
+      try {
+        if (cameraRef.current) {
+          await cameraRef.current.stopRecording();
+        }
+      } catch (error) {
+        console.error('Error stopping recording:', error);
+      }
+
+      setIsRecording(false);
+      setRecordingTime(0);
+    } else if (shouldTakePhotoRef.current) {
+      // Take photo (was a quick tap)
+      shouldTakePhotoRef.current = false;
+      setIsProcessing(true);
+
+      try {
+        if (cameraRef.current) {
+          const photo = await cameraRef.current.takePictureAsync({
+            quality: 0.8,
+          });
+
+          if (photo && photo.uri) {
+            await processMedia(photo.uri, 'photo');
+          }
+        }
+      } catch (error) {
+        console.error('Error taking photo:', error);
+        Alert.alert('Error', 'Failed to take photo');
+      } finally {
+        setIsProcessing(false);
+      }
     }
   };
 
@@ -255,9 +273,8 @@ export default function CaptureScoopScreen({ navigation }: any) {
             style={styles.shutterButtonContainer}
             onPressIn={handleShutterPressIn}
             onPressOut={handleShutterPressOut}
-            onPress={handleShutterPress}
-            delayPressIn={200} // 200ms delay to distinguish tap from hold
             disabled={isProcessing || !isCameraReady}
+            activeOpacity={0.8}
           >
             <View style={[
               styles.shutterButton,
