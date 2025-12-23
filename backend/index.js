@@ -35,6 +35,7 @@ const NOTIFICATIONS_TABLE = process.env.NOTIFICATIONS_TABLE; // NEW: pk USER#<ta
 const PUSH_TOKENS_TABLE = process.env.PUSH_TOKENS_TABLE; // pk: USER#<userId>, sk: TOKEN#<tokenHash>
 const REPORTS_TABLE = process.env.REPORTS_TABLE; // pk: REPORT#<reportId>, sk: <timestamp>
 const BLOCKS_TABLE = process.env.BLOCKS_TABLE; // pk: USER#<userId>, sk: BLOCKED#<blockedUserId>
+const SCOOPS_TABLE = process.env.SCOOPS_TABLE; // pk: USER#<userId>, sk: SCOOP#<timestamp>#<uuid>
 const USER_POOL_ID = process.env.USER_POOL_ID;
 
 // ---------- Allowed origins for CORS ----------
@@ -2743,6 +2744,262 @@ module.exports.handler = async (event) => {
       }));
 
       return ok({ ok: true });
+    }
+
+    // ===== SCOOPS API =====
+
+    // ----- POST /scoops (create a scoop) -----
+    if (route === 'POST /scoops') {
+      if (!userId) return bad('Unauthorized', 401);
+      if (!SCOOPS_TABLE) return bad('Scoops not enabled', 501);
+
+      const body = JSON.parse(event.body || '{}');
+      const mediaKey = String(body.mediaKey || '').trim();
+      const mediaType = String(body.mediaType || 'photo');
+      const duration = body.duration || null;
+      const aspectRatio = body.aspectRatio || 1;
+      const textOverlay = body.textOverlay || [];
+
+      if (!mediaKey) return bad('mediaKey required', 400);
+      if (!['photo', 'video'].includes(mediaType)) return bad('mediaType must be photo or video', 400);
+
+      // Moderate content (using empty text since scoops are media-only initially)
+      const moderation = await moderateContent('', mediaKey);
+      if (!moderation.safe) {
+        console.log(`[Moderation] Scoop blocked for user ${userId}: ${moderation.reason}`);
+        return bad(`Content blocked: ${moderation.reason || 'Content violates our community guidelines'}`, 403);
+      }
+
+      const id = crypto.randomUUID();
+      const now = Date.now();
+      const expiresAt = now + (24 * 60 * 60 * 1000); // 24 hours
+
+      const handle = await getHandleForUserId(userId);
+      const userProfile = await ddb.send(new GetCommand({
+        TableName: USERS_TABLE,
+        Key: { pk: `USER#${userId}` },
+        ConsistentRead: true,
+      }));
+      const avatarKey = userProfile.Item?.avatarKey || null;
+
+      const item = {
+        pk: `USER#${userId}`,
+        sk: `SCOOP#${now}#${id}`,
+        id,
+        userId,
+        handle: handle || null,
+        avatarKey,
+        mediaKey,
+        mediaType,
+        aspectRatio,
+        createdAt: now,
+        expiresAt,
+        viewedBy: new Set(),
+        viewCount: 0,
+      };
+      if (duration) item.duration = duration;
+      if (textOverlay && textOverlay.length > 0) item.textOverlay = textOverlay;
+
+      await ddb.send(new PutCommand({ TableName: SCOOPS_TABLE, Item: item }));
+      return ok({ id });
+    }
+
+    // ----- GET /scoops/feed (get scoops from followed users) -----
+    if (route === 'GET /scoops/feed') {
+      if (!userId) return bad('Unauthorized', 401);
+      if (!SCOOPS_TABLE) return bad('Scoops not enabled', 501);
+      if (!FOLLOWS_TABLE) return bad('Follows not enabled', 501);
+
+      // Get list of followed users
+      const followsResult = await ddb.send(new QueryCommand({
+        TableName: FOLLOWS_TABLE,
+        KeyConditionExpression: 'pk = :pk',
+        ExpressionAttributeValues: { ':pk': userId },
+      }));
+      const followedUserIds = (followsResult.Items || []).map(item => item.sk);
+
+      if (followedUserIds.length === 0) {
+        return ok({ items: [] });
+      }
+
+      // Fetch scoops for each followed user
+      const now = Date.now();
+      const feedItems = [];
+
+      for (const followedUserId of followedUserIds) {
+        try {
+          const scoopsResult = await ddb.send(new QueryCommand({
+            TableName: SCOOPS_TABLE,
+            KeyConditionExpression: 'pk = :pk AND begins_with(sk, :sk)',
+            ExpressionAttributeValues: {
+              ':pk': `USER#${followedUserId}`,
+              ':sk': 'SCOOP#',
+            },
+            ScanIndexForward: false, // Most recent first
+          }));
+
+          const scoops = (scoopsResult.Items || [])
+            .filter(scoop => scoop.expiresAt > now) // Filter expired
+            .map(scoop => ({
+              id: scoop.id,
+              userId: scoop.userId,
+              handle: scoop.handle,
+              avatarKey: scoop.avatarKey,
+              mediaKey: scoop.mediaKey,
+              mediaType: scoop.mediaType,
+              duration: scoop.duration,
+              aspectRatio: scoop.aspectRatio,
+              textOverlay: scoop.textOverlay,
+              createdAt: scoop.createdAt,
+              expiresAt: scoop.expiresAt,
+              viewCount: scoop.viewCount || 0,
+              viewedByMe: scoop.viewedBy && scoop.viewedBy.has ? scoop.viewedBy.has(userId) : false,
+            }));
+
+          if (scoops.length > 0) {
+            const hasNew = scoops.some(s => !s.viewedByMe);
+            feedItems.push({
+              userId: followedUserId,
+              handle: scoops[0].handle,
+              avatarKey: scoops[0].avatarKey,
+              scoops,
+              hasNew,
+            });
+          }
+        } catch (e) {
+          console.error(`Failed to fetch scoops for user ${followedUserId}:`, e);
+        }
+      }
+
+      // Sort: users with new content first
+      feedItems.sort((a, b) => {
+        if (a.hasNew && !b.hasNew) return -1;
+        if (!a.hasNew && b.hasNew) return 1;
+        // Then by most recent scoop
+        return b.scoops[0].createdAt - a.scoops[0].createdAt;
+      });
+
+      return ok({ items: feedItems });
+    }
+
+    // ----- GET /scoops/user/:userId (get specific user's scoops) -----
+    if (method === 'GET' && path.match(/^\/scoops\/user\/[^/]+$/)) {
+      if (!userId) return bad('Unauthorized', 401);
+      if (!SCOOPS_TABLE) return bad('Scoops not enabled', 501);
+
+      const targetUserId = path.split('/')[3];
+      if (!targetUserId) return bad('Missing userId', 400);
+
+      const now = Date.now();
+      const scoopsResult = await ddb.send(new QueryCommand({
+        TableName: SCOOPS_TABLE,
+        KeyConditionExpression: 'pk = :pk AND begins_with(sk, :sk)',
+        ExpressionAttributeValues: {
+          ':pk': `USER#${targetUserId}`,
+          ':sk': 'SCOOP#',
+        },
+        ScanIndexForward: false,
+      }));
+
+      const scoops = (scoopsResult.Items || [])
+        .filter(scoop => scoop.expiresAt > now)
+        .map(scoop => ({
+          id: scoop.id,
+          userId: scoop.userId,
+          handle: scoop.handle,
+          avatarKey: scoop.avatarKey,
+          mediaKey: scoop.mediaKey,
+          mediaType: scoop.mediaType,
+          duration: scoop.duration,
+          aspectRatio: scoop.aspectRatio,
+          textOverlay: scoop.textOverlay,
+          createdAt: scoop.createdAt,
+          expiresAt: scoop.expiresAt,
+          viewCount: scoop.viewCount || 0,
+          viewedByMe: scoop.viewedBy && scoop.viewedBy.has ? scoop.viewedBy.has(userId) : false,
+        }));
+
+      return ok({ scoops });
+    }
+
+    // ----- POST /scoops/:id/view (mark scoop as viewed) -----
+    if (method === 'POST' && path.match(/^\/scoops\/[^/]+\/view$/)) {
+      if (!userId) return bad('Unauthorized', 401);
+      if (!SCOOPS_TABLE) return bad('Scoops not enabled', 501);
+
+      const scoopId = path.split('/')[2];
+      if (!scoopId) return bad('Missing scoopId', 400);
+
+      // Find the scoop by scanning (we'd need a GSI for better performance)
+      // For now, we'll use a scan with filter - in production, add a GSI on id
+      const scanResult = await ddb.send(new ScanCommand({
+        TableName: SCOOPS_TABLE,
+        FilterExpression: 'id = :id',
+        ExpressionAttributeValues: { ':id': scoopId },
+        Limit: 1,
+      }));
+
+      const scoop = (scanResult.Items || [])[0];
+      if (!scoop) return bad('Scoop not found', 404);
+
+      // Update to add viewer and increment count
+      try {
+        await ddb.send(new UpdateCommand({
+          TableName: SCOOPS_TABLE,
+          Key: { pk: scoop.pk, sk: scoop.sk },
+          UpdateExpression: 'ADD viewedBy :viewer, viewCount :inc',
+          ExpressionAttributeValues: {
+            ':viewer': new Set([userId]),
+            ':inc': 1,
+          },
+        }));
+      } catch (e) {
+        console.error('Failed to mark scoop as viewed:', e);
+      }
+
+      return ok({ viewed: true });
+    }
+
+    // ----- DELETE /scoops/:id (delete own scoop) -----
+    if (method === 'DELETE' && path.match(/^\/scoops\/[^/]+$/)) {
+      if (!userId) return bad('Unauthorized', 401);
+      if (!SCOOPS_TABLE) return bad('Scoops not enabled', 501);
+
+      const scoopId = path.split('/')[2];
+      if (!scoopId) return bad('Missing scoopId', 400);
+
+      // Find the scoop
+      const scanResult = await ddb.send(new ScanCommand({
+        TableName: SCOOPS_TABLE,
+        FilterExpression: 'id = :id',
+        ExpressionAttributeValues: { ':id': scoopId },
+        Limit: 1,
+      }));
+
+      const scoop = (scanResult.Items || [])[0];
+      if (!scoop) return bad('Scoop not found', 404);
+      if (scoop.userId !== userId) return bad('Forbidden', 403);
+
+      // Delete media from S3
+      if (scoop.mediaKey && MEDIA_BUCKET) {
+        try {
+          await s3.send(new DeleteObjectCommand({
+            Bucket: MEDIA_BUCKET,
+            Key: scoop.mediaKey,
+          }));
+          console.log(`[DELETE /scoops] Deleted S3 object: ${scoop.mediaKey}`);
+        } catch (e) {
+          console.error('[DELETE /scoops] Failed to delete S3 object:', e);
+        }
+      }
+
+      // Delete from DynamoDB
+      await ddb.send(new DeleteCommand({
+        TableName: SCOOPS_TABLE,
+        Key: { pk: scoop.pk, sk: scoop.sk },
+      }));
+
+      return ok({ deleted: true });
     }
 
     // ----- GET /posts/{id} -----

@@ -17,6 +17,9 @@ import { UserListScreen } from '../screens/UserListScreen';
 import { useNotifications } from '../lib/notifications';
 import PostScreen from '../screens/PostScreen';
 import TermsOfServiceScreen from '../screens/TermsOfServiceScreen';
+import CaptureScoopScreen from '../screens/CaptureScoopScreen';
+import EditScoopScreen from '../screens/EditScoopScreen';
+import ScoopViewerScreen from '../screens/ScoopViewerScreen';
 import { IconButton, Badge } from '../components/ui';
 import { useTheme, spacing } from '../theme';
 import { navigationRef } from './navigationRef';
@@ -128,6 +131,9 @@ export default function RootNavigator(){
           options={{ title: 'Post' }}
         />
         <Stack.Screen name="ComposePost" component={ComposePostScreen} options={{ headerShown: false, presentation: 'modal' }} />
+        <Stack.Screen name="CaptureScoop" component={CaptureScoopScreen} options={{ headerShown: false, presentation: 'fullScreenModal' }} />
+        <Stack.Screen name="EditScoop" component={EditScoopScreen} options={{ headerShown: false, presentation: 'modal' }} />
+        <Stack.Screen name="ScoopViewer" component={ScoopViewerScreen} options={{ headerShown: false, presentation: 'fullScreenModal' }} />
         <Stack.Screen name="Search" component={SearchScreen as any} options={{ title: 'Search Users' }} />
         <Stack.Screen name="Profile" component={ProfileScreen} options={{ title: 'Profile' }} />
         <Stack.Screen

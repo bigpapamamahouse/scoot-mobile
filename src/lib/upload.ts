@@ -394,3 +394,20 @@ export function guessImageContentType(uri: string): string {
   if (ext === 'heic' || ext === 'heif') return 'image/heic';
   return `image/${ext}`;
 }
+
+export function guessMediaContentType(uri: string, mediaType: 'image' | 'video'): string {
+  if (mediaType === 'video') {
+    const filename = uri.split('/').pop() || '';
+    const match = /\.(\w+)$/.exec(filename);
+    if (!match) {
+      return 'video/mp4';
+    }
+    const ext = match[1].toLowerCase();
+    if (ext === 'mp4') return 'video/mp4';
+    if (ext === 'mov') return 'video/quicktime';
+    if (ext === 'avi') return 'video/x-msvideo';
+    if (ext === 'webm') return 'video/webm';
+    return `video/${ext}`;
+  }
+  return guessImageContentType(uri);
+}

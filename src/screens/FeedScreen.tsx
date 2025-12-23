@@ -3,11 +3,12 @@ import React from 'react';
 import { View, Text, FlatList, RefreshControl, StyleSheet, ActivityIndicator } from 'react-native';
 import { PostsAPI, ReactionsAPI } from '../api';
 import PostCard from '../components/PostCard';
-import { Post } from '../types';
+import { Post, ScoopFeedItem } from '../types';
 import { resolveHandle } from '../lib/resolveHandle';
 import { IconButton } from '../components/ui';
 import { useTheme, spacing, shadows } from '../theme';
 import { cache, CacheKeys, CacheTTL } from '../lib/cache';
+import { ScoopsRow } from '../components/ScoopsRow';
 
 const POSTS_PER_PAGE = 20;
 
@@ -155,6 +156,29 @@ export default function FeedScreen({ navigation }: any){
     return unsubscribe;
   }, [navigation, load]);
 
+  const handleScoopPress = React.useCallback(
+    (item: ScoopFeedItem, userIndex: number, allItems: ScoopFeedItem[]) => {
+      navigation.navigate('ScoopViewer', {
+        feedItems: allItems,
+        startIndex: userIndex,
+      });
+    },
+    [navigation]
+  );
+
+  const handleCreateScoop = React.useCallback(() => {
+    navigation.navigate('CaptureScoop');
+  }, [navigation]);
+
+  const renderScoopsHeader = React.useCallback(() => {
+    return (
+      <ScoopsRow
+        onScoopPress={handleScoopPress}
+        onCreatePress={handleCreateScoop}
+      />
+    );
+  }, [handleScoopPress, handleCreateScoop]);
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.background.secondary }}>
       <FlatList
@@ -167,6 +191,7 @@ export default function FeedScreen({ navigation }: any){
           minIndexForVisible: 0,
         }}
         keyboardShouldPersistTaps="handled"
+        ListHeaderComponent={renderScoopsHeader}
         renderItem={({ item }) => (
           <PostCard
             post={item}

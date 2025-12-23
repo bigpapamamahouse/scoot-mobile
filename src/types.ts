@@ -70,3 +70,34 @@ export interface ReactionWithUsers {
     avatarKey?: string;
   }>;
 }
+
+export interface TextOverlay {
+  text: string;
+  font: string;
+  color: string;
+  position: { x: number; y: number };
+}
+
+export interface Scoop {
+  id: string;
+  userId: string;
+  handle?: string;
+  avatarKey?: string;
+  mediaKey: string;
+  mediaType: 'photo' | 'video';
+  duration?: number;
+  aspectRatio: number;
+  textOverlay?: TextOverlay[];
+  createdAt: number;
+  expiresAt: number;
+  viewCount: number;
+  viewedByMe?: boolean;
+}
+
+export interface ScoopFeedItem {
+  userId: string;
+  handle?: string;
+  avatarKey?: string;
+  scoops: Scoop[];
+  hasNew: boolean;
+}
