@@ -21,6 +21,7 @@ export default function CaptureScoopScreen({ navigation }: any) {
   const { colors } = useTheme();
   const [facing, setFacing] = React.useState<CameraType>('back');
   const [permission, requestPermission] = useCameraPermissions();
+  const [isCameraReady, setIsCameraReady] = React.useState(false);
   const [isRecording, setIsRecording] = React.useState(false);
   const [recordingTime, setRecordingTime] = React.useState(0);
   const [isProcessing, setIsProcessing] = React.useState(false);
@@ -72,7 +73,7 @@ export default function CaptureScoopScreen({ navigation }: any) {
   };
 
   const handleShutterPressIn = async () => {
-    if (isRecording || isProcessing) return;
+    if (isRecording || isProcessing || !isCameraReady) return;
 
     // Start recording video
     setIsRecording(true);
@@ -132,7 +133,7 @@ export default function CaptureScoopScreen({ navigation }: any) {
   };
 
   const handleShutterPress = async () => {
-    if (isRecording || isProcessing) return;
+    if (isRecording || isProcessing || !isCameraReady) return;
 
     // Take photo
     setIsProcessing(true);
@@ -200,76 +201,77 @@ export default function CaptureScoopScreen({ navigation }: any) {
         ref={cameraRef}
         style={styles.camera}
         facing={facing}
-      >
-        {/* Top bar */}
-        <SafeAreaView style={styles.topBar}>
-          <TouchableOpacity
-            style={styles.topButton}
-            onPress={() => navigation.goBack()}
-          >
-            <Ionicons name="close" size={32} color="white" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.topButton}
-            onPress={toggleCameraFacing}
-          >
-            <Ionicons name="camera-reverse" size={32} color="white" />
-          </TouchableOpacity>
-        </SafeAreaView>
+        onCameraReady={() => setIsCameraReady(true)}
+      />
 
-        {/* Recording indicator and timer */}
+      {/* Top bar */}
+      <SafeAreaView style={styles.topBar}>
+        <TouchableOpacity
+          style={styles.topButton}
+          onPress={() => navigation.goBack()}
+        >
+          <Ionicons name="close" size={32} color="white" />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.topButton}
+          onPress={toggleCameraFacing}
+        >
+          <Ionicons name="camera-reverse" size={32} color="white" />
+        </TouchableOpacity>
+      </SafeAreaView>
+
+      {/* Recording indicator and timer */}
+      {isRecording && (
+        <View style={styles.recordingIndicator}>
+          <View style={styles.recordingDot} />
+          <Text style={styles.recordingTime}>
+            {(recordingTime / 1000).toFixed(1)}s
+          </Text>
+        </View>
+      )}
+
+      {/* Bottom controls */}
+      <View style={styles.bottomBar}>
         {isRecording && (
-          <View style={styles.recordingIndicator}>
-            <View style={styles.recordingDot} />
-            <Text style={styles.recordingTime}>
-              {(recordingTime / 1000).toFixed(1)}s
-            </Text>
+          <View style={styles.progressBarContainer}>
+            <View
+              style={[
+                styles.progressBar,
+                { width: `${progressPercentage}%` },
+              ]}
+            />
           </View>
         )}
 
-        {/* Bottom controls */}
-        <View style={styles.bottomBar}>
-          {isRecording && (
-            <View style={styles.progressBarContainer}>
-              <View
-                style={[
-                  styles.progressBar,
-                  { width: `${progressPercentage}%` },
-                ]}
-              />
+        <View style={styles.controls}>
+          <View style={styles.spacer} />
+
+          {/* Shutter button */}
+          <TouchableOpacity
+            style={styles.shutterButtonContainer}
+            onPressIn={handleShutterPressIn}
+            onPressOut={handleShutterPressOut}
+            onPress={handleShutterPress}
+            delayPressIn={200} // 200ms delay to distinguish tap from hold
+            disabled={isProcessing || !isCameraReady}
+          >
+            <View style={[
+              styles.shutterButton,
+              isRecording && styles.shutterButtonRecording,
+            ]}>
+              {isProcessing && (
+                <ActivityIndicator size="large" color="white" />
+              )}
             </View>
-          )}
+          </TouchableOpacity>
 
-          <View style={styles.controls}>
-            <View style={styles.spacer} />
-
-            {/* Shutter button */}
-            <TouchableOpacity
-              style={styles.shutterButtonContainer}
-              onPressIn={handleShutterPressIn}
-              onPressOut={handleShutterPressOut}
-              onPress={handleShutterPress}
-              delayPressIn={200} // 200ms delay to distinguish tap from hold
-              disabled={isProcessing}
-            >
-              <View style={[
-                styles.shutterButton,
-                isRecording && styles.shutterButtonRecording,
-              ]}>
-                {isProcessing && (
-                  <ActivityIndicator size="large" color="white" />
-                )}
-              </View>
-            </TouchableOpacity>
-
-            <View style={styles.instructionContainer}>
-              <Text style={styles.instructionText}>
-                {isRecording ? 'Release to stop' : 'Tap for photo\nHold for video'}
-              </Text>
-            </View>
+          <View style={styles.instructionContainer}>
+            <Text style={styles.instructionText}>
+              {isRecording ? 'Release to stop' : 'Tap for photo\nHold for video'}
+            </Text>
           </View>
         </View>
-      </CameraView>
+      </View>
     </View>
   );
 }
