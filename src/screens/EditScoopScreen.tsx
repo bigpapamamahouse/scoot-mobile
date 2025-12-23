@@ -25,9 +25,9 @@ import { TextOverlay } from '../types';
 const { width, height } = Dimensions.get('window');
 
 const FONTS = [
-  { name: 'System', value: 'System' },
-  { name: 'Bold', value: 'System' },
-  { name: 'Monospace', value: 'monospace' },
+  { name: 'System', value: 'system', weight: 'normal' as const },
+  { name: 'Bold', value: 'system-bold', weight: 'bold' as const },
+  { name: 'Monospace', value: 'monospace', weight: 'normal' as const },
 ];
 
 const COLORS = [
@@ -178,9 +178,9 @@ export default function EditScoopScreen({ route, navigation }: any) {
               style={[
                 styles.overlayText,
                 {
-                  fontFamily: overlay.font,
+                  fontFamily: overlay.font.includes('monospace') ? 'monospace' : undefined,
                   color: overlay.color,
-                  fontWeight: overlay.font === 'Bold' ? '700' : 'normal',
+                  fontWeight: overlay.font === 'system-bold' ? '700' : 'normal',
                 },
               ]}
             >
@@ -259,8 +259,10 @@ export default function EditScoopScreen({ route, navigation }: any) {
                     <Text
                       style={[
                         styles.fontOptionText,
-                        { fontFamily: font.value },
-                        font.value === 'Bold' && { fontWeight: '700' },
+                        {
+                          fontFamily: font.value.includes('monospace') ? 'monospace' : undefined,
+                          fontWeight: font.weight,
+                        },
                         selectedFont === font.value && styles.fontOptionTextSelected,
                       ]}
                     >
@@ -303,9 +305,9 @@ export default function EditScoopScreen({ route, navigation }: any) {
                 style={[
                   styles.textPreview,
                   {
-                    fontFamily: selectedFont,
+                    fontFamily: selectedFont.includes('monospace') ? 'monospace' : undefined,
                     color: selectedColor,
-                    fontWeight: selectedFont === 'Bold' ? '700' : 'normal',
+                    fontWeight: selectedFont === 'system-bold' ? '700' : 'normal',
                   },
                 ]}
               >

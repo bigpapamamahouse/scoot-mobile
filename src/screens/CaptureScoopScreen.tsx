@@ -69,6 +69,7 @@ export default function CaptureScoopScreen({ navigation }: any) {
   }
 
   const toggleCameraFacing = () => {
+    setIsCameraReady(false); // Reset ready state when switching cameras
     setFacing(current => (current === 'back' ? 'front' : 'back'));
   };
 
@@ -201,7 +202,10 @@ export default function CaptureScoopScreen({ navigation }: any) {
         ref={cameraRef}
         style={styles.camera}
         facing={facing}
-        onCameraReady={() => setIsCameraReady(true)}
+        onCameraReady={() => {
+          // Add small delay to ensure camera is fully ready
+          setTimeout(() => setIsCameraReady(true), 300);
+        }}
       />
 
       {/* Top bar */}

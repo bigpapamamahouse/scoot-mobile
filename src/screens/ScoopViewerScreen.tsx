@@ -179,9 +179,9 @@ export default function ScoopViewerScreen({ route, navigation }: any) {
             style={[
               styles.overlayText,
               {
-                fontFamily: overlay.font,
+                fontFamily: overlay.font.includes('monospace') ? 'monospace' : undefined,
                 color: overlay.color,
-                fontWeight: overlay.font === 'Bold' ? '700' : 'normal',
+                fontWeight: overlay.font === 'system-bold' ? '700' : 'normal',
               },
             ]}
           >
