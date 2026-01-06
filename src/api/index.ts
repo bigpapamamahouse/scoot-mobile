@@ -18,3 +18,4 @@ export const ModerationAPI = moderation;
 export { api } from './client';
 export * from './auth';
 export { mediaUrlFromKey } from './media';
+export type { CreatePostImage } from './posts';

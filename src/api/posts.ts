@@ -150,8 +150,36 @@ export async function getUserPosts(options: GetUserPostsOptions = {}){
   throw new Error('No user post endpoints responded');
 }
 
-export async function createPost(text: string, imageKey?: string, imageAspectRatio?: number){
-  return api('/posts', { method: 'POST', body: JSON.stringify({ text, imageKey, imageAspectRatio }) });
+export interface CreatePostImage {
+  key: string;
+  aspectRatio: number;
+  width?: number;
+  height?: number;
+}
+
+export async function createPost(
+  text: string,
+  imagesOrKey?: CreatePostImage[] | string,
+  aspectRatio?: number
+) {
+  // Support both new multi-image format and legacy single image format
+  let body: any = { text };
+
+  if (Array.isArray(imagesOrKey)) {
+    // New format: multi-image support
+    body.images = imagesOrKey.map((img, index) => ({
+      ...img,
+      order: index,
+    }));
+  } else if (typeof imagesOrKey === 'string') {
+    // Legacy format: single image with imageKey
+    body.imageKey = imagesOrKey;
+    if (aspectRatio !== undefined) {
+      body.imageAspectRatio = aspectRatio;
+    }
+  }
+
+  return api('/posts', { method: 'POST', body: JSON.stringify(body) });
 }
 
 export async function deletePost(id: string){

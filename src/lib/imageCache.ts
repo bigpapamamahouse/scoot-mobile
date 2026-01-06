@@ -54,8 +54,9 @@ class ImageDimensionCache {
 
   /**
    * Store dimensions in cache with LRU eviction.
+   * Public method to allow manual caching of known dimensions.
    */
-  private set(url: string, dimensions: { width: number; height: number; aspectRatio: number }): void {
+  set(url: string, dimensions: { width: number; height: number; aspectRatio: number }): void {
     // LRU eviction: if cache is full, remove oldest entry
     if (this.cache.size >= this.maxEntries) {
       const firstKey = this.cache.keys().next().value;
