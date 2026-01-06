@@ -7,13 +7,9 @@ import {
   StyleSheet,
   ActivityIndicator,
   ViewStyle,
+  ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import DraggableFlatList, {
-  RenderItemParams,
-  ScaleDecorator,
-} from 'react-native-draggable-flatlist';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useTheme, spacing, typography, borderRadius } from '../theme';
 import { IconButton } from './ui';
 
@@ -40,7 +36,6 @@ interface MultiImagePickerProps {
 export function MultiImagePicker({
   images,
   maxImages = 10,
-  onImagesChange,
   onAddPress,
   onRemoveImage,
   style,
@@ -50,108 +45,89 @@ export function MultiImagePicker({
 
   const canAddMore = images.length < maxImages;
 
-  const renderItem = ({ item, drag, isActive, getIndex }: RenderItemParams<UploadingImage>) => {
-    const index = getIndex();
-    if (index === undefined) return null;
-
+  const renderImage = (item: UploadingImage, index: number) => {
     return (
-      <ScaleDecorator>
-        <TouchableOpacity
-          onLongPress={drag}
-          disabled={isActive || item.uploading}
-          activeOpacity={0.8}
-          style={[
-            styles.imageItem,
-            isActive && styles.imageItemActive,
-          ]}
-        >
-          <Image source={{ uri: item.uri }} style={styles.thumbnail} />
+      <View key={index} style={styles.imageItem}>
+        <Image source={{ uri: item.uri }} style={styles.thumbnail} />
 
-          {/* Upload Progress Overlay */}
-          {item.uploading && (
-            <View style={styles.uploadingOverlay}>
-              <ActivityIndicator size="small" color="white" />
-              {item.progress !== undefined && (
-                <Text style={styles.progressText}>{Math.round(item.progress * 100)}%</Text>
-              )}
-            </View>
-          )}
-
-          {/* Error Overlay */}
-          {item.error && (
-            <View style={styles.errorOverlay}>
-              <Ionicons name="alert-circle" size={24} color="white" />
-              <Text style={styles.errorText}>Failed</Text>
-            </View>
-          )}
-
-          {/* Remove Button */}
-          {!item.uploading && (
-            <IconButton
-              icon="close"
-              onPress={() => onRemoveImage(index)}
-              variant="solid"
-              size="sm"
-              style={styles.removeButton}
-              backgroundColor="rgba(0,0,0,0.6)"
-              color="white"
-            />
-          )}
-
-          {/* Drag Indicator */}
-          {!item.uploading && (
-            <View style={styles.dragIndicator}>
-              <Ionicons name="reorder-three" size={20} color="white" />
-            </View>
-          )}
-
-          {/* Order Number */}
-          <View style={styles.orderBadge}>
-            <Text style={styles.orderText}>{index + 1}</Text>
+        {/* Upload Progress Overlay */}
+        {item.uploading && (
+          <View style={styles.uploadingOverlay}>
+            <ActivityIndicator size="small" color="white" />
+            {item.progress !== undefined && (
+              <Text style={styles.progressText}>{Math.round(item.progress * 100)}%</Text>
+            )}
           </View>
-        </TouchableOpacity>
-      </ScaleDecorator>
+        )}
+
+        {/* Error Overlay */}
+        {item.error && (
+          <View style={styles.errorOverlay}>
+            <Ionicons name="alert-circle" size={24} color="white" />
+            <Text style={styles.errorText}>Failed</Text>
+          </View>
+        )}
+
+        {/* Remove Button */}
+        {!item.uploading && (
+          <IconButton
+            icon="close"
+            onPress={() => onRemoveImage(index)}
+            variant="solid"
+            size="sm"
+            style={styles.removeButton}
+            backgroundColor="rgba(0,0,0,0.6)"
+            color="white"
+          />
+        )}
+
+        {/* Order Number */}
+        <View style={styles.orderBadge}>
+          <Text style={styles.orderText}>{index + 1}</Text>
+        </View>
+      </View>
     );
   };
 
   return (
     <View style={[styles.container, style]}>
-      <GestureHandlerRootView style={styles.gestureRoot}>
-        <DraggableFlatList
-          data={images}
-          onDragEnd={({ data }) => onImagesChange(data)}
-          keyExtractor={(item, index) => `${item.uri}-${index}`}
-          renderItem={renderItem}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.listContent}
-        />
-      </GestureHandlerRootView>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
+        {images.map((item, index) => renderImage(item, index))}
 
-      {/* Add Photo Button */}
-      {canAddMore && (
-        <TouchableOpacity
-          style={styles.addButton}
-          onPress={onAddPress}
-          disabled={!canAddMore}
-        >
-          <Ionicons name="add-circle-outline" size={40} color={colors.primary[500]} />
-          <Text style={styles.addText}>
-            Add Photo
-          </Text>
-          <Text style={styles.countText}>
-            {images.length}/{maxImages}
-          </Text>
-        </TouchableOpacity>
-      )}
+        {/* Add Photo Button */}
+        {canAddMore && (
+          <TouchableOpacity
+            style={styles.addButton}
+            onPress={onAddPress}
+            disabled={!canAddMore}
+          >
+            <Ionicons name="add-circle-outline" size={40} color={colors.primary[500]} />
+            <Text style={styles.addText}>Add Photo</Text>
+            <Text style={styles.countText}>
+              {images.length}/{maxImages}
+            </Text>
+          </TouchableOpacity>
+        )}
+      </ScrollView>
 
       {/* Max Limit Reached */}
       {!canAddMore && (
         <View style={styles.maxLimitContainer}>
           <Text style={styles.maxLimitText}>
-            Max {maxImages} photos
+            Max {maxImages} photos reached
           </Text>
         </View>
+      )}
+
+      {/* Reorder Hint */}
+      {images.length > 1 && (
+        <Text style={styles.hintText}>
+          Images will appear in the order shown
+        </Text>
       )}
     </View>
   );
@@ -161,23 +137,16 @@ const createStyles = (colors: any) => StyleSheet.create({
   container: {
     marginVertical: spacing[3],
   },
-  gestureRoot: {
-    minHeight: 120,
-  },
-  listContent: {
+  scrollContent: {
     paddingHorizontal: spacing[4],
     gap: spacing[3],
+    alignItems: 'center',
   },
   imageItem: {
     width: 100,
     height: 100,
     borderRadius: borderRadius.lg,
     position: 'relative',
-    marginRight: spacing[2],
-  },
-  imageItemActive: {
-    opacity: 0.8,
-    transform: [{ scale: 1.05 }],
   },
   thumbnail: {
     width: '100%',
@@ -223,14 +192,6 @@ const createStyles = (colors: any) => StyleSheet.create({
     top: spacing[1],
     right: spacing[1],
   },
-  dragIndicator: {
-    position: 'absolute',
-    bottom: spacing[1],
-    left: spacing[1],
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    borderRadius: borderRadius.sm,
-    padding: 2,
-  },
   orderBadge: {
     position: 'absolute',
     bottom: spacing[1],
@@ -256,7 +217,6 @@ const createStyles = (colors: any) => StyleSheet.create({
     borderStyle: 'dashed',
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: spacing[4],
   },
   addText: {
     color: colors.primary[500],
@@ -270,12 +230,19 @@ const createStyles = (colors: any) => StyleSheet.create({
     marginTop: spacing[1],
   },
   maxLimitContainer: {
-    padding: spacing[4],
+    padding: spacing[2],
     alignItems: 'center',
   },
   maxLimitText: {
     color: colors.text.secondary,
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.medium,
+  },
+  hintText: {
+    color: colors.text.tertiary,
+    fontSize: typography.fontSize.xs,
+    textAlign: 'center',
+    marginTop: spacing[2],
+    paddingHorizontal: spacing[4],
   },
 });
