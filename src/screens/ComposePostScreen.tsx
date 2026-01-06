@@ -7,8 +7,10 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { PostsAPI, CreatePostImage } from '../api';
@@ -242,12 +244,19 @@ export default function ComposePostScreen({ navigation }: any) {
       // Convert to CreatePostImage format
       const postImages: CreatePostImage[] = images
         .filter(img => img.key) // Only include successfully uploaded images
-        .map(img => ({
+        .map((img, index) => ({
           key: img.key!,
           aspectRatio: img.aspectRatio,
           width: img.width,
           height: img.height,
+          order: index,
         }));
+
+      console.log('[ComposePost] Creating post with images:', {
+        textLength: text.trim().length,
+        imageCount: postImages.length,
+        images: postImages,
+      });
 
       await PostsAPI.createPost(
         text.trim(),
@@ -304,7 +313,11 @@ export default function ComposePostScreen({ navigation }: any) {
           />
         </View>
 
-        <ScrollView style={styles.content}>
+        <ScrollView
+          style={styles.content}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={styles.scrollContent}
+        >
           <MentionTextInput
             style={styles.textInput}
             placeholder="What's on your mind?"
@@ -319,7 +332,8 @@ export default function ComposePostScreen({ navigation }: any) {
             flex={false}
           />
 
-          {hasImages && (
+          {/* Image picker - always visible */}
+          {hasImages ? (
             <MultiImagePicker
               images={images}
               maxImages={MAX_IMAGES}
@@ -327,26 +341,22 @@ export default function ComposePostScreen({ navigation }: any) {
               onAddPress={showImageOptions}
               onRemoveImage={removeImage}
             />
-          )}
-        </ScrollView>
-
-        <View style={styles.footer}>
-          {!hasImages ? (
-            <Button
-              title="Add Photos"
-              onPress={showImageOptions}
-              variant="ghost"
-              size="md"
-            />
           ) : (
-            <Text style={styles.imageCount}>
-              {images.length}/{MAX_IMAGES} photo{images.length !== 1 ? 's' : ''}
-            </Text>
+            <TouchableOpacity
+              style={styles.addPhotosButton}
+              onPress={showImageOptions}
+            >
+              <Ionicons name="camera-outline" size={24} color={colors.primary[500]} />
+              <Text style={styles.addPhotosText}>Add Photos</Text>
+            </TouchableOpacity>
           )}
-          <Text style={styles.charCount}>
-            {text.length}/500
+
+          {/* Character count at bottom of scrollable area */}
+          <Text style={styles.charCountInline}>
+            {text.length}/500 characters
+            {hasImages && ` • ${images.length}/${MAX_IMAGES} photo${images.length !== 1 ? 's' : ''}`}
           </Text>
-        </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -375,28 +385,40 @@ const createStyles = (colors: any) => StyleSheet.create({
   content: {
     flex: 1,
   },
+  scrollContent: {
+    paddingBottom: spacing[6],
+  },
   textInput: {
     padding: spacing[4],
     fontSize: typography.fontSize.base,
     textAlignVertical: 'top',
-    minHeight: 44,
+    minHeight: 100,
     color: colors.text.primary,
   },
-  footer: {
+  addPhotosButton: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing[2],
     padding: spacing[4],
-    borderTopWidth: 1,
-    borderTopColor: colors.border.light,
+    marginHorizontal: spacing[4],
+    marginTop: spacing[2],
+    borderRadius: borderRadius.lg,
+    borderWidth: 2,
+    borderColor: colors.primary[500],
+    borderStyle: 'dashed',
+    backgroundColor: colors.background.base,
   },
-  imageCount: {
-    color: colors.text.secondary,
-    fontSize: typography.fontSize.sm,
+  addPhotosText: {
+    color: colors.primary[500],
+    fontSize: typography.fontSize.base,
     fontWeight: typography.fontWeight.medium,
   },
-  charCount: {
+  charCountInline: {
     color: colors.text.tertiary,
     fontSize: typography.fontSize.sm,
+    textAlign: 'center',
+    marginTop: spacing[4],
+    marginBottom: spacing[2],
   },
 });

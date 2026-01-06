@@ -171,15 +171,25 @@ export async function createPost(
       ...img,
       order: index,
     }));
+    console.log('[PostsAPI] Creating post with images array:', {
+      text,
+      imageCount: body.images.length,
+      body,
+    });
   } else if (typeof imagesOrKey === 'string') {
     // Legacy format: single image with imageKey
     body.imageKey = imagesOrKey;
     if (aspectRatio !== undefined) {
       body.imageAspectRatio = aspectRatio;
     }
+    console.log('[PostsAPI] Creating post with single imageKey:', { text, body });
+  } else {
+    console.log('[PostsAPI] Creating text-only post:', { text });
   }
 
-  return api('/posts', { method: 'POST', body: JSON.stringify(body) });
+  const response = await api('/posts', { method: 'POST', body: JSON.stringify(body) });
+  console.log('[PostsAPI] Post created successfully:', response);
+  return response;
 }
 
 export async function deletePost(id: string){
