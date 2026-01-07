@@ -180,6 +180,7 @@ export default function FeedScreen({ navigation }: any){
             onPostDeleted={handlePostDeleted}
             initialReactions={reactionsMap.get(item.id)}
             onReactionsUpdated={(reactions) => handleReactionsUpdated(item.id, reactions)}
+            allowImageZoom={true}
           />
         )}
         ItemSeparatorComponent={() => <View style={{ height: spacing[3] }} />}

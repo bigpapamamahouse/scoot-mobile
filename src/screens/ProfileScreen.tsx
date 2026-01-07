@@ -994,6 +994,7 @@ export default function ProfileScreen({ navigation, route }: any) {
             }}
             onPostUpdated={handlePostUpdated}
             onPostDeleted={handlePostDeleted}
+            allowImageZoom={true}
           />
         )}
         ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
