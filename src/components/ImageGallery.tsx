@@ -94,6 +94,27 @@ export function ImageGallery({ images, onPress, style }: ImageGalleryProps) {
             containerWidth,
           });
 
+          // Debug: Fetch the URL to check HTTP status
+          if (imageUri) {
+            fetch(imageUri, { method: 'HEAD' })
+              .then(response => {
+                console.log(`[ImageGallery] Image ${index} HEAD check:`, {
+                  status: response.status,
+                  statusText: response.statusText,
+                  url: imageUri.substring(0, 100),
+                });
+                if (!response.ok) {
+                  // Fetch the actual response to see what error we're getting
+                  return fetch(imageUri).then(r => r.text()).then(text => {
+                    console.log(`[ImageGallery] Image ${index} error body (${response.status}):`, text.substring(0, 500));
+                  });
+                }
+              })
+              .catch(err => {
+                console.log(`[ImageGallery] Image ${index} fetch error:`, err.message);
+              });
+          }
+
           if (!imageUri) {
             console.log(`[ImageGallery] No URI for image ${index}`);
             return null;
