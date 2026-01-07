@@ -35,12 +35,18 @@ export default function ComposePostScreen({ navigation }: any) {
 
   const styles = React.useMemo(() => createStyles(colors), [colors]);
 
+  // Use ref to track images for cleanup without triggering effect re-runs
+  const imagesRef = React.useRef<UploadingImage[]>([]);
+  React.useEffect(() => {
+    imagesRef.current = images;
+  }, [images]);
+
   // Cleanup: Delete uploaded images if user navigates away without posting
   React.useEffect(() => {
     return () => {
       // Only delete if there are uploaded images and the post wasn't created
       if (!postedRef.current) {
-        images.forEach(img => {
+        imagesRef.current.forEach(img => {
           if (img.key) {
             deleteMedia(img.key)
               .then(() => console.log('Cleaned up unused uploaded image:', img.key))
@@ -49,7 +55,8 @@ export default function ComposePostScreen({ navigation }: any) {
         });
       }
     };
-  }, [images]);
+  }, []); // Empty deps - only run cleanup on unmount
+
 
   const compressImage = async (uri: string, width: number, height: number) => {
     const MAX_WIDTH = 1920;
