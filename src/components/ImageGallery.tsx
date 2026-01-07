@@ -94,20 +94,23 @@ export function ImageGallery({ images, onPress, style }: ImageGalleryProps) {
             containerWidth,
           });
 
-          // Debug: Fetch the URL to check HTTP status
+          // Debug: Fetch the URL to check actual response
           if (imageUri) {
-            fetch(imageUri, { method: 'HEAD' })
+            fetch(imageUri)
               .then(response => {
-                console.log(`[ImageGallery] Image ${index} HEAD check:`, {
+                console.log(`[ImageGallery] Image ${index} GET check:`, {
                   status: response.status,
                   statusText: response.statusText,
-                  url: imageUri.substring(0, 100),
+                  contentType: response.headers.get('content-type'),
+                  contentLength: response.headers.get('content-length'),
+                  url: imageUri.substring(0, 80),
                 });
-                if (!response.ok) {
-                  // Fetch the actual response to see what error we're getting
-                  return fetch(imageUri).then(r => r.text()).then(text => {
-                    console.log(`[ImageGallery] Image ${index} error body (${response.status}):`, text.substring(0, 500));
-                  });
+                return response.text();
+              })
+              .then(text => {
+                console.log(`[ImageGallery] Image ${index} response length: ${text.length} bytes`);
+                if (text.length < 1000) {
+                  console.log(`[ImageGallery] Image ${index} response body:`, text);
                 }
               })
               .catch(err => {
