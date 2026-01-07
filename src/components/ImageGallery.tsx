@@ -26,6 +26,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 export function ImageGallery({ images, onPress, style }: ImageGalleryProps) {
   const { colors } = useTheme();
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [containerWidth, setContainerWidth] = useState(SCREEN_WIDTH - 48);
   const flatListRef = useRef<FlatList>(null);
 
   // Debug: Log images array
@@ -33,9 +34,9 @@ export function ImageGallery({ images, onPress, style }: ImageGalleryProps) {
 
   const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const offsetX = event.nativeEvent.contentOffset.x;
-    const index = Math.round(offsetX / (SCREEN_WIDTH - 48)); // 48 is total horizontal padding
+    const index = Math.round(offsetX / containerWidth);
     setCurrentIndex(index);
-  }, []);
+  }, [containerWidth]);
 
   const renderImage = useCallback(({ item, index }: { item: PostImage; index: number }) => {
     const imageUri = optimizedMediaUrl(item.key, ImagePresets.feedFull);
@@ -53,7 +54,7 @@ export function ImageGallery({ images, onPress, style }: ImageGalleryProps) {
     return (
       <Pressable
         onPress={() => onPress?.(index)}
-        style={styles.imageContainer}
+        style={[styles.imageContainer, { width: containerWidth }]}
       >
         <Image
           source={{ uri: imageUri }}
@@ -67,7 +68,7 @@ export function ImageGallery({ images, onPress, style }: ImageGalleryProps) {
         />
       </Pressable>
     );
-  }, [onPress]);
+  }, [onPress, containerWidth]);
 
   const keyExtractor = useCallback((item: PostImage) => item.key, []);
 
@@ -97,7 +98,14 @@ export function ImageGallery({ images, onPress, style }: ImageGalleryProps) {
 
   // Multiple images - show carousel with pagination
   return (
-    <View style={[styles.container, style]}>
+    <View
+      style={[styles.container, style]}
+      onLayout={(e) => {
+        const width = e.nativeEvent.layout.width;
+        console.log('[ImageGallery] Container width measured:', width);
+        setContainerWidth(width);
+      }}
+    >
       <FlatList
         ref={flatListRef}
         data={images}
@@ -110,7 +118,16 @@ export function ImageGallery({ images, onPress, style }: ImageGalleryProps) {
         scrollEventThrottle={16}
         decelerationRate="fast"
         snapToAlignment="start"
-        snapToInterval={SCREEN_WIDTH - 48}
+        snapToInterval={containerWidth}
+        initialNumToRender={images.length}
+        maxToRenderPerBatch={images.length}
+        windowSize={5}
+        removeClippedSubviews={false}
+        getItemLayout={(data, index) => ({
+          length: containerWidth,
+          offset: containerWidth * index,
+          index,
+        })}
       />
 
       {/* Page Indicator Badge */}
@@ -150,7 +167,7 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   imageContainer: {
-    width: SCREEN_WIDTH - 48, // Account for card padding
+    // Width set dynamically via inline style
   },
   image: {
     width: '100%',
