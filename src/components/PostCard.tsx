@@ -104,23 +104,6 @@ function PostCard({
   // Update local post when prop changes
   React.useEffect(() => {
     setLocalPost(post);
-
-    // Debug logging for images
-    if (post.images && post.images.length > 0) {
-      console.log('[PostCard] Post has images:', {
-        postId: post.id,
-        imageCount: post.images.length,
-        images: post.images,
-        isArray: Array.isArray(post.images),
-        firstImageKey: post.images[0]?.key,
-        secondImageKey: post.images[1]?.key,
-        thirdImageKey: post.images[2]?.key,
-      });
-    } else if (post.imageKey) {
-      console.log('[PostCard] Post has legacy imageKey:', post.imageKey);
-    } else {
-      console.log('[PostCard] Post has no images:', post.id);
-    }
   }, [post]);
 
   const userOwnsPost = React.useMemo(() => {

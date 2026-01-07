@@ -51,7 +51,6 @@ export default function FeedScreen({ navigation }: any){
       if (!append && pageNum === 0) {
         const cachedData = cache.get<Post[]>(CacheKeys.feed(0));
         if (cachedData && cachedData.length > 0) {
-          console.log('[FeedScreen] Loading from cache:', cachedData.length, 'posts');
           setItems(cachedData);
         }
       }
@@ -63,13 +62,6 @@ export default function FeedScreen({ navigation }: any){
         offset
       });
       const newItems = f.items || f || [];
-
-      // Debug: Log feed items with images
-      console.log('[FeedScreen] Fetched feed items:', {
-        count: newItems.length,
-        itemsWithImages: newItems.filter((p: any) => p.images?.length > 0).length,
-        firstPostWithImages: newItems.find((p: any) => p.images?.length > 0),
-      });
 
       // Batch load reactions for all posts (prevents N+1 problem)
       if (newItems.length > 0) {
@@ -134,7 +126,6 @@ export default function FeedScreen({ navigation }: any){
   const loadMore = React.useCallback(async () => {
     if (loadingMore || !hasMore) return;
 
-    console.log('[FeedScreen] Loading more posts, page:', page + 1);
     setLoadingMore(true);
     const nextPage = page + 1;
     await load(nextPage, true);

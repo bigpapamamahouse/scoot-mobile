@@ -259,12 +259,6 @@ export default function ComposePostScreen({ navigation }: any) {
           order: index,
         }));
 
-      console.log('[ComposePost] Creating post with images:', {
-        textLength: text.trim().length,
-        imageCount: postImages.length,
-        images: postImages,
-      });
-
       await PostsAPI.createPost(
         text.trim(),
         postImages.length > 0 ? postImages : undefined

@@ -22,6 +22,7 @@ interface ImageGalleryProps {
 }
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const MAX_IMAGE_HEIGHT = 600; // Prevent extremely tall images from dominating feed
 
 export function ImageGallery({ images, onPress, style }: ImageGalleryProps) {
   const { colors } = useTheme();
@@ -29,15 +30,11 @@ export function ImageGallery({ images, onPress, style }: ImageGalleryProps) {
   const [containerWidth, setContainerWidth] = useState(0);
   const scrollViewRef = useRef<ScrollView>(null);
 
-  // Debug: Log images array
-  console.log('[ImageGallery] Rendering with images:', JSON.stringify(images, null, 2));
-
   const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
     if (containerWidth === 0) return; // Wait until width is measured
     const offsetX = event.nativeEvent.contentOffset.x;
     const index = Math.round(offsetX / containerWidth);
     setCurrentIndex(index);
-    console.log('[ImageGallery] Scrolled to index:', index);
   }, [containerWidth]);
 
   // Don't show gallery if no images
@@ -47,9 +44,10 @@ export function ImageGallery({ images, onPress, style }: ImageGalleryProps) {
 
   // Single image - no pagination needed
   if (images.length === 1) {
-    // Use raw URL without optimization params (CloudFront doesn't support query params yet)
     const imageUri = mediaUrlFromKey(images[0].key);
     if (!imageUri) return null;
+
+    const aspectRatio = images[0].aspectRatio || 4 / 3;
 
     return (
       <Pressable onPress={() => onPress?.(0)} style={style}>
@@ -57,7 +55,10 @@ export function ImageGallery({ images, onPress, style }: ImageGalleryProps) {
           source={{ uri: imageUri }}
           style={[
             styles.singleImage,
-            { aspectRatio: images[0].aspectRatio || 4 / 3 }
+            {
+              aspectRatio,
+              maxHeight: MAX_IMAGE_HEIGHT,
+            }
           ]}
           resizeMode="cover"
         />
@@ -71,7 +72,6 @@ export function ImageGallery({ images, onPress, style }: ImageGalleryProps) {
       style={[styles.container, style]}
       onLayout={(e) => {
         const width = e.nativeEvent.layout.width;
-        console.log('[ImageGallery] Container width measured:', width);
         setContainerWidth(width);
       }}
     >
@@ -87,19 +87,10 @@ export function ImageGallery({ images, onPress, style }: ImageGalleryProps) {
         snapToInterval={containerWidth > 0 ? containerWidth : undefined}
       >
         {images.map((image, index) => {
-          // Use raw URL without optimization params (CloudFront doesn't support query params yet)
           const imageUri = mediaUrlFromKey(image.key);
-          console.log(`[ImageGallery] Rendering image ${index}:`, {
-            key: image.key,
-            uri: imageUri,
-            aspectRatio: image.aspectRatio,
-            containerWidth,
-          });
+          if (!imageUri) return null;
 
-          if (!imageUri) {
-            console.log(`[ImageGallery] No URI for image ${index}`);
-            return null;
-          }
+          const aspectRatio = image.aspectRatio || 4 / 3;
 
           return (
             <Pressable
@@ -114,11 +105,12 @@ export function ImageGallery({ images, onPress, style }: ImageGalleryProps) {
                 source={{ uri: imageUri }}
                 style={[
                   styles.image,
-                  { aspectRatio: image.aspectRatio || 4 / 3 }
+                  {
+                    aspectRatio,
+                    maxHeight: MAX_IMAGE_HEIGHT,
+                  }
                 ]}
                 resizeMode="cover"
-                onError={(e) => console.log(`[ImageGallery] Image ${index} error:`, e.nativeEvent)}
-                onLoad={() => console.log(`[ImageGallery] Image ${index} loaded successfully`)}
               />
             </Pressable>
           );
