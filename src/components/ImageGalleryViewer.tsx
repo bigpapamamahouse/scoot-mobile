@@ -1,7 +1,7 @@
 import React from 'react';
 import ImageViewing from 'react-native-image-viewing';
 import { PostImage } from '../types';
-import { optimizedMediaUrl, ImagePresets } from '../lib/media';
+import { mediaUrlFromKey } from '../lib/media';
 
 interface ImageGalleryViewerProps {
   images: PostImage[];
@@ -17,9 +17,10 @@ export function ImageGalleryViewer({
   onClose,
 }: ImageGalleryViewerProps) {
   // Convert PostImage array to format expected by react-native-image-viewing
+  // Use raw URLs without optimization params (CloudFront doesn't support query params yet)
   const imageUris = images
     .map(img => {
-      const uri = optimizedMediaUrl(img.key, ImagePresets.fullScreen);
+      const uri = mediaUrlFromKey(img.key);
       return uri ? { uri } : null;
     })
     .filter((img): img is { uri: string } => img !== null);

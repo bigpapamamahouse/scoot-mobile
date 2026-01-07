@@ -12,7 +12,7 @@ import {
   Text,
 } from 'react-native';
 import { PostImage } from '../types';
-import { optimizedMediaUrl, ImagePresets } from '../lib/media';
+import { mediaUrlFromKey, optimizedMediaUrl, ImagePresets } from '../lib/media';
 import { useTheme, borderRadius, typography } from '../theme';
 
 interface ImageGalleryProps {
@@ -47,7 +47,8 @@ export function ImageGallery({ images, onPress, style }: ImageGalleryProps) {
 
   // Single image - no pagination needed
   if (images.length === 1) {
-    const imageUri = optimizedMediaUrl(images[0].key, ImagePresets.feedFull);
+    // Use raw URL without optimization params (CloudFront doesn't support query params yet)
+    const imageUri = mediaUrlFromKey(images[0].key);
     if (!imageUri) return null;
 
     return (
@@ -86,37 +87,14 @@ export function ImageGallery({ images, onPress, style }: ImageGalleryProps) {
         snapToInterval={containerWidth > 0 ? containerWidth : undefined}
       >
         {images.map((image, index) => {
-          const imageUri = optimizedMediaUrl(image.key, ImagePresets.feedFull);
+          // Use raw URL without optimization params (CloudFront doesn't support query params yet)
+          const imageUri = mediaUrlFromKey(image.key);
           console.log(`[ImageGallery] Rendering image ${index}:`, {
             key: image.key,
             uri: imageUri,
             aspectRatio: image.aspectRatio,
             containerWidth,
           });
-
-          // Debug: Fetch the URL to check actual response
-          if (imageUri) {
-            fetch(imageUri)
-              .then(response => {
-                console.log(`[ImageGallery] Image ${index} GET check:`, {
-                  status: response.status,
-                  statusText: response.statusText,
-                  contentType: response.headers.get('content-type'),
-                  contentLength: response.headers.get('content-length'),
-                  url: imageUri.substring(0, 80),
-                });
-                return response.text();
-              })
-              .then(text => {
-                console.log(`[ImageGallery] Image ${index} response length: ${text.length} bytes`);
-                if (text.length < 1000) {
-                  console.log(`[ImageGallery] Image ${index} response body:`, text);
-                }
-              })
-              .catch(err => {
-                console.log(`[ImageGallery] Image ${index} fetch error:`, err.message);
-              });
-          }
 
           if (!imageUri) {
             console.log(`[ImageGallery] No URI for image ${index}`);
