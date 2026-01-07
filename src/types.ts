@@ -1,13 +1,27 @@
 // Common types used across the application
 
+export interface PostImage {
+  key: string;                    // S3 key
+  aspectRatio: number;           // width/height for layout optimization
+  width?: number;                // Optional original dimensions
+  height?: number;
+  order: number;                 // Display order (0-9)
+}
+
 export interface Post {
   id: string;
   userId: string;
   handle?: string;
   avatarKey?: string;
   text: string;
+
+  // Multi-image support
+  images?: PostImage[];          // Array of up to 10 images
+
+  // Deprecated: Keep for backward compatibility with old posts
   imageKey?: string;
   imageAspectRatio?: number;
+
   createdAt: string;
   updatedAt?: string;
   reactionCount?: number;

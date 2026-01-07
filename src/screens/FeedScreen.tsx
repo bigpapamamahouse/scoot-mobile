@@ -51,7 +51,6 @@ export default function FeedScreen({ navigation }: any){
       if (!append && pageNum === 0) {
         const cachedData = cache.get<Post[]>(CacheKeys.feed(0));
         if (cachedData && cachedData.length > 0) {
-          console.log('[FeedScreen] Loading from cache:', cachedData.length, 'posts');
           setItems(cachedData);
         }
       }
@@ -127,7 +126,6 @@ export default function FeedScreen({ navigation }: any){
   const loadMore = React.useCallback(async () => {
     if (loadingMore || !hasMore) return;
 
-    console.log('[FeedScreen] Loading more posts, page:', page + 1);
     setLoadingMore(true);
     const nextPage = page + 1;
     await load(nextPage, true);
@@ -182,6 +180,7 @@ export default function FeedScreen({ navigation }: any){
             onPostDeleted={handlePostDeleted}
             initialReactions={reactionsMap.get(item.id)}
             onReactionsUpdated={(reactions) => handleReactionsUpdated(item.id, reactions)}
+            allowImageZoom={true}
           />
         )}
         ItemSeparatorComponent={() => <View style={{ height: spacing[3] }} />}

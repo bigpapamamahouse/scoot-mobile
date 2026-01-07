@@ -2,10 +2,12 @@ import React from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet, Alert, Pressable } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import ImageViewing from 'react-native-image-viewing';
-import { Post, Reaction, ReactionWithUsers, Comment } from '../types';
+import { Post, Reaction, ReactionWithUsers, Comment, PostImage } from '../types';
 import { optimizedMediaUrl, ImagePresets } from '../lib/media';
 import { Avatar } from './Avatar';
 import { MentionText } from './MentionText';
+import { ImageGallery } from './ImageGallery';
+import { ImageGalleryViewer } from './ImageGalleryViewer';
 import { CommentsAPI, ReactionsAPI, PostsAPI, ModerationAPI } from '../api';
 import { resolveHandle } from '../lib/resolveHandle';
 import { useCurrentUser, isOwner } from '../hooks/useCurrentUser';
@@ -53,6 +55,7 @@ function PostCard({
   const [imageAspectRatio, setImageAspectRatio] = React.useState<number | null>(null);
   const [localPost, setLocalPost] = React.useState<Post>(post);
   const [imageViewerVisible, setImageViewerVisible] = React.useState(false);
+  const [imageViewerIndex, setImageViewerIndex] = React.useState(0);
 
   // Use optimized image URL for feed display (800px wide, 85% quality)
   const imageUri = React.useMemo(
@@ -501,8 +504,20 @@ function PostCard({
         }}
       />
 
-      {/* Image */}
-      {imageUri && (
+      {/* Image Gallery */}
+      {localPost.images && localPost.images.length > 0 ? (
+        <ImageGallery
+          images={localPost.images}
+          onPress={(index) => {
+            if (allowImageZoom) {
+              setImageViewerIndex(index);
+              setImageViewerVisible(true);
+            }
+          }}
+          style={styles.imageGallery}
+        />
+      ) : imageUri ? (
+        // Fallback for legacy posts with single imageKey
         allowImageZoom ? (
           <Pressable onPress={() => setImageViewerVisible(true)}>
             <Image
@@ -528,7 +543,7 @@ function PostCard({
             resizeMode="contain"
           />
         )
-      )}
+      ) : null}
 
       {/* Reactions */}
       <View style={styles.quickReactions}>
@@ -692,13 +707,22 @@ function PostCard({
         onUserPress={onPressUser}
       />
 
-      {allowImageZoom && fullScreenImageUri && (
-        <ImageViewing
-          images={[{ uri: fullScreenImageUri }]}
-          imageIndex={0}
-          visible={imageViewerVisible}
-          onRequestClose={() => setImageViewerVisible(false)}
-        />
+      {allowImageZoom && (localPost.images?.length || fullScreenImageUri) && (
+        localPost.images && localPost.images.length > 0 ? (
+          <ImageGalleryViewer
+            images={localPost.images}
+            initialIndex={imageViewerIndex}
+            visible={imageViewerVisible}
+            onClose={() => setImageViewerVisible(false)}
+          />
+        ) : fullScreenImageUri ? (
+          <ImageViewing
+            images={[{ uri: fullScreenImageUri }]}
+            imageIndex={0}
+            visible={imageViewerVisible}
+            onRequestClose={() => setImageViewerVisible(false)}
+          />
+        ) : null
       )}
     </TouchableOpacity>
   );
@@ -742,6 +766,9 @@ const createStyles = (colors: any) => StyleSheet.create({
     ...typography.styles.body,
     marginBottom: spacing[2],
     color: colors.text.primary,
+  },
+  imageGallery: {
+    marginBottom: spacing[2],
   },
   image: {
     width: '100%',

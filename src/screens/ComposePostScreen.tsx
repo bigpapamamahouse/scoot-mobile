@@ -2,113 +2,61 @@ import React from 'react';
 import {
   View,
   Text,
-  TouchableOpacity,
   StyleSheet,
   Alert,
   KeyboardAvoidingView,
   Platform,
-  ActivityIndicator,
-  Image,
+  ScrollView,
+  TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
-import { PostsAPI } from '../api';
+import { PostsAPI, CreatePostImage } from '../api';
 import { uploadMedia } from '../lib/upload';
-import { Button, IconButton } from '../components/ui';
+import { Button } from '../components/ui';
 import { MentionTextInput } from '../components/MentionTextInput';
-import { useTheme, spacing, typography, borderRadius, shadows } from '../theme';
+import { MultiImagePicker, UploadingImage } from '../components/MultiImagePicker';
+import { useTheme, spacing, typography, borderRadius } from '../theme';
 import { imageDimensionCache } from '../lib/imageCache';
 import { mediaUrlFromKey, deleteMedia } from '../lib/media';
+
+const MAX_IMAGES = 10;
 
 export default function ComposePostScreen({ navigation }: any) {
   const { colors } = useTheme();
   const [text, setText] = React.useState('');
-  const [imageUri, setImageUri] = React.useState<string | null>(null);
-  const [imageKey, setImageKey] = React.useState<string | null>(null);
-  const [imageAspectRatio, setImageAspectRatio] = React.useState<number | null>(null);
+  const [images, setImages] = React.useState<UploadingImage[]>([]);
   const [loading, setLoading] = React.useState(false);
-  const [uploading, setUploading] = React.useState(false);
 
   // Use ref instead of state to avoid race condition on unmount
   const postedRef = React.useRef(false);
 
   const styles = React.useMemo(() => createStyles(colors), [colors]);
 
-  // Cleanup: Delete uploaded image if user navigates away without posting
+  // Use ref to track images for cleanup without triggering effect re-runs
+  const imagesRef = React.useRef<UploadingImage[]>([]);
+  React.useEffect(() => {
+    imagesRef.current = images;
+  }, [images]);
+
+  // Cleanup: Delete uploaded images if user navigates away without posting
   React.useEffect(() => {
     return () => {
-      // Only delete if there's an uploaded image and the post wasn't created
-      if (imageKey && !postedRef.current) {
-        deleteMedia(imageKey)
-          .then(() => console.log('Cleaned up unused uploaded image:', imageKey))
-          .catch((error) => console.warn('Failed to cleanup unused image:', error));
+      // Only delete if there are uploaded images and the post wasn't created
+      if (!postedRef.current) {
+        imagesRef.current.forEach(img => {
+          if (img.key) {
+            deleteMedia(img.key)
+              .then(() => console.log('Cleaned up unused uploaded image:', img.key))
+              .catch((error) => console.warn('Failed to cleanup unused image:', error));
+          }
+        });
       }
     };
-  }, [imageKey]);
+  }, []); // Empty deps - only run cleanup on unmount
 
-  const pickImage = async (fromCamera: boolean) => {
-    try {
-      let result;
-
-      if (fromCamera) {
-        const { status } = await ImagePicker.requestCameraPermissionsAsync();
-        if (status !== 'granted') {
-          Alert.alert('Permission needed', 'Camera permission is required');
-          return;
-        }
-        result = await ImagePicker.launchCameraAsync({
-          mediaTypes: 'images',
-          quality: 0.8,
-        });
-      } else {
-        const { status} = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (status !== 'granted') {
-          Alert.alert('Permission needed', 'Gallery permission is required');
-          return;
-        }
-        result = await ImagePicker.launchImageLibraryAsync({
-          mediaTypes: 'images',
-          quality: 0.8,
-        });
-      }
-
-      if (!result.canceled && result.assets[0]) {
-        const uri = result.assets[0].uri;
-        let { width, height } = result.assets[0];
-
-        // Compress and resize image before uploading
-        let processedUri = uri;
-        try {
-          const compressed = await compressImage(uri, width, height);
-          processedUri = compressed.uri;
-          width = compressed.width;
-          height = compressed.height;
-        } catch (error) {
-          console.warn('Image compression failed, using original:', error);
-          // Continue with original image if compression fails
-        }
-
-        // Cache dimensions immediately for the local URI (for preview)
-        const aspectRatio = width && height ? width / height : null;
-        if (aspectRatio) {
-          imageDimensionCache.set(processedUri, {
-            width,
-            height,
-            aspectRatio,
-          });
-          setImageAspectRatio(aspectRatio);
-        }
-
-        setImageUri(processedUri);
-        await uploadImage(processedUri, width, height);
-      }
-    } catch (error: any) {
-      console.error('Error picking image:', error);
-      Alert.alert('Error', 'Failed to pick image');
-    }
-  };
 
   const compressImage = async (uri: string, width: number, height: number) => {
     const MAX_WIDTH = 1920;
@@ -141,22 +89,14 @@ export default function ComposePostScreen({ navigation }: any) {
     return manipResult;
   };
 
-  const uploadImage = async (uri: string, width?: number, height?: number) => {
-    setUploading(true);
+  const uploadImage = async (uri: string, width: number, height: number, index: number) => {
     try {
-      // If there's already an uploaded image, delete it first
-      if (imageKey) {
-        try {
-          await deleteMedia(imageKey);
-          console.log('Deleted previous uploaded image:', imageKey);
-        } catch (error) {
-          console.warn('Failed to delete previous image:', error);
-          // Continue with new upload even if deletion fails
-        }
-      }
+      // Update image as uploading
+      setImages(prev => prev.map((img, i) =>
+        i === index ? { ...img, uploading: true, error: undefined } : img
+      ));
 
       const key = await uploadMedia({ uri, intent: 'post-image' });
-      setImageKey(key);
 
       // Cache dimensions for the S3 URL so it's available when viewing the post
       if (key && width && height) {
@@ -169,47 +109,162 @@ export default function ComposePostScreen({ navigation }: any) {
           });
         }
       }
+
+      // Update image with S3 key
+      setImages(prev => prev.map((img, i) =>
+        i === index ? { ...img, key, uploading: false } : img
+      ));
     } catch (error: any) {
       console.error('Error uploading image:', error);
-      Alert.alert('Error', error?.message ? `Failed to upload image: ${error.message}` : 'Failed to upload image');
-      setImageUri(null);
-      setImageKey(null);
-    } finally {
-      setUploading(false);
+      // Mark image with error
+      setImages(prev => prev.map((img, i) =>
+        i === index ? { ...img, uploading: false, error: error?.message || 'Upload failed' } : img
+      ));
+      Alert.alert('Upload Error', `Failed to upload image ${index + 1}`);
     }
   };
 
-  const removeImage = async () => {
+  const pickImages = async (fromCamera: boolean) => {
+    try {
+      if (images.length >= MAX_IMAGES) {
+        Alert.alert('Limit Reached', `You can only add up to ${MAX_IMAGES} photos per post`);
+        return;
+      }
+
+      let result;
+
+      if (fromCamera) {
+        const { status } = await ImagePicker.requestCameraPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert('Permission needed', 'Camera permission is required');
+          return;
+        }
+        result = await ImagePicker.launchCameraAsync({
+          mediaTypes: 'images',
+          quality: 0.8,
+        });
+      } else {
+        const { status} = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert('Permission needed', 'Gallery permission is required');
+          return;
+        }
+        result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: 'images',
+          quality: 0.8,
+          allowsMultipleSelection: true,
+          selectionLimit: MAX_IMAGES - images.length,
+        });
+      }
+
+      if (!result.canceled && result.assets.length > 0) {
+        const newImages: UploadingImage[] = [];
+
+        for (const asset of result.assets) {
+          const uri = asset.uri;
+          let { width, height } = asset;
+
+          // Compress and resize image before uploading
+          let processedUri = uri;
+          try {
+            const compressed = await compressImage(uri, width, height);
+            processedUri = compressed.uri;
+            width = compressed.width;
+            height = compressed.height;
+          } catch (error) {
+            console.warn('Image compression failed, using original:', error);
+            // Continue with original image if compression fails
+          }
+
+          // Cache dimensions immediately for the local URI (for preview)
+          const aspectRatio = width && height ? width / height : 4 / 3;
+          imageDimensionCache.set(processedUri, {
+            width,
+            height,
+            aspectRatio,
+          });
+
+          newImages.push({
+            uri: processedUri,
+            aspectRatio,
+            width,
+            height,
+            uploading: false,
+          });
+        }
+
+        // Add new images to the list
+        const startIndex = images.length;
+        setImages(prev => [...prev, ...newImages]);
+
+        // Upload all new images in parallel
+        newImages.forEach((img, idx) => {
+          uploadImage(img.uri, img.width || 0, img.height || 0, startIndex + idx);
+        });
+      }
+    } catch (error: any) {
+      console.error('Error picking images:', error);
+      Alert.alert('Error', 'Failed to pick images');
+    }
+  };
+
+  const removeImage = async (index: number) => {
+    const img = images[index];
+
     // Delete from S3 if it was uploaded
-    if (imageKey) {
+    if (img.key) {
       try {
-        await deleteMedia(imageKey);
-        console.log('Deleted unused uploaded image:', imageKey);
+        await deleteMedia(img.key);
+        console.log('Deleted uploaded image:', img.key);
       } catch (error) {
         console.warn('Failed to delete image from S3:', error);
         // Continue with local removal even if S3 deletion fails
       }
     }
 
-    setImageUri(null);
-    setImageKey(null);
-    setImageAspectRatio(null);
+    // Remove from list
+    setImages(prev => prev.filter((_, i) => i !== index));
   };
 
   const handlePost = async () => {
-    if (!text.trim() && !imageKey) {
-      Alert.alert('Error', 'Please enter some text or attach an image');
+    if (!text.trim() && images.length === 0) {
+      Alert.alert('Error', 'Please enter some text or attach at least one image');
+      return;
+    }
+
+    // Check if any images are still uploading
+    const stillUploading = images.some(img => img.uploading);
+    if (stillUploading) {
+      Alert.alert('Upload in Progress', 'Please wait for all images to finish uploading');
+      return;
+    }
+
+    // Check if any images failed to upload
+    const hasErrors = images.some(img => img.error);
+    if (hasErrors) {
+      Alert.alert('Upload Failed', 'Some images failed to upload. Please remove them or try again.');
       return;
     }
 
     setLoading(true);
     try {
+      // Convert to CreatePostImage format
+      const postImages: CreatePostImage[] = images
+        .filter(img => img.key) // Only include successfully uploaded images
+        .map((img, index) => ({
+          key: img.key!,
+          aspectRatio: img.aspectRatio,
+          width: img.width,
+          height: img.height,
+          order: index,
+        }));
+
       await PostsAPI.createPost(
         text.trim(),
-        imageKey || undefined,
-        imageAspectRatio || undefined
+        postImages.length > 0 ? postImages : undefined
       );
-      postedRef.current = true; // Mark as posted so cleanup doesn't delete the image
+
+      postedRef.current = true; // Mark as posted so cleanup doesn't delete the images
       Alert.alert('Success', 'Post created!');
       navigation.goBack();
     } catch (e: any) {
@@ -222,15 +277,18 @@ export default function ComposePostScreen({ navigation }: any) {
 
   const showImageOptions = () => {
     Alert.alert(
-      'Add Photo',
+      'Add Photos',
       'Choose a source',
       [
-        { text: 'Camera', onPress: () => pickImage(true) },
-        { text: 'Gallery', onPress: () => pickImage(false) },
+        { text: 'Camera', onPress: () => pickImages(true) },
+        { text: 'Gallery', onPress: () => pickImages(false) },
         { text: 'Cancel', style: 'cancel' },
       ]
     );
   };
+
+  const isUploading = images.some(img => img.uploading);
+  const hasImages = images.length > 0;
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
@@ -249,61 +307,57 @@ export default function ComposePostScreen({ navigation }: any) {
           <Button
             title="Post"
             onPress={handlePost}
-            disabled={loading || uploading || (!text.trim() && !imageKey)}
+            disabled={loading || isUploading || (!text.trim() && !hasImages)}
             loading={loading}
             variant="primary"
             size="sm"
           />
         </View>
 
-        <MentionTextInput
-          style={styles.textInput}
-          placeholder="What's on your mind?"
-          placeholderTextColor={colors.text.tertiary}
-          value={text}
-          onChangeText={setText}
-          multiline
-          maxLength={500}
-          autoFocus
-          placement="below"
-          autocompleteMaxHeight={250}
-          flex={false}
-        />
+        <ScrollView
+          style={styles.content}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={styles.scrollContent}
+        >
+          <MentionTextInput
+            style={styles.textInput}
+            placeholder="What's on your mind?"
+            placeholderTextColor={colors.text.tertiary}
+            value={text}
+            onChangeText={setText}
+            multiline
+            maxLength={500}
+            autoFocus
+            placement="below"
+            autocompleteMaxHeight={250}
+            flex={false}
+          />
 
-        {imageUri && (
-          <View style={styles.imageContainer}>
-            <Image source={{ uri: imageUri }} style={styles.imagePreview} />
-            {uploading && (
-              <View style={styles.uploadingOverlay}>
-                <ActivityIndicator size="large" color="white" />
-                <Text style={styles.uploadingText}>Uploading...</Text>
-              </View>
-            )}
-            <IconButton
-              icon="close"
-              onPress={removeImage}
-              variant="solid"
-              size="sm"
-              style={styles.removeImageButton}
-              backgroundColor="rgba(0,0,0,0.6)"
-              color={colors.text.inverse}
+          {/* Image picker - always visible */}
+          {hasImages ? (
+            <MultiImagePicker
+              images={images}
+              maxImages={MAX_IMAGES}
+              onImagesChange={setImages}
+              onAddPress={showImageOptions}
+              onRemoveImage={removeImage}
             />
-          </View>
-        )}
+          ) : (
+            <TouchableOpacity
+              style={styles.addPhotosButton}
+              onPress={showImageOptions}
+            >
+              <Ionicons name="camera-outline" size={24} color={colors.primary[500]} />
+              <Text style={styles.addPhotosText}>Add Photos</Text>
+            </TouchableOpacity>
+          )}
 
-        <View style={styles.footer}>
-          <TouchableOpacity
-            style={styles.addPhotoButton}
-            onPress={showImageOptions}
-            disabled={uploading}
-          >
-            <Ionicons name="camera-outline" size={24} color={colors.primary[500]} />
-            <Text style={styles.addPhotoText}>Add Photo</Text>
-          </TouchableOpacity>
-          <Text style={styles.charCount}>
-            {text.length}/500
+          {/* Character count at bottom of scrollable area */}
+          <Text style={styles.charCountInline}>
+            {text.length}/500 characters
+            {hasImages && ` • ${images.length}/${MAX_IMAGES} photo${images.length !== 1 ? 's' : ''}`}
           </Text>
-        </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -329,63 +383,43 @@ const createStyles = (colors: any) => StyleSheet.create({
     ...typography.styles.h5,
     color: colors.text.primary,
   },
+  content: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: spacing[6],
+  },
   textInput: {
     padding: spacing[4],
     fontSize: typography.fontSize.base,
     textAlignVertical: 'top',
-    minHeight: 44,
+    minHeight: 100,
     color: colors.text.primary,
   },
-  imageContainer: {
-    margin: spacing[4],
-    position: 'relative',
-  },
-  imagePreview: {
-    width: '100%',
-    height: 200,
-    borderRadius: borderRadius.lg,
-  },
-  uploadingOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: colors.overlay.dark,
+  addPhotosButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: borderRadius.lg,
-  },
-  uploadingText: {
-    color: colors.text.inverse,
-    marginTop: spacing[2],
-    fontSize: typography.fontSize.sm,
-  },
-  removeImageButton: {
-    position: 'absolute',
-    top: spacing[2],
-    right: spacing[2],
-  },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: spacing[4],
-    borderTopWidth: 1,
-    borderTopColor: colors.border.light,
-  },
-  addPhotoButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
     gap: spacing[2],
+    padding: spacing[4],
+    marginHorizontal: spacing[4],
+    marginTop: spacing[2],
+    borderRadius: borderRadius.lg,
+    borderWidth: 2,
+    borderColor: colors.primary[500],
+    borderStyle: 'dashed',
+    backgroundColor: colors.background.base,
   },
-  addPhotoText: {
+  addPhotosText: {
     color: colors.primary[500],
     fontSize: typography.fontSize.base,
     fontWeight: typography.fontWeight.medium,
   },
-  charCount: {
+  charCountInline: {
     color: colors.text.tertiary,
     fontSize: typography.fontSize.sm,
+    textAlign: 'center',
+    marginTop: spacing[4],
+    marginBottom: spacing[2],
   },
 });

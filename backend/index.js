@@ -771,6 +771,7 @@ async function listPostsByUserId(targetId, limit = 1000) {
     text: i.text || '',
     imageKey: i.imageKey || null,
     imageAspectRatio: i.imageAspectRatio || null,
+    images: i.images || null,
     avatarKey: i.avatarKey || null,
     createdAt: i.createdAt,
   }));
@@ -2284,6 +2285,7 @@ module.exports.handler = async (event) => {
               handle: i.handle || null,
               text: i.text || '', imageKey: i.imageKey || null,
               imageAspectRatio: i.imageAspectRatio || null,
+              images: i.images || null,
               avatarKey: i.avatarKey || null,
               createdAt: i.createdAt,
             }));
@@ -2408,6 +2410,8 @@ module.exports.handler = async (event) => {
           id: i.id, userId: i.userId, username: i.username || 'unknown',
           handle: i.handle || null,
           text: i.text || '', imageKey: i.imageKey || null,
+          imageAspectRatio: i.imageAspectRatio || null,
+          images: i.images || null,
           avatarKey: i.avatarKey || null,
           createdAt: i.createdAt,
         }));
@@ -2558,8 +2562,22 @@ module.exports.handler = async (event) => {
         text: textContent,
         createdAt: now,
       };
-      if (body.imageKey) item.imageKey = body.imageKey;
-      if (body.imageAspectRatio) item.imageAspectRatio = body.imageAspectRatio;
+
+      // Support multi-image posts (new format)
+      if (body.images && Array.isArray(body.images) && body.images.length > 0) {
+        item.images = body.images.map((img, index) => ({
+          key: img.key,
+          aspectRatio: img.aspectRatio || 1,
+          width: img.width || null,
+          height: img.height || null,
+          order: img.order !== undefined ? img.order : index,
+        }));
+      }
+      // Backward compatibility: support legacy single image format
+      else if (body.imageKey) {
+        item.imageKey = body.imageKey;
+        if (body.imageAspectRatio) item.imageAspectRatio = body.imageAspectRatio;
+      }
 
       await ddb.send(new PutCommand({ TableName: POSTS_TABLE, Item: item }));
 
@@ -2576,7 +2594,19 @@ module.exports.handler = async (event) => {
         }
       } catch (e) { console.error('notify mentions (post) failed', e); }
 
-      return ok({ id });
+      // Return the full post object (matching GET /posts/{id} format)
+      return ok({
+        id: item.id,
+        userId: item.userId,
+        username: item.username,
+        handle: item.handle,
+        text: item.text,
+        imageKey: item.imageKey || null,
+        imageAspectRatio: item.imageAspectRatio || null,
+        images: item.images || null,
+        avatarKey: item.avatarKey,
+        createdAt: item.createdAt,
+      });
     }
 
     // ----- /upload-url (media for posts) -----
@@ -2588,6 +2618,7 @@ module.exports.handler = async (event) => {
         Bucket: MEDIA_BUCKET,
         Key: key,
         ContentType: contentType || 'application/octet-stream',
+        // Note: ACL removed - bucket uses "Bucket owner enforced" Object Ownership
       });
       const url = await getSignedUrl(s3, put, { expiresIn: 60 });
       return ok({ url, key });
@@ -2602,6 +2633,7 @@ module.exports.handler = async (event) => {
         Bucket: MEDIA_BUCKET,
         Key: key,
         ContentType: contentType || 'image/jpeg',
+        // Note: ACL removed - bucket uses "Bucket owner enforced" Object Ownership
       });
       const url = await getSignedUrl(s3, put, { expiresIn: 60 });
       return ok({ url, key });
@@ -2782,6 +2814,7 @@ module.exports.handler = async (event) => {
         text: post.text || '',
         imageKey: post.imageKey || null,
         imageAspectRatio: post.imageAspectRatio || null,
+        images: post.images || null,
         avatarKey: post.avatarKey || null,
         createdAt: post.createdAt,
       });
