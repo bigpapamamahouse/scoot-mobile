@@ -2618,6 +2618,7 @@ module.exports.handler = async (event) => {
         Bucket: MEDIA_BUCKET,
         Key: key,
         ContentType: contentType || 'application/octet-stream',
+        ACL: 'bucket-owner-full-control', // Ensure CloudFront OAC can read uploaded objects
       });
       const url = await getSignedUrl(s3, put, { expiresIn: 60 });
       return ok({ url, key });
@@ -2632,6 +2633,7 @@ module.exports.handler = async (event) => {
         Bucket: MEDIA_BUCKET,
         Key: key,
         ContentType: contentType || 'image/jpeg',
+        ACL: 'bucket-owner-full-control', // Ensure CloudFront OAC can read uploaded objects
       });
       const url = await getSignedUrl(s3, put, { expiresIn: 60 });
       return ok({ url, key });
