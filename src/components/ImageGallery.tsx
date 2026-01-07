@@ -28,6 +28,9 @@ export function ImageGallery({ images, onPress, style }: ImageGalleryProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const flatListRef = useRef<FlatList>(null);
 
+  // Debug: Log images array
+  console.log('[ImageGallery] Rendering with images:', JSON.stringify(images, null, 2));
+
   const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const offsetX = event.nativeEvent.contentOffset.x;
     const index = Math.round(offsetX / (SCREEN_WIDTH - 48)); // 48 is total horizontal padding
@@ -36,7 +39,16 @@ export function ImageGallery({ images, onPress, style }: ImageGalleryProps) {
 
   const renderImage = useCallback(({ item, index }: { item: PostImage; index: number }) => {
     const imageUri = optimizedMediaUrl(item.key, ImagePresets.feedFull);
-    if (!imageUri) return null;
+    console.log(`[ImageGallery] Image ${index}:`, {
+      key: item.key,
+      uri: imageUri,
+      aspectRatio: item.aspectRatio,
+    });
+
+    if (!imageUri) {
+      console.log(`[ImageGallery] No URI generated for image ${index}`);
+      return null;
+    }
 
     return (
       <Pressable
@@ -50,6 +62,8 @@ export function ImageGallery({ images, onPress, style }: ImageGalleryProps) {
             { aspectRatio: item.aspectRatio || 4 / 3 }
           ]}
           resizeMode="cover"
+          onError={(e) => console.log(`[ImageGallery] Image ${index} load error:`, e.nativeEvent)}
+          onLoad={() => console.log(`[ImageGallery] Image ${index} loaded successfully`)}
         />
       </Pressable>
     );

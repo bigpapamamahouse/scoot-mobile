@@ -64,6 +64,13 @@ export default function FeedScreen({ navigation }: any){
       });
       const newItems = f.items || f || [];
 
+      // Debug: Log feed items with images
+      console.log('[FeedScreen] Fetched feed items:', {
+        count: newItems.length,
+        itemsWithImages: newItems.filter((p: any) => p.images?.length > 0).length,
+        firstPostWithImages: newItems.find((p: any) => p.images?.length > 0),
+      });
+
       // Batch load reactions for all posts (prevents N+1 problem)
       if (newItems.length > 0) {
         const postIds = newItems.map((post: Post) => post.id);
