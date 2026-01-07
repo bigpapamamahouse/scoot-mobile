@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback } from 'react';
 import {
   View,
-  FlatList,
+  ScrollView,
   Image,
   StyleSheet,
   Dimensions,
@@ -26,51 +26,19 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 export function ImageGallery({ images, onPress, style }: ImageGalleryProps) {
   const { colors } = useTheme();
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [containerWidth, setContainerWidth] = useState(SCREEN_WIDTH - 48);
-  const flatListRef = useRef<FlatList>(null);
+  const [containerWidth, setContainerWidth] = useState(0);
+  const scrollViewRef = useRef<ScrollView>(null);
 
   // Debug: Log images array
   console.log('[ImageGallery] Rendering with images:', JSON.stringify(images, null, 2));
 
   const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    if (containerWidth === 0) return; // Wait until width is measured
     const offsetX = event.nativeEvent.contentOffset.x;
     const index = Math.round(offsetX / containerWidth);
     setCurrentIndex(index);
+    console.log('[ImageGallery] Scrolled to index:', index);
   }, [containerWidth]);
-
-  const renderImage = useCallback(({ item, index }: { item: PostImage; index: number }) => {
-    const imageUri = optimizedMediaUrl(item.key, ImagePresets.feedFull);
-    console.log(`[ImageGallery] Image ${index}:`, {
-      key: item.key,
-      uri: imageUri,
-      aspectRatio: item.aspectRatio,
-    });
-
-    if (!imageUri) {
-      console.log(`[ImageGallery] No URI generated for image ${index}`);
-      return null;
-    }
-
-    return (
-      <Pressable
-        onPress={() => onPress?.(index)}
-        style={[styles.imageContainer, { width: containerWidth }]}
-      >
-        <Image
-          source={{ uri: imageUri }}
-          style={[
-            styles.image,
-            { aspectRatio: item.aspectRatio || 4 / 3 }
-          ]}
-          resizeMode="cover"
-          onError={(e) => console.log(`[ImageGallery] Image ${index} load error:`, e.nativeEvent)}
-          onLoad={() => console.log(`[ImageGallery] Image ${index} loaded successfully`)}
-        />
-      </Pressable>
-    );
-  }, [onPress, containerWidth]);
-
-  const keyExtractor = useCallback((item: PostImage) => item.key, []);
 
   // Don't show gallery if no images
   if (!images || images.length === 0) {
@@ -106,11 +74,8 @@ export function ImageGallery({ images, onPress, style }: ImageGalleryProps) {
         setContainerWidth(width);
       }}
     >
-      <FlatList
-        ref={flatListRef}
-        data={images}
-        renderItem={renderImage}
-        keyExtractor={keyExtractor}
+      <ScrollView
+        ref={scrollViewRef}
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
@@ -118,17 +83,45 @@ export function ImageGallery({ images, onPress, style }: ImageGalleryProps) {
         scrollEventThrottle={16}
         decelerationRate="fast"
         snapToAlignment="start"
-        snapToInterval={containerWidth}
-        initialNumToRender={images.length}
-        maxToRenderPerBatch={images.length}
-        windowSize={5}
-        removeClippedSubviews={false}
-        getItemLayout={(data, index) => ({
-          length: containerWidth,
-          offset: containerWidth * index,
-          index,
+        snapToInterval={containerWidth > 0 ? containerWidth : undefined}
+      >
+        {images.map((image, index) => {
+          const imageUri = optimizedMediaUrl(image.key, ImagePresets.feedFull);
+          console.log(`[ImageGallery] Rendering image ${index}:`, {
+            key: image.key,
+            uri: imageUri,
+            aspectRatio: image.aspectRatio,
+            containerWidth,
+          });
+
+          if (!imageUri) {
+            console.log(`[ImageGallery] No URI for image ${index}`);
+            return null;
+          }
+
+          return (
+            <Pressable
+              key={image.key}
+              onPress={() => onPress?.(index)}
+              style={[
+                styles.imageContainer,
+                containerWidth > 0 && { width: containerWidth }
+              ]}
+            >
+              <Image
+                source={{ uri: imageUri }}
+                style={[
+                  styles.image,
+                  { aspectRatio: image.aspectRatio || 4 / 3 }
+                ]}
+                resizeMode="cover"
+                onError={(e) => console.log(`[ImageGallery] Image ${index} error:`, e.nativeEvent)}
+                onLoad={() => console.log(`[ImageGallery] Image ${index} loaded successfully`)}
+              />
+            </Pressable>
+          );
         })}
-      />
+      </ScrollView>
 
       {/* Page Indicator Badge */}
       <View style={styles.pageIndicatorContainer}>
@@ -167,7 +160,7 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   imageContainer: {
-    // Width set dynamically via inline style
+    width: '100%', // Fallback, will be overridden by inline style
   },
   image: {
     width: '100%',
