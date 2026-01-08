@@ -420,6 +420,30 @@ export default function ProfileScreen({ navigation, route }: any) {
           ]);
         }
 
+        // Fetch total post count in background on first page load
+        if (pageNum === 0 && !shouldSkipAPICall && (targetHandle || targetUserId)) {
+          // Make a background request to get all posts and count them
+          PostsAPI.getUserPosts({
+            handle: targetHandle,
+            userId: targetUserId,
+            limit: 10000, // High limit to get all posts
+            offset: 0,
+          })
+            .then((countData) => {
+              const allPosts = resolvePosts(countData);
+              const filteredPosts = filterPostsForUser(allPosts, {
+                id: targetUserId,
+                handle: targetHandle,
+              });
+              const total = filteredPosts.length;
+              setTotalPostCount(total);
+              console.log('[ProfileScreen] Total post count from background fetch:', total);
+            })
+            .catch((err) => {
+              console.warn('[ProfileScreen] Failed to fetch total post count:', err?.message || String(err));
+            });
+        }
+
         // Skip posts API call if we already have cached data
         if (!shouldSkipAPICall) {
           try {
