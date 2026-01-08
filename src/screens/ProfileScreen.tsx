@@ -45,6 +45,7 @@ export default function ProfileScreen({ navigation, route }: any) {
   const [followStatus, setFollowStatus] = React.useState<'none' | 'pending' | 'following'>('none');
   const [followLoading, setFollowLoading] = React.useState(false);
   const [isPrivate, setIsPrivate] = React.useState(false);
+  const [totalPostCount, setTotalPostCount] = React.useState<number | null>(null);
 
   // Extract route params to stable values to prevent unnecessary re-renders
   const routeUserHandle = route?.params?.userHandle || route?.params?.handle || route?.params?.username;
@@ -419,6 +420,30 @@ export default function ProfileScreen({ navigation, route }: any) {
           ]);
         }
 
+        // Fetch total post count in background on first page load
+        if (pageNum === 0 && !shouldSkipAPICall && (targetHandle || targetUserId)) {
+          // Make a background request to get all posts and count them
+          PostsAPI.getUserPosts({
+            handle: targetHandle,
+            userId: targetUserId,
+            limit: 10000, // High limit to get all posts
+            offset: 0,
+          })
+            .then((countData) => {
+              const allPosts = resolvePosts(countData);
+              const filteredPosts = filterPostsForUser(allPosts, {
+                id: targetUserId,
+                handle: targetHandle,
+              });
+              const total = filteredPosts.length;
+              setTotalPostCount(total);
+              console.log('[ProfileScreen] Total post count from background fetch:', total);
+            })
+            .catch((err) => {
+              console.warn('[ProfileScreen] Failed to fetch total post count:', err?.message || String(err));
+            });
+        }
+
         // Skip posts API call if we already have cached data
         if (!shouldSkipAPICall) {
           try {
@@ -431,6 +456,22 @@ export default function ProfileScreen({ navigation, route }: any) {
               offset,
             });
             console.log('[ProfileScreen] API response:', JSON.stringify(postsData).substring(0, 200));
+
+            // Extract total post count from API response
+            if (postsData && typeof postsData === 'object') {
+              const maybeRecord = postsData as Record<string, unknown>;
+              // Check common field names for total count
+              const totalCount =
+                (typeof maybeRecord.totalCount === 'number' ? maybeRecord.totalCount : null) ??
+                (typeof maybeRecord.total === 'number' ? maybeRecord.total : null) ??
+                (typeof maybeRecord.count === 'number' ? maybeRecord.count : null) ??
+                (typeof maybeRecord.postCount === 'number' ? maybeRecord.postCount : null);
+
+              if (totalCount !== null) {
+                setTotalPostCount(totalCount);
+                console.log('[ProfileScreen] Total post count from API:', totalCount);
+              }
+            }
 
             // Check if profile is private
             if (postsData && typeof postsData === 'object' && 'isPrivate' in postsData) {
@@ -562,6 +603,17 @@ export default function ProfileScreen({ navigation, route }: any) {
                 fullName: (profileData as any).fullName ?? prev?.fullName ?? null,
                 createdAt: (profileData as any).createdAt ?? prev?.createdAt ?? null,
               }));
+
+              // Extract total post count from profile data if available
+              const profilePostCount =
+                (typeof (profileData as any).postCount === 'number' ? (profileData as any).postCount : null) ??
+                (typeof (profileData as any).totalPosts === 'number' ? (profileData as any).totalPosts : null) ??
+                (typeof (profileData as any).postsCount === 'number' ? (profileData as any).postsCount : null);
+
+              if (profilePostCount !== null) {
+                setTotalPostCount(profilePostCount);
+                console.log('[ProfileScreen] Total post count from profile data:', profilePostCount);
+              }
 
               // Check if profile is private
               if ('isPrivate' in profileData) {
@@ -941,7 +993,7 @@ export default function ProfileScreen({ navigation, route }: any) {
 
             <View style={styles.statsRow}>
               <View style={styles.stat}>
-                <Text style={styles.statValue}>{posts.length}</Text>
+                <Text style={styles.statValue}>{totalPostCount ?? posts.length}</Text>
                 <Text style={styles.statLabel}>Posts</Text>
               </View>
               <TouchableOpacity style={styles.stat} onPress={handleFollowersPress}>
