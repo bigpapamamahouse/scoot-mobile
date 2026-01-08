@@ -19,6 +19,7 @@ export default function FeedScreen({ navigation }: any){
   const [hasMore, setHasMore] = React.useState(true);
   const [page, setPage] = React.useState(0);
   const [reactionsMap, setReactionsMap] = React.useState<Map<string, any>>(new Map());
+  const flatListRef = React.useRef<FlatList>(null);
 
   const openProfile = React.useCallback(
     (post: Post) => {
@@ -95,6 +96,10 @@ export default function FeedScreen({ navigation }: any){
         // Cache the first page for instant loads
         if (pageNum === 0 && newItems.length > 0) {
           cache.set(CacheKeys.feed(0), newItems, CacheTTL.feed);
+          // Scroll to top when loading fresh feed data
+          setTimeout(() => {
+            flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
+          }, 100);
         }
       }
 
@@ -156,14 +161,12 @@ export default function FeedScreen({ navigation }: any){
   return (
     <View style={{ flex: 1, backgroundColor: colors.background.secondary }}>
       <FlatList
+        ref={flatListRef}
         style={{ padding: spacing[3] }}
         data={items}
         keyExtractor={(it)=>it.id}
         initialNumToRender={10}
         windowSize={21}
-        maintainVisibleContentPosition={{
-          minIndexForVisible: 0,
-        }}
         keyboardShouldPersistTaps="handled"
         renderItem={({ item }) => (
           <PostCard
