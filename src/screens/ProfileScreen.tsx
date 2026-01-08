@@ -1029,6 +1029,17 @@ export default function ProfileScreen({ navigation, route }: any) {
               </TouchableOpacity>
             )}
 
+            {isViewingSelf && (
+              <TouchableOpacity
+                style={styles.inviteFriendsButton}
+                onPress={openSettings}
+              >
+                <Text style={styles.inviteFriendsButtonText}>
+                  Invite Friends
+                </Text>
+              </TouchableOpacity>
+            )}
+
             {posts.length > 0 && (
               <Text style={styles.sectionTitle}>{postsSectionTitle}</Text>
             )}
@@ -1191,6 +1202,21 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   pendingButtonText: {
     color: colors.warning.main,
+  },
+  inviteFriendsButton: {
+    marginTop: spacing[3],
+    paddingHorizontal: spacing[6],
+    paddingVertical: spacing[2],
+    borderRadius: borderRadius.full,
+    backgroundColor: colors.primary[500],
+    alignSelf: 'stretch',
+    ...shadows.sm,
+  },
+  inviteFriendsButtonText: {
+    color: colors.text.inverse,
+    fontWeight: typography.fontWeight.semibold,
+    fontSize: typography.fontSize.base,
+    textAlign: 'center',
   },
   sectionTitle: {
     ...typography.styles.h5,
