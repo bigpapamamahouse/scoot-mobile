@@ -127,7 +127,7 @@ export default function InviteScreen({ navigation }: any) {
       const message = `Join me on Scoot! Use my invite code: ${inviteCode}`;
       const result = await Share.share({
         message,
-        ...(Platform.OS === 'ios' && { url: 'https://scoot.app' }), // Optional: add app URL if available
+        ...(Platform.OS === 'ios' && { url: 'https://apps.apple.com/us/app/scoot-social/id6755162428' }),
       });
 
       if (result.action === Share.sharedAction) {
