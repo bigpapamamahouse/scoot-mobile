@@ -7,6 +7,7 @@ import FeedScreen from '../screens/FeedScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import SettingsScreen from '../screens/SettingsScreen';
+import InviteScreen from '../screens/InviteScreen';
 import LoginScreen from '../screens/Auth/LoginScreen';
 import SignupScreen from '../screens/Auth/SignupScreen';
 import ConfirmCodeScreen from '../screens/Auth/ConfirmCodeScreen';
@@ -79,6 +80,14 @@ function HeaderActions({ navigation }: { navigation: any }) {
       </View>
 
       <IconButton
+        icon="person-add-outline"
+        onPress={() => navigation.navigate('Invite')}
+        variant="ghost"
+        size="md"
+        color={colors.text.primary}
+      />
+
+      <IconButton
         icon="person-outline"
         onPress={() => navigation.navigate('Profile')}
         variant="ghost"
@@ -138,6 +147,7 @@ export default function RootNavigator(){
           })}
         />
         <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Notifications' }} />
+        <Stack.Screen name="Invite" component={InviteScreen} options={{ title: 'Invite Friends' }} />
         <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: 'Settings' }} />
       </Stack.Navigator>
     </NavigationContainer>
