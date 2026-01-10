@@ -18,7 +18,7 @@ import {
   Animated,
   ScrollView,
 } from 'react-native';
-import { Video, ResizeMode } from 'expo-av';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme, spacing, typography } from '../theme';
 import { ScoopMediaType, ScoopTextOverlay, ScoopFontFamily } from '../types';
@@ -85,6 +85,15 @@ export const ScoopEditor: React.FC<ScoopEditorProps> = ({
   const [selectedColor, setSelectedColor] = useState('#FFFFFF');
   const [selectedOverlayId, setSelectedOverlayId] = useState<string | null>(null);
   const textInputRef = useRef<TextInput>(null);
+
+  const isVideo = mediaType === 'video';
+
+  // Create video player for preview
+  const player = useVideoPlayer(isVideo ? mediaUri : null, (player) => {
+    player.loop = true;
+    player.muted = true;
+    player.play();
+  });
 
   const addTextOverlay = useCallback(() => {
     if (!currentText.trim()) {
@@ -168,20 +177,16 @@ export const ScoopEditor: React.FC<ScoopEditorProps> = ({
     }, 100);
   }, []);
 
-  const isVideo = mediaType === 'video';
-
   return (
     <View style={styles.container}>
       {/* Media preview */}
       <View style={styles.mediaContainer}>
-        {isVideo ? (
-          <Video
-            source={{ uri: mediaUri }}
+        {isVideo && player ? (
+          <VideoView
+            player={player}
             style={styles.media}
-            resizeMode={ResizeMode.COVER}
-            shouldPlay
-            isLooping
-            isMuted
+            contentFit="cover"
+            nativeControls={false}
           />
         ) : (
           <Image

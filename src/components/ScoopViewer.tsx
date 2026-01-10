@@ -14,7 +14,7 @@ import {
   Animated,
   ActivityIndicator,
 } from 'react-native';
-import { Video, ResizeMode, AVPlaybackStatus } from 'expo-av';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Avatar } from './Avatar';
@@ -65,7 +65,6 @@ export const ScoopViewer: React.FC<ScoopViewerProps> = ({
   const { colors } = useTheme();
   const progressAnim = useRef(new Animated.Value(0)).current;
   const animationRef = useRef<Animated.CompositeAnimation | null>(null);
-  const videoRef = useRef<Video>(null);
   const [mediaLoaded, setMediaLoaded] = React.useState(false);
   const [videoDuration, setVideoDuration] = React.useState<number | null>(null);
 
@@ -74,6 +73,12 @@ export const ScoopViewer: React.FC<ScoopViewerProps> = ({
   const duration = isVideo
     ? Math.min(videoDuration || VIDEO_MAX_DURATION, VIDEO_MAX_DURATION)
     : SCOOP_DURATION;
+
+  // Create video player using expo-video hook
+  const player = useVideoPlayer(isVideo && mediaUrl ? mediaUrl : null, (player) => {
+    player.loop = false;
+    player.muted = false;
+  });
 
   // Start or pause progress animation
   useEffect(() => {
@@ -120,29 +125,39 @@ export const ScoopViewer: React.FC<ScoopViewerProps> = ({
     setVideoDuration(null);
   }, [scoop.id, progressAnim]);
 
-  // Handle video playback status
-  const handlePlaybackStatusUpdate = useCallback((status: AVPlaybackStatus) => {
-    if (!status.isLoaded) return;
+  // Listen to video player events
+  useEffect(() => {
+    if (!isVideo || !player) return;
 
-    if (status.durationMillis && !videoDuration) {
-      setVideoDuration(status.durationMillis);
-    }
+    const statusSubscription = player.addListener('statusChange', (event) => {
+      if (event.status === 'readyToPlay') {
+        setMediaLoaded(true);
+        if (player.duration && !videoDuration) {
+          setVideoDuration(player.duration * 1000); // Convert to ms
+        }
+      }
+    });
 
-    if (status.didJustFinish) {
+    const endSubscription = player.addListener('playToEnd', () => {
       onComplete();
-    }
-  }, [videoDuration, onComplete]);
+    });
+
+    return () => {
+      statusSubscription.remove();
+      endSubscription.remove();
+    };
+  }, [isVideo, player, videoDuration, onComplete]);
 
   // Control video playback based on active/paused state
   useEffect(() => {
-    if (!isVideo || !videoRef.current) return;
+    if (!isVideo || !player) return;
 
     if (isActive && !isPaused && mediaLoaded) {
-      videoRef.current.playAsync();
+      player.play();
     } else {
-      videoRef.current.pauseAsync();
+      player.pause();
     }
-  }, [isActive, isPaused, mediaLoaded, isVideo]);
+  }, [isActive, isPaused, mediaLoaded, isVideo, player]);
 
   const handleMediaLoad = useCallback(() => {
     setMediaLoaded(true);
@@ -196,17 +211,12 @@ export const ScoopViewer: React.FC<ScoopViewerProps> = ({
         delayLongPress={200}
       >
         <View style={styles.mediaContainer}>
-          {isVideo ? (
-            <Video
-              ref={videoRef}
-              source={{ uri: mediaUrl || '' }}
+          {isVideo && player ? (
+            <VideoView
+              player={player}
               style={styles.media}
-              resizeMode={ResizeMode.COVER}
-              shouldPlay={false}
-              isLooping={false}
-              onLoad={handleMediaLoad}
-              onPlaybackStatusUpdate={handlePlaybackStatusUpdate}
-              isMuted={false}
+              contentFit="cover"
+              nativeControls={false}
             />
           ) : (
             <Image

@@ -37,6 +37,7 @@ export const ScoopCamera: React.FC<ScoopCameraProps> = ({
   const [micPermission, requestMicPermission] = useMicrophonePermissions();
   const [facing, setFacing] = useState<CameraType>('back');
   const [isRecording, setIsRecording] = useState(false);
+  const [isCameraReady, setIsCameraReady] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
   const recordingProgress = useRef(new Animated.Value(0)).current;
   const recordingTimer = useRef<NodeJS.Timeout | null>(null);
@@ -66,7 +67,13 @@ export const ScoopCamera: React.FC<ScoopCameraProps> = ({
   }, []);
 
   const toggleFacing = useCallback(() => {
+    setIsCameraReady(false);
     setFacing((prev) => (prev === 'back' ? 'front' : 'back'));
+  }, []);
+
+  const handleCameraReady = useCallback(() => {
+    console.log('[ScoopCamera] Camera is ready');
+    setIsCameraReady(true);
   }, []);
 
   const takePhoto = useCallback(async () => {
@@ -89,7 +96,12 @@ export const ScoopCamera: React.FC<ScoopCameraProps> = ({
   }, [onCapture]);
 
   const startRecording = useCallback(async () => {
-    if (!cameraRef.current || isRecording) return;
+    if (!cameraRef.current || isRecording || !isCameraReady) {
+      if (!isCameraReady) {
+        console.warn('[ScoopCamera] Camera not ready yet, cannot record');
+      }
+      return;
+    }
 
     setIsRecording(true);
     setRecordingDuration(0);
@@ -125,7 +137,7 @@ export const ScoopCamera: React.FC<ScoopCameraProps> = ({
       console.error('[ScoopCamera] Failed to record video:', error);
       setIsRecording(false);
     }
-  }, [isRecording, recordingProgress, onCapture]);
+  }, [isRecording, isCameraReady, recordingProgress, onCapture]);
 
   const stopRecording = useCallback(async () => {
     if (!cameraRef.current || !isRecording) return;
@@ -214,6 +226,7 @@ export const ScoopCamera: React.FC<ScoopCameraProps> = ({
         style={styles.camera}
         facing={facing}
         mode={isRecording ? 'video' : 'picture'}
+        onCameraReady={handleCameraReady}
       />
 
       {/* Recording progress bar */}
@@ -244,7 +257,7 @@ export const ScoopCamera: React.FC<ScoopCameraProps> = ({
       {/* Bottom controls */}
       <View style={styles.bottomControls}>
         <Text style={styles.hintText}>
-          {isRecording ? 'Recording...' : 'Tap for photo, hold for video'}
+          {!isCameraReady ? 'Loading camera...' : isRecording ? 'Recording...' : 'Tap for photo, hold for video'}
         </Text>
 
         {/* Shutter button */}
