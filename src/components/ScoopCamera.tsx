@@ -225,7 +225,7 @@ export const ScoopCamera: React.FC<ScoopCameraProps> = ({
         ref={cameraRef}
         style={styles.camera}
         facing={facing}
-        mode={isRecording ? 'video' : 'picture'}
+        mode="video"
         onCameraReady={handleCameraReady}
       />
 
