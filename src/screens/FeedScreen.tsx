@@ -3,7 +3,8 @@ import React from 'react';
 import { View, Text, FlatList, RefreshControl, StyleSheet, ActivityIndicator } from 'react-native';
 import { PostsAPI, ReactionsAPI } from '../api';
 import PostCard from '../components/PostCard';
-import { Post } from '../types';
+import { ScoopsBar } from '../components/ScoopsBar';
+import { Post, UserScoops, Scoop } from '../types';
 import { resolveHandle } from '../lib/resolveHandle';
 import { IconButton } from '../components/ui';
 import { useTheme, spacing, shadows } from '../theme';
@@ -158,6 +159,19 @@ export default function FeedScreen({ navigation }: any){
     return unsubscribe;
   }, [navigation, load]);
 
+  // Scoop handlers
+  const handlePressScoops = React.useCallback((userScoops: UserScoops) => {
+    navigation.navigate('ScoopViewer', { userScoops });
+  }, [navigation]);
+
+  const handlePressCreateScoop = React.useCallback(() => {
+    navigation.navigate('CreateScoop');
+  }, [navigation]);
+
+  const handlePressOwnScoops = React.useCallback((scoops: Scoop[]) => {
+    navigation.navigate('ScoopViewer', { scoops, isOwner: true });
+  }, [navigation]);
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.background.secondary }}>
       <FlatList
@@ -187,6 +201,13 @@ export default function FeedScreen({ navigation }: any){
           />
         )}
         ItemSeparatorComponent={() => <View style={{ height: spacing[3] }} />}
+        ListHeaderComponent={
+          <ScoopsBar
+            onPressScoops={handlePressScoops}
+            onPressCreate={handlePressCreateScoop}
+            onPressOwnScoops={handlePressOwnScoops}
+          />
+        }
         refreshControl={
           <RefreshControl
             refreshing={refreshing}

@@ -6,6 +6,7 @@ import * as reactions from './reactions';
 import * as notifications from './notifications';
 import * as invites from './invites';
 import * as moderation from './moderation';
+import * as scoops from './scoops';
 
 export const PostsAPI = posts;
 export const UsersAPI = users;
@@ -14,6 +15,7 @@ export const ReactionsAPI = reactions;
 export const NotificationsAPI = notifications;
 export const InvitesAPI = invites;
 export const ModerationAPI = moderation;
+export const ScoopsAPI = scoops;
 
 export { api } from './client';
 export * from './auth';

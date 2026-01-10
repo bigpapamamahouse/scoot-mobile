@@ -22,3 +22,51 @@ export type Notification = {
   userUrl?: string;
   postUrl?: string;
 };
+
+// Scoop (Stories) Types
+export type ScoopMediaType = 'image' | 'video';
+
+export type ScoopFontFamily = 'default' | 'bold' | 'script' | 'mono';
+
+export type ScoopTextOverlay = {
+  id: string;
+  text: string;
+  x: number; // percentage from left (0-100)
+  y: number; // percentage from top (0-100)
+  fontFamily: ScoopFontFamily;
+  fontSize: number;
+  color: string;
+  backgroundColor?: string;
+  rotation?: number;
+};
+
+export type Scoop = {
+  id: string;
+  userId: string;
+  handle?: string | null;
+  avatarKey?: string | null;
+  mediaKey: string;
+  mediaType: ScoopMediaType;
+  mediaAspectRatio?: number | null;
+  textOverlays?: ScoopTextOverlay[];
+  createdAt: number;
+  expiresAt: number;
+  viewCount: number;
+  viewed?: boolean; // whether current user has viewed this scoop
+};
+
+export type ScoopViewer = {
+  userId: string;
+  handle?: string | null;
+  avatarKey?: string | null;
+  viewedAt: number;
+};
+
+export type UserScoops = {
+  userId: string;
+  handle?: string | null;
+  avatarKey?: string | null;
+  scoops: Scoop[];
+  hasUnviewed: boolean;
+  latestScoopAt: number;
+};
