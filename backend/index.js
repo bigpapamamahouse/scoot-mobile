@@ -3935,12 +3935,23 @@ module.exports.handler = async (event) => {
       const scoopId = path.split('/')[2];
       if (!scoopId) return bad('Missing scoopId', 400);
 
-      // Find the scoop
-      const result = await ddb.send(new ScanCommand({
+      // Query user's scoops and filter by id (more efficient than scan)
+      const now = Date.now();
+      const twentyFourHoursAgo = now - (24 * 60 * 60 * 1000);
+
+      const result = await ddb.send(new QueryCommand({
         TableName: SCOOPS_TABLE,
+        KeyConditionExpression: '#pk = :pk AND #sk > :sk',
         FilterExpression: 'id = :id',
-        ExpressionAttributeValues: { ':id': scoopId },
-        Limit: 1,
+        ExpressionAttributeNames: {
+          '#pk': SCOOP_PK,
+          '#sk': SCOOP_SK,
+        },
+        ExpressionAttributeValues: {
+          ':pk': `USER#${userId}`,
+          ':sk': `SCOOP#${twentyFourHoursAgo}`,
+          ':id': scoopId,
+        },
       }));
 
       const scoop = (result.Items || [])[0];

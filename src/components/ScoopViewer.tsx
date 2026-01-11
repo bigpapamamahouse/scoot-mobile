@@ -130,12 +130,17 @@ export const ScoopViewer: React.FC<ScoopViewerProps> = ({
   useEffect(() => {
     if (!isVideo || !player) return;
 
+    console.log('[ScoopViewer] Setting up video player for:', mediaUrl);
+
     const statusSubscription = player.addListener('statusChange', (event) => {
+      console.log('[ScoopViewer] Video status:', event.status);
       if (event.status === 'readyToPlay') {
         setMediaLoaded(true);
         if (player.duration && !videoDuration) {
           setVideoDuration(player.duration * 1000); // Convert to ms
         }
+      } else if (event.status === 'error') {
+        console.error('[ScoopViewer] Video error:', event.error);
       }
     });
 
@@ -147,7 +152,7 @@ export const ScoopViewer: React.FC<ScoopViewerProps> = ({
       statusSubscription.remove();
       endSubscription.remove();
     };
-  }, [isVideo, player, videoDuration, onComplete]);
+  }, [isVideo, player, videoDuration, onComplete, mediaUrl]);
 
   // Control video playback based on active/paused state
   useEffect(() => {
