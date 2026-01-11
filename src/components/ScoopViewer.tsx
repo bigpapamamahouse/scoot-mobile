@@ -229,8 +229,11 @@ export const ScoopViewer: React.FC<ScoopViewerProps> = ({
   const timeAgo = React.useMemo(() => {
     const now = Date.now();
     const diff = now - scoop.createdAt;
+    const seconds = Math.floor(diff / 1000);
+    const minutes = Math.floor(diff / (1000 * 60));
     const hours = Math.floor(diff / (1000 * 60 * 60));
-    if (hours < 1) return 'Just now';
+    if (seconds < 60) return `${seconds}s ago`;
+    if (minutes < 60) return `${minutes}m ago`;
     if (hours === 1) return '1h ago';
     return `${hours}h ago`;
   }, [scoop.createdAt]);

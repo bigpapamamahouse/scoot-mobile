@@ -3632,9 +3632,9 @@ module.exports.handler = async (event) => {
         }
       }
 
-      // Sort scoops within each user by createdAt (newest first)
+      // Sort scoops within each user by createdAt (oldest first)
       for (const entry of userScoopsMap.values()) {
-        entry.scoops.sort((a, b) => b.createdAt - a.createdAt);
+        entry.scoops.sort((a, b) => a.createdAt - b.createdAt);
       }
 
       // Sort by latest scoop and prioritize unviewed
@@ -3667,7 +3667,7 @@ module.exports.handler = async (event) => {
           ':pk': `USER#${userId}`,
           ':sk': `SCOOP#${twentyFourHoursAgo}`,
         },
-        ScanIndexForward: false,
+        ScanIndexForward: true, // oldest first
       }));
 
       const items = (result.Items || [])
@@ -3712,7 +3712,7 @@ module.exports.handler = async (event) => {
           ':pk': `USER#${targetUserId}`,
           ':sk': `SCOOP#${twentyFourHoursAgo}`,
         },
-        ScanIndexForward: false,
+        ScanIndexForward: true, // oldest first
       }));
 
       const items = (result.Items || [])
