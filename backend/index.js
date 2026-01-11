@@ -3808,11 +3808,11 @@ module.exports.handler = async (event) => {
       }
 
       // Scan to find scoop by ID (since we need both pk and sk for GetCommand)
+      // Note: No Limit here - Limit would only scan N items, not find N matches
       const result = await ddb.send(new ScanCommand({
         TableName: SCOOPS_TABLE,
         FilterExpression: 'id = :id',
         ExpressionAttributeValues: { ':id': scoopId },
-        Limit: 1,
       }));
 
       const scoop = (result.Items || [])[0];
@@ -3842,12 +3842,11 @@ module.exports.handler = async (event) => {
       const scoopId = path.split('/')[2];
       if (!scoopId) return bad('Missing scoopId', 400);
 
-      // Find the scoop first
+      // Find the scoop first (no Limit - it would only scan N items, not find N matches)
       const result = await ddb.send(new ScanCommand({
         TableName: SCOOPS_TABLE,
         FilterExpression: 'id = :id',
         ExpressionAttributeValues: { ':id': scoopId },
-        Limit: 1,
       }));
 
       const scoop = (result.Items || [])[0];
@@ -3886,12 +3885,11 @@ module.exports.handler = async (event) => {
       const scoopId = path.split('/')[2];
       if (!scoopId) return bad('Missing scoopId', 400);
 
-      // Find the scoop
+      // Find the scoop (no Limit - it would only scan N items, not find N matches)
       const result = await ddb.send(new ScanCommand({
         TableName: SCOOPS_TABLE,
         FilterExpression: 'id = :id',
         ExpressionAttributeValues: { ':id': scoopId },
-        Limit: 1,
       }));
 
       const scoop = (result.Items || [])[0];
