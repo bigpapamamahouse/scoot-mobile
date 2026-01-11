@@ -15,6 +15,7 @@ import {
   Alert,
 } from 'react-native';
 import { CameraView, CameraType, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
+import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme, spacing, typography } from '../theme';
 import { ScoopMediaType } from '../types';
@@ -186,6 +187,27 @@ export const ScoopCamera: React.FC<ScoopCameraProps> = ({
     }
   }, [isRecording, stopRecording, takePhoto]);
 
+  const pickFromGallery = useCallback(async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.All,
+        allowsEditing: true,
+        quality: 0.8,
+        videoMaxDuration: 10,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        const asset = result.assets[0];
+        const isVideo = asset.type === 'video';
+        const aspectRatio = (asset.width || SCREEN_WIDTH) / (asset.height || SCREEN_HEIGHT);
+        onCapture(asset.uri, isVideo ? 'video' : 'image', aspectRatio);
+      }
+    } catch (error) {
+      console.error('[ScoopCamera] Gallery picker error:', error);
+      Alert.alert('Error', 'Failed to pick from gallery');
+    }
+  }, [onCapture]);
+
   const formatDuration = (ms: number) => {
     const seconds = Math.floor(ms / 1000);
     const tenths = Math.floor((ms % 1000) / 100);
@@ -243,40 +265,56 @@ export const ScoopCamera: React.FC<ScoopCameraProps> = ({
         </View>
       )}
 
-      {/* Top controls */}
+      {/* Top controls - close button only */}
       <View style={styles.topControls}>
-        <TouchableOpacity style={styles.controlButton} onPress={onClose}>
-          <Ionicons name="close" size={28} color="#fff" />
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.controlButton} onPress={toggleFacing}>
-          <Ionicons name="camera-reverse-outline" size={28} color="#fff" />
+        <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+          <Ionicons name="close" size={32} color="#fff" />
         </TouchableOpacity>
       </View>
 
-      {/* Bottom controls */}
+      {/* Bottom controls - redesigned layout */}
       <View style={styles.bottomControls}>
         <Text style={styles.hintText}>
           {!isCameraReady ? 'Loading camera...' : isRecording ? 'Recording...' : 'Tap for photo, hold for video'}
         </Text>
 
-        {/* Shutter button */}
-        <TouchableOpacity
-          style={[
-            styles.shutterButton,
-            isRecording && styles.shutterButtonRecording,
-          ]}
-          onPressIn={handlePressIn}
-          onPressOut={handlePressOut}
-          activeOpacity={0.8}
-        >
-          <View
+        <View style={styles.controlsRow}>
+          {/* Gallery button */}
+          <TouchableOpacity
+            style={styles.sideButton}
+            onPress={pickFromGallery}
+            disabled={isRecording}
+          >
+            <Ionicons name="images-outline" size={28} color="#fff" />
+          </TouchableOpacity>
+
+          {/* Shutter button */}
+          <TouchableOpacity
             style={[
-              styles.shutterInner,
-              isRecording && styles.shutterInnerRecording,
+              styles.shutterButton,
+              isRecording && styles.shutterButtonRecording,
             ]}
-          />
-        </TouchableOpacity>
+            onPressIn={handlePressIn}
+            onPressOut={handlePressOut}
+            activeOpacity={0.8}
+          >
+            <View
+              style={[
+                styles.shutterInner,
+                isRecording && styles.shutterInnerRecording,
+              ]}
+            />
+          </TouchableOpacity>
+
+          {/* Flip camera button */}
+          <TouchableOpacity
+            style={styles.sideButton}
+            onPress={toggleFacing}
+            disabled={isRecording}
+          >
+            <Ionicons name="camera-reverse-outline" size={28} color="#fff" />
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   );
@@ -346,23 +384,23 @@ const styles = StyleSheet.create({
   },
   topControls: {
     position: 'absolute',
-    top: 60,
+    top: 16,
     left: spacing[4],
     right: spacing[4],
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
   },
-  controlButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+  closeButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: 'rgba(0,0,0,0.4)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   bottomControls: {
     position: 'absolute',
-    bottom: 50,
+    bottom: 40,
     left: 0,
     right: 0,
     alignItems: 'center',
@@ -371,6 +409,20 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.7)',
     fontSize: typography.fontSize.sm,
     marginBottom: spacing[4],
+  },
+  controlsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing[6],
+  },
+  sideButton: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   shutterButton: {
     width: 80,

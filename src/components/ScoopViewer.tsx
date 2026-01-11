@@ -351,24 +351,20 @@ export const ScoopViewer: React.FC<ScoopViewerProps> = ({
 
       {/* Footer for owner */}
       {isOwner && (
-        <View style={styles.ownerFooter}>
+        <View style={styles.ownerFooter} {...panResponder.panHandlers}>
           {/* Time remaining */}
           <View style={styles.timeRemainingBadge}>
             <Ionicons name="time-outline" size={18} color="#fff" />
             <Text style={styles.timeRemainingText}>{timeRemaining}</Text>
           </View>
 
-          {/* Views button */}
-          {onViewViewers && (
-            <TouchableWithoutFeedback onPress={onViewViewers}>
-              <View style={styles.viewersButton}>
-                <Ionicons name="eye-outline" size={20} color="#fff" />
-                <Text style={styles.viewersText}>
-                  {scoop.viewCount} {scoop.viewCount === 1 ? 'view' : 'views'}
-                </Text>
-              </View>
-            </TouchableWithoutFeedback>
-          )}
+          {/* Swipe up hint */}
+          <Animated.View style={[styles.swipeHint, { transform: [{ translateY: Animated.multiply(swipeAnim, -0.3) }] }]}>
+            <Ionicons name="chevron-up" size={20} color="rgba(255,255,255,0.8)" />
+            <Text style={styles.swipeHintText}>
+              {scoop.viewCount} {scoop.viewCount === 1 ? 'view' : 'views'}
+            </Text>
+          </Animated.View>
         </View>
       )}
     </View>
@@ -489,18 +485,17 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.sm,
     fontWeight: '500',
   },
-  viewersButton: {
-    flexDirection: 'row',
+  swipeHint: {
     alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.5)',
-    paddingHorizontal: spacing[3],
+    paddingHorizontal: spacing[4],
     paddingVertical: spacing[2],
     borderRadius: 20,
   },
-  viewersText: {
-    color: '#fff',
-    fontSize: typography.fontSize.sm,
-    marginLeft: spacing[2],
+  swipeHintText: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: typography.fontSize.xs,
+    marginTop: 2,
   },
 });
 

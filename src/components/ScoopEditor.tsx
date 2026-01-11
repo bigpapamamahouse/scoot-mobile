@@ -84,6 +84,7 @@ export const ScoopEditor: React.FC<ScoopEditorProps> = ({
   const [selectedFont, setSelectedFont] = useState<ScoopFontFamily>('default');
   const [selectedColor, setSelectedColor] = useState('#FFFFFF');
   const [selectedOverlayId, setSelectedOverlayId] = useState<string | null>(null);
+  const [tapPosition, setTapPosition] = useState<{ x: number; y: number }>({ x: 50, y: 50 });
   const textInputRef = useRef<TextInput>(null);
 
   const isVideo = mediaType === 'video';
@@ -101,22 +102,41 @@ export const ScoopEditor: React.FC<ScoopEditorProps> = ({
       return;
     }
 
+    // Convert tap position percentage to pixel position
+    const pixelX = (tapPosition.x / 100) * SCREEN_WIDTH;
+    const pixelY = (tapPosition.y / 100) * SCREEN_HEIGHT;
+
     const newOverlay: TextOverlayState = {
       id: `overlay-${Date.now()}`,
       text: currentText.trim(),
-      x: 50, // Center
-      y: 50, // Center
+      x: tapPosition.x,
+      y: tapPosition.y,
       fontFamily: selectedFont,
       fontSize: 24,
       color: selectedColor,
       backgroundColor: selectedColor === '#FFFFFF' ? 'rgba(0,0,0,0.5)' : undefined,
-      pan: new Animated.ValueXY({ x: SCREEN_WIDTH / 2 - 50, y: SCREEN_HEIGHT / 2 - 20 }),
+      pan: new Animated.ValueXY({ x: pixelX - 50, y: pixelY - 20 }),
     };
 
     setTextOverlays((prev) => [...prev, newOverlay]);
     setCurrentText('');
     setIsAddingText(false);
-  }, [currentText, selectedFont, selectedColor]);
+    setTapPosition({ x: 50, y: 50 }); // Reset for next time
+  }, [currentText, selectedFont, selectedColor, tapPosition]);
+
+  const handleMediaTap = useCallback((event: any) => {
+    // Get tap position relative to the media container
+    const { locationX, locationY } = event.nativeEvent;
+    const xPercent = (locationX / SCREEN_WIDTH) * 100;
+    const yPercent = (locationY / SCREEN_HEIGHT) * 100;
+
+    setTapPosition({ x: xPercent, y: yPercent });
+    setSelectedOverlayId(null); // Deselect any selected overlay
+    setIsAddingText(true);
+    setTimeout(() => {
+      textInputRef.current?.focus();
+    }, 100);
+  }, []);
 
   const removeOverlay = useCallback((id: string) => {
     setTextOverlays((prev) => prev.filter((o) => o.id !== id));
@@ -170,17 +190,14 @@ export const ScoopEditor: React.FC<ScoopEditorProps> = ({
     []
   );
 
-  const startAddingText = useCallback(() => {
-    setIsAddingText(true);
-    setTimeout(() => {
-      textInputRef.current?.focus();
-    }, 100);
-  }, []);
-
   return (
     <View style={styles.container}>
-      {/* Media preview */}
-      <View style={styles.mediaContainer}>
+      {/* Media preview - tap anywhere to add text */}
+      <TouchableOpacity
+        style={styles.mediaContainer}
+        activeOpacity={1}
+        onPress={handleMediaTap}
+      >
         {isVideo && player ? (
           <VideoView
             player={player}
@@ -235,7 +252,7 @@ export const ScoopEditor: React.FC<ScoopEditorProps> = ({
             </Animated.View>
           );
         })}
-      </View>
+      </TouchableOpacity>
 
       {/* Top controls */}
       <View style={styles.topControls}>
@@ -243,9 +260,10 @@ export const ScoopEditor: React.FC<ScoopEditorProps> = ({
           <Ionicons name="close" size={28} color="#fff" />
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.controlButton} onPress={startAddingText}>
-          <Ionicons name="text" size={24} color="#fff" />
-        </TouchableOpacity>
+        {/* Hint for tap to add text */}
+        <View style={styles.tapHint}>
+          <Text style={styles.tapHintText}>Tap to add text</Text>
+        </View>
       </View>
 
       {/* Bottom controls */}
@@ -379,6 +397,16 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.4)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  tapHint: {
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    paddingHorizontal: spacing[3],
+    paddingVertical: spacing[2],
+    borderRadius: 16,
+  },
+  tapHintText: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: typography.fontSize.xs,
   },
   bottomControls: {
     position: 'absolute',
