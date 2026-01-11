@@ -53,13 +53,11 @@ export const ScoopsBar: React.FC<ScoopsBarProps> = ({
     loadScoops();
   }, [loadScoops]);
 
-  const handlePressMyScoop = React.useCallback(() => {
+  const handlePressViewMyScoop = React.useCallback(() => {
     if (myScoops.length > 0 && onPressOwnScoops) {
       onPressOwnScoops(myScoops);
-    } else {
-      onPressCreate();
     }
-  }, [myScoops, onPressOwnScoops, onPressCreate]);
+  }, [myScoops, onPressOwnScoops]);
 
   const renderScoopItem = React.useCallback(
     ({ item }: { item: UserScoops }) => (
@@ -95,11 +93,28 @@ export const ScoopsBar: React.FC<ScoopsBarProps> = ({
     );
   }
 
-  // Don't show the bar if there are no scoops to display
-  if (scoopsFeed.length === 0 && myScoops.length === 0) {
+  // Show minimal bar when there are no other users' scoops
+  if (scoopsFeed.length === 0) {
     return (
-      <View style={styles.container}>
-        {/* Just show the "Your Scoop" button */}
+      <View style={[styles.container, styles.minimalContainer]}>
+        {/* User's scoop - shown when they have scoops */}
+        {myScoops.length > 0 && (
+          <View style={styles.scoopItem}>
+            <ScoopAvatar
+              avatarKey={currentUser?.avatarKey}
+              size={64}
+              hasUnviewed={true}
+              onPress={handlePressViewMyScoop}
+            />
+            <Text
+              style={[styles.handle, { color: colors.text.secondary }]}
+              numberOfLines={1}
+            >
+              Your Scoop
+            </Text>
+          </View>
+        )}
+        {/* Add scoop button - always visible */}
         <View style={styles.scoopItem}>
           <ScoopAvatar
             avatarKey={currentUser?.avatarKey}
@@ -112,7 +127,7 @@ export const ScoopsBar: React.FC<ScoopsBarProps> = ({
             style={[styles.handle, { color: colors.text.secondary }]}
             numberOfLines={1}
           >
-            Your Scoop
+            Add Scoop
           </Text>
         </View>
       </View>
@@ -129,21 +144,41 @@ export const ScoopsBar: React.FC<ScoopsBarProps> = ({
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.listContent}
         ListHeaderComponent={
-          <View style={styles.scoopItem}>
-            <ScoopAvatar
-              avatarKey={currentUser?.avatarKey}
-              size={64}
-              hasUnviewed={myScoops.length > 0}
-              onPress={handlePressMyScoop}
-              showAddButton={myScoops.length === 0}
-            />
-            <Text
-              style={[styles.handle, { color: colors.text.secondary }]}
-              numberOfLines={1}
-            >
-              {myScoops.length > 0 ? 'Your Scoop' : 'Add Scoop'}
-            </Text>
-          </View>
+          <>
+            {/* User's scoop - shown when they have scoops */}
+            {myScoops.length > 0 && (
+              <View style={styles.scoopItem}>
+                <ScoopAvatar
+                  avatarKey={currentUser?.avatarKey}
+                  size={64}
+                  hasUnviewed={true}
+                  onPress={handlePressViewMyScoop}
+                />
+                <Text
+                  style={[styles.handle, { color: colors.text.secondary }]}
+                  numberOfLines={1}
+                >
+                  Your Scoop
+                </Text>
+              </View>
+            )}
+            {/* Add scoop button - always visible */}
+            <View style={styles.scoopItem}>
+              <ScoopAvatar
+                avatarKey={currentUser?.avatarKey}
+                size={64}
+                hasUnviewed={false}
+                onPress={onPressCreate}
+                showAddButton
+              />
+              <Text
+                style={[styles.handle, { color: colors.text.secondary }]}
+                numberOfLines={1}
+              >
+                Add Scoop
+              </Text>
+            </View>
+          </>
         }
       />
     </View>
@@ -157,6 +192,10 @@ const createStyles = (colors: any) =>
       paddingVertical: spacing[3],
       borderBottomWidth: 1,
       borderBottomColor: colors.border.light,
+    },
+    minimalContainer: {
+      flexDirection: 'row',
+      paddingHorizontal: spacing[3],
     },
     loadingContainer: {
       height: 100,

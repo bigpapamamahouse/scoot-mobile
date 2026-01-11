@@ -259,11 +259,6 @@ export const ScoopEditor: React.FC<ScoopEditorProps> = ({
         <TouchableOpacity style={styles.controlButton} onPress={onDiscard}>
           <Ionicons name="close" size={28} color="#fff" />
         </TouchableOpacity>
-
-        {/* Hint for tap to add text */}
-        <View style={styles.tapHint}>
-          <Text style={styles.tapHintText}>Tap to add text</Text>
-        </View>
       </View>
 
       {/* Bottom controls */}
@@ -397,16 +392,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.4)',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  tapHint: {
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    paddingHorizontal: spacing[3],
-    paddingVertical: spacing[2],
-    borderRadius: 16,
-  },
-  tapHintText: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: typography.fontSize.xs,
   },
   bottomControls: {
     position: 'absolute',
