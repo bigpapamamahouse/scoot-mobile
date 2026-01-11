@@ -250,7 +250,7 @@ export default function MyScoopsScreen({ navigation, route }: any) {
                 <Ionicons
                   name="trash-outline"
                   size={16}
-                  color={colors.status.error}
+                  color={colors.error.main}
                 />
               </TouchableOpacity>
             </View>
