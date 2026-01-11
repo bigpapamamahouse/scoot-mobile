@@ -3552,6 +3552,11 @@ module.exports.handler = async (event) => {
     }
 
     // ===================== SCOOPS (Stories) =====================
+    // SCOOPS_TABLE schema:
+    //   Partition key: "USER#<userId>" (String) - attribute name is literally "USER#<userId>"
+    //   Sort key: "SCOOP#<timestamp>#<uuid>" (String) - attribute name is literally "SCOOP#<timestamp>#<uuid>"
+    const SCOOP_PK = 'USER#<userId>';
+    const SCOOP_SK = 'SCOOP#<timestamp>#<uuid>';
 
     // Get scoops feed - returns scoops from followed users grouped by user
     if (route === 'GET /scoops/feed') {
@@ -3574,48 +3579,62 @@ module.exports.handler = async (event) => {
         }
       }
 
-      // Get scoops from each followed user
+      // Get all recent scoops with a single scan
+      const scoopsResult = await ddb.send(new ScanCommand({
+        TableName: SCOOPS_TABLE,
+        FilterExpression: 'expiresAt > :now AND createdAt > :minTime',
+        ExpressionAttributeValues: {
+          ':now': now,
+          ':minTime': twentyFourHoursAgo,
+        },
+      }));
+
+      // Group scoops by user
       const userScoopsMap = new Map();
 
-      for (const followedId of followedUsers) {
-        const scoopsResult = await ddb.send(new QueryCommand({
-          TableName: SCOOPS_TABLE,
-          KeyConditionExpression: 'pk = :pk AND sk > :sk',
-          ExpressionAttributeValues: {
-            ':pk': `USER#${followedId}`,
-            ':sk': `SCOOP#${twentyFourHoursAgo}`,
-          },
-          ScanIndexForward: false,
-        }));
+      for (const s of (scoopsResult.Items || [])) {
+        // Only include scoops from followed users
+        if (!followedUsers.includes(s.userId)) continue;
 
-        const scoops = (scoopsResult.Items || [])
-          .filter(s => s.expiresAt > now)
-          .map(s => ({
-            id: s.id,
+        const scoop = {
+          id: s.id,
+          pk: s[SCOOP_PK],
+          sk: s[SCOOP_SK],
+          userId: s.userId,
+          handle: s.handle,
+          avatarKey: s.avatarKey,
+          mediaKey: s.mediaKey,
+          mediaType: s.mediaType,
+          mediaAspectRatio: s.mediaAspectRatio,
+          textOverlays: s.textOverlays,
+          createdAt: s.createdAt,
+          expiresAt: s.expiresAt,
+          viewCount: s.viewCount || 0,
+          viewed: (s.viewers || []).includes(userId),
+        };
+
+        if (!userScoopsMap.has(s.userId)) {
+          userScoopsMap.set(s.userId, {
             userId: s.userId,
             handle: s.handle,
             avatarKey: s.avatarKey,
-            mediaKey: s.mediaKey,
-            mediaType: s.mediaType,
-            mediaAspectRatio: s.mediaAspectRatio,
-            textOverlays: s.textOverlays,
-            createdAt: s.createdAt,
-            expiresAt: s.expiresAt,
-            viewCount: s.viewCount || 0,
-            viewed: (s.viewers || []).includes(userId),
-          }));
-
-        if (scoops.length > 0) {
-          const hasUnviewed = scoops.some(s => !s.viewed);
-          userScoopsMap.set(followedId, {
-            userId: followedId,
-            handle: scoops[0].handle,
-            avatarKey: scoops[0].avatarKey,
-            scoops,
-            hasUnviewed,
-            latestScoopAt: scoops[0].createdAt,
+            scoops: [],
+            hasUnviewed: false,
+            latestScoopAt: 0,
           });
         }
+
+        const userEntry = userScoopsMap.get(s.userId);
+        userEntry.scoops.push(scoop);
+        if (!scoop.viewed) userEntry.hasUnviewed = true;
+        if (scoop.createdAt > userEntry.latestScoopAt) {
+          userEntry.latestScoopAt = scoop.createdAt;
+        }
+      }
+
+      // Sort scoops within each user by createdAt (newest first)
+      for (const entry of userScoopsMap.values()) {
+        entry.scoops.sort((a, b) => b.createdAt - a.createdAt);
       }
 
       // Sort by latest scoop and prioritize unviewed
@@ -3636,9 +3655,14 @@ module.exports.handler = async (event) => {
       const now = Date.now();
       const twentyFourHoursAgo = now - (24 * 60 * 60 * 1000);
 
+      // Query by partition key
       const result = await ddb.send(new QueryCommand({
         TableName: SCOOPS_TABLE,
-        KeyConditionExpression: 'pk = :pk AND sk > :sk',
+        KeyConditionExpression: '#pk = :pk AND #sk > :sk',
+        ExpressionAttributeNames: {
+          '#pk': SCOOP_PK,
+          '#sk': SCOOP_SK,
+        },
         ExpressionAttributeValues: {
           ':pk': `USER#${userId}`,
           ':sk': `SCOOP#${twentyFourHoursAgo}`,
@@ -3676,9 +3700,14 @@ module.exports.handler = async (event) => {
       const now = Date.now();
       const twentyFourHoursAgo = now - (24 * 60 * 60 * 1000);
 
+      // Query by partition key
       const result = await ddb.send(new QueryCommand({
         TableName: SCOOPS_TABLE,
-        KeyConditionExpression: 'pk = :pk AND sk > :sk',
+        KeyConditionExpression: '#pk = :pk AND #sk > :sk',
+        ExpressionAttributeNames: {
+          '#pk': SCOOP_PK,
+          '#sk': SCOOP_SK,
+        },
         ExpressionAttributeValues: {
           ':pk': `USER#${targetUserId}`,
           ':sk': `SCOOP#${twentyFourHoursAgo}`,
@@ -3731,9 +3760,10 @@ module.exports.handler = async (event) => {
       }));
       const avatarKey = userInfo.Item?.avatarKey || null;
 
+      // Create item with literal key attribute names
       const item = {
-        pk: `USER#${userId}`,
-        sk: `SCOOP#${now}#${id}`,
+        [SCOOP_PK]: `USER#${userId}`,
+        [SCOOP_SK]: `SCOOP#${now}#${id}`,
         id,
         userId,
         handle,
@@ -3777,7 +3807,7 @@ module.exports.handler = async (event) => {
         return bad('Not found', 404);
       }
 
-      // Scan to find scoop by ID (since we don't know the user)
+      // Scan to find scoop by ID (since we need both pk and sk for GetCommand)
       const result = await ddb.send(new ScanCommand({
         TableName: SCOOPS_TABLE,
         FilterExpression: 'id = :id',
@@ -3812,7 +3842,7 @@ module.exports.handler = async (event) => {
       const scoopId = path.split('/')[2];
       if (!scoopId) return bad('Missing scoopId', 400);
 
-      // Find the scoop
+      // Find the scoop first
       const result = await ddb.send(new ScanCommand({
         TableName: SCOOPS_TABLE,
         FilterExpression: 'id = :id',
@@ -3836,10 +3866,13 @@ module.exports.handler = async (event) => {
         }
       }
 
-      // Delete from DynamoDB
+      // Delete from DynamoDB using the actual key values
       await ddb.send(new DeleteCommand({
         TableName: SCOOPS_TABLE,
-        Key: { pk: scoop.pk, sk: scoop.sk },
+        Key: {
+          [SCOOP_PK]: scoop[SCOOP_PK],
+          [SCOOP_SK]: scoop[SCOOP_SK],
+        },
       }));
 
       return ok({ success: true });
@@ -3878,7 +3911,10 @@ module.exports.handler = async (event) => {
       // Add viewer and increment count
       await ddb.send(new UpdateCommand({
         TableName: SCOOPS_TABLE,
-        Key: { pk: scoop.pk, sk: scoop.sk },
+        Key: {
+          [SCOOP_PK]: scoop[SCOOP_PK],
+          [SCOOP_SK]: scoop[SCOOP_SK],
+        },
         UpdateExpression: 'SET viewers = list_append(if_not_exists(viewers, :empty), :viewer), viewCount = if_not_exists(viewCount, :zero) + :one',
         ExpressionAttributeValues: {
           ':viewer': [userId],
