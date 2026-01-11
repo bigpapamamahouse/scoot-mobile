@@ -169,7 +169,7 @@ export default function FeedScreen({ navigation }: any){
   }, [navigation]);
 
   const handlePressOwnScoops = React.useCallback((scoops: Scoop[]) => {
-    navigation.navigate('ScoopViewer', { scoops, isOwner: true });
+    navigation.navigate('MyScoops', { initialScoops: scoops });
   }, [navigation]);
 
   return (

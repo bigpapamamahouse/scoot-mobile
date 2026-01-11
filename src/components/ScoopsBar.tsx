@@ -133,7 +133,7 @@ export const ScoopsBar: React.FC<ScoopsBarProps> = ({
             <ScoopAvatar
               avatarKey={currentUser?.avatarKey}
               size={64}
-              hasUnviewed={false}
+              hasUnviewed={myScoops.length > 0}
               onPress={handlePressMyScoop}
               showAddButton={myScoops.length === 0}
             />

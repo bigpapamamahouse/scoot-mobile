@@ -201,6 +201,16 @@ export const ScoopViewer: React.FC<ScoopViewerProps> = ({
     return `${hours}h ago`;
   }, [scoop.createdAt]);
 
+  const timeRemaining = React.useMemo(() => {
+    const now = Date.now();
+    const remaining = scoop.expiresAt - now;
+    if (remaining <= 0) return 'Expired';
+    const hours = Math.floor(remaining / (1000 * 60 * 60));
+    const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
+    if (hours > 0) return `${hours}h ${minutes}m left`;
+    return `${minutes}m left`;
+  }, [scoop.expiresAt]);
+
   return (
     <View style={styles.container}>
       {/* Media */}
@@ -306,15 +316,26 @@ export const ScoopViewer: React.FC<ScoopViewerProps> = ({
       </View>
 
       {/* Footer for owner */}
-      {isOwner && onViewViewers && (
-        <TouchableWithoutFeedback onPress={onViewViewers}>
-          <View style={styles.viewersButton}>
-            <Ionicons name="eye-outline" size={20} color="#fff" />
-            <Text style={styles.viewersText}>
-              {scoop.viewCount} {scoop.viewCount === 1 ? 'view' : 'views'}
-            </Text>
+      {isOwner && (
+        <View style={styles.ownerFooter}>
+          {/* Time remaining */}
+          <View style={styles.timeRemainingBadge}>
+            <Ionicons name="time-outline" size={18} color="#fff" />
+            <Text style={styles.timeRemainingText}>{timeRemaining}</Text>
           </View>
-        </TouchableWithoutFeedback>
+
+          {/* Views button */}
+          {onViewViewers && (
+            <TouchableWithoutFeedback onPress={onViewViewers}>
+              <View style={styles.viewersButton}>
+                <Ionicons name="eye-outline" size={20} color="#fff" />
+                <Text style={styles.viewersText}>
+                  {scoop.viewCount} {scoop.viewCount === 1 ? 'view' : 'views'}
+                </Text>
+              </View>
+            </TouchableWithoutFeedback>
+          )}
+        </View>
       )}
     </View>
   );
@@ -411,10 +432,30 @@ const styles = StyleSheet.create({
     paddingVertical: spacing[1],
     borderRadius: 4,
   },
-  viewersButton: {
+  ownerFooter: {
     position: 'absolute',
     bottom: 50,
     left: spacing[4],
+    right: spacing[4],
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  timeRemainingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    paddingHorizontal: spacing[3],
+    paddingVertical: spacing[2],
+    borderRadius: 20,
+    gap: spacing[1],
+  },
+  timeRemainingText: {
+    color: '#fff',
+    fontSize: typography.fontSize.sm,
+    fontWeight: '500',
+  },
+  viewersButton: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.5)',
