@@ -13,6 +13,7 @@ import {
   TouchableWithoutFeedback,
   Animated,
   ActivityIndicator,
+  PanResponder,
 } from 'react-native';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { Ionicons } from '@expo/vector-icons';
@@ -186,6 +187,39 @@ export const ScoopViewer: React.FC<ScoopViewerProps> = ({
   const handleLongPressOut = useCallback(() => {
     onPauseChange(false);
   }, [onPauseChange]);
+
+  // Swipe up gesture for viewers (owner only)
+  const swipeAnim = useRef(new Animated.Value(0)).current;
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        // Only respond to vertical swipes when owner
+        return isOwner && Math.abs(gestureState.dy) > 10 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx);
+      },
+      onPanResponderGrant: () => {
+        onPauseChange(true);
+      },
+      onPanResponderMove: (_, gestureState) => {
+        // Only allow upward swipes (negative dy)
+        if (gestureState.dy < 0) {
+          swipeAnim.setValue(Math.abs(gestureState.dy));
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        onPauseChange(false);
+        // If swiped up enough, show viewers
+        if (gestureState.dy < -100 && onViewViewers) {
+          onViewViewers();
+        }
+        // Reset animation
+        Animated.spring(swipeAnim, {
+          toValue: 0,
+          useNativeDriver: false,
+        }).start();
+      },
+    })
+  ).current;
 
   const progressWidth = progressAnim.interpolate({
     inputRange: [0, 1],

@@ -169,7 +169,8 @@ export default function FeedScreen({ navigation }: any){
   }, [navigation]);
 
   const handlePressOwnScoops = React.useCallback((scoops: Scoop[]) => {
-    navigation.navigate('MyScoops', { initialScoops: scoops });
+    // Go directly to viewer for immediate viewing experience
+    navigation.navigate('ScoopViewer', { scoops, isOwner: true });
   }, [navigation]);
 
   return (
