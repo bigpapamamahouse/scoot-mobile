@@ -26,7 +26,7 @@ const MAX_VIDEO_DURATION = 10000; // 10 seconds
 const MAX_ZOOM = 0.5; // Maximum zoom level (0-1 range for expo-camera)
 
 interface ScoopCameraProps {
-  onCapture: (uri: string, type: ScoopMediaType, aspectRatio: number) => void;
+  onCapture: (uri: string, type: ScoopMediaType, aspectRatio: number, isFromGallery: boolean, videoDuration?: number) => void;
   onClose: () => void;
 }
 
@@ -165,7 +165,7 @@ export const ScoopCamera: React.FC<ScoopCameraProps> = ({
 
       if (photo?.uri) {
         const aspectRatio = (photo.width || SCREEN_WIDTH) / (photo.height || SCREEN_HEIGHT);
-        onCapture(photo.uri, 'image', aspectRatio);
+        onCapture(photo.uri, 'image', aspectRatio, false);
       }
     } catch (error: any) {
       console.error('[ScoopCamera] Failed to take photo:', error);
@@ -210,7 +210,7 @@ export const ScoopCamera: React.FC<ScoopCameraProps> = ({
 
       if (video?.uri) {
         const aspectRatio = SCREEN_WIDTH / SCREEN_HEIGHT; // Assuming full-screen capture
-        onCapture(video.uri, 'video', aspectRatio);
+        onCapture(video.uri, 'video', aspectRatio, false);
       }
     } catch (error: any) {
       console.error('[ScoopCamera] Failed to record video:', error);
@@ -257,8 +257,8 @@ export const ScoopCamera: React.FC<ScoopCameraProps> = ({
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.All,
-        allowsEditing: true,
-        quality: 0.8,
+        allowsEditing: false, // We'll handle cropping in the editor
+        quality: 1.0, // Keep full quality, we'll compress later
         videoMaxDuration: 10,
       });
 
@@ -266,7 +266,9 @@ export const ScoopCamera: React.FC<ScoopCameraProps> = ({
         const asset = result.assets[0];
         const isVideo = asset.type === 'video';
         const aspectRatio = (asset.width || SCREEN_WIDTH) / (asset.height || SCREEN_HEIGHT);
-        onCapture(asset.uri, isVideo ? 'video' : 'image', aspectRatio);
+        // Duration is in milliseconds, convert to seconds
+        const durationInSeconds = isVideo && asset.duration ? asset.duration / 1000 : undefined;
+        onCapture(asset.uri, isVideo ? 'video' : 'image', aspectRatio, true, durationInSeconds);
       }
     } catch (error) {
       console.error('[ScoopCamera] Gallery picker error:', error);

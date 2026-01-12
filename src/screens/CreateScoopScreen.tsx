@@ -13,11 +13,14 @@ import { ScoopsAPI } from '../api';
 import { uploadMedia } from '../lib/upload';
 import { ScoopMediaType, ScoopTextOverlay } from '../types';
 import { useTheme } from '../theme';
+import { VideoTrimParams } from '../components/ScoopEditor';
 
 type EditorState = {
   uri: string;
   type: ScoopMediaType;
   aspectRatio: number;
+  isFromGallery: boolean;
+  videoDuration?: number; // Duration in seconds for videos
 };
 
 export default function CreateScoopScreen({ navigation }: any) {
@@ -26,8 +29,8 @@ export default function CreateScoopScreen({ navigation }: any) {
   const [isPublishing, setIsPublishing] = useState(false);
 
   const handleCapture = useCallback(
-    (uri: string, type: ScoopMediaType, aspectRatio: number) => {
-      setEditorState({ uri, type, aspectRatio });
+    (uri: string, type: ScoopMediaType, aspectRatio: number, isFromGallery: boolean, videoDuration?: number) => {
+      setEditorState({ uri, type, aspectRatio, isFromGallery, videoDuration });
     },
     []
   );
@@ -41,7 +44,7 @@ export default function CreateScoopScreen({ navigation }: any) {
   }, [navigation]);
 
   const handlePublish = useCallback(
-    async (textOverlays: ScoopTextOverlay[]) => {
+    async (textOverlays: ScoopTextOverlay[], trimParams?: VideoTrimParams) => {
       if (!editorState) return;
 
       setIsPublishing(true);
@@ -52,6 +55,7 @@ export default function CreateScoopScreen({ navigation }: any) {
           uri: editorState.uri,
           type: editorState.type,
           aspectRatio: editorState.aspectRatio,
+          trimParams,
         });
 
         const mediaKey = await uploadMedia({
@@ -65,11 +69,12 @@ export default function CreateScoopScreen({ navigation }: any) {
           throw new Error('Failed to upload media');
         }
 
-        // Create the scoop
+        // Create the scoop with optional trim params for server-side processing
         console.log('[CreateScoopScreen] Creating scoop with:', {
           mediaKey,
           mediaType: editorState.type,
           mediaAspectRatio: editorState.aspectRatio,
+          trimParams,
         });
 
         const result = await ScoopsAPI.createScoop({
@@ -77,6 +82,8 @@ export default function CreateScoopScreen({ navigation }: any) {
           mediaType: editorState.type,
           mediaAspectRatio: editorState.aspectRatio,
           textOverlays: textOverlays.length > 0 ? textOverlays : undefined,
+          // Note: trimParams would be passed to backend for server-side video trimming
+          // For now, we log it - full implementation would require FFmpeg on server
         });
 
         console.log('[CreateScoopScreen] Scoop created:', result);
@@ -112,8 +119,10 @@ export default function CreateScoopScreen({ navigation }: any) {
           mediaUri={editorState.uri}
           mediaType={editorState.type}
           aspectRatio={editorState.aspectRatio}
+          videoDuration={editorState.videoDuration}
           onPublish={handlePublish}
           onDiscard={handleDiscard}
+          isFromGallery={editorState.isFromGallery}
         />
       ) : (
         <ScoopCamera onCapture={handleCapture} onClose={handleClose} />
