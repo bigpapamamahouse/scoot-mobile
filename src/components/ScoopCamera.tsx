@@ -255,6 +255,17 @@ export const ScoopCamera: React.FC<ScoopCameraProps> = ({
 
   const pickFromGallery = useCallback(async () => {
     try {
+      // Request media library permissions first (required for iOS 14+)
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permission Required',
+          'Please grant photo library access to select photos and videos.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.All,
         allowsEditing: false, // We'll handle cropping in the editor
@@ -272,7 +283,7 @@ export const ScoopCamera: React.FC<ScoopCameraProps> = ({
       }
     } catch (error) {
       console.error('[ScoopCamera] Gallery picker error:', error);
-      Alert.alert('Error', 'Failed to pick from gallery');
+      Alert.alert('Error', 'Failed to pick from gallery. Please try again.');
     }
   }, [onCapture]);
 
