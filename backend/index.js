@@ -2,6 +2,9 @@
 // ---------- CommonJS + AWS SDK v3 ----------
 const crypto = require('crypto');
 const { randomUUID } = require('crypto');
+const { execSync } = require('child_process');
+const fs = require('fs');
+const path = require('path');
 
 const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
 const {
@@ -62,6 +65,128 @@ const ddb = DynamoDBDocumentClient.from(ddbClient, {
 const s3 = new S3Client({});
 const cognito = new CognitoIdentityProviderClient({});
 const bedrock = new BedrockRuntimeClient({ region: 'us-east-1' });
+
+// ---------- Video Processing with FFmpeg ----------
+// FFmpeg is provided via Lambda Layer: arn:aws:lambda:us-east-1:678705476278:layer:ffmpeg:1
+// Or you can use a custom layer built from https://github.com/serverlesspub/ffmpeg-aws-lambda-layer
+const FFMPEG_PATH = process.env.FFMPEG_PATH || '/opt/bin/ffmpeg';
+
+/**
+ * Process video: trim to specified segment and compress
+ * @param {string} bucket - S3 bucket name
+ * @param {string} key - S3 object key
+ * @param {number} startTime - Start time in seconds
+ * @param {number} endTime - End time in seconds
+ * @returns {Promise<string>} - New S3 key for processed video
+ */
+async function processVideo(bucket, key, startTime, endTime) {
+  const timestamp = Date.now();
+  const tmpInput = `/tmp/input_${timestamp}.mp4`;
+  const tmpOutput = `/tmp/output_${timestamp}.mp4`;
+
+  try {
+    console.log(`[VideoProcess] Downloading video from s3://${bucket}/${key}`);
+
+    // Download video from S3
+    const getResult = await s3.send(new GetObjectCommand({
+      Bucket: bucket,
+      Key: key,
+    }));
+
+    // Stream the body to a file
+    const chunks = [];
+    for await (const chunk of getResult.Body) {
+      chunks.push(chunk);
+    }
+    fs.writeFileSync(tmpInput, Buffer.concat(chunks));
+    console.log(`[VideoProcess] Downloaded ${fs.statSync(tmpInput).size} bytes`);
+
+    // Calculate duration
+    const duration = endTime - startTime;
+    console.log(`[VideoProcess] Trimming from ${startTime}s to ${endTime}s (${duration}s)`);
+
+    // Check if FFmpeg is available
+    try {
+      execSync(`${FFMPEG_PATH} -version`, { stdio: 'pipe' });
+    } catch (e) {
+      console.error('[VideoProcess] FFmpeg not available at', FFMPEG_PATH);
+      // Return original key if FFmpeg is not available
+      fs.unlinkSync(tmpInput);
+      return key;
+    }
+
+    // Build FFmpeg command:
+    // -ss: seek to start time (before -i for fast seeking)
+    // -t: duration
+    // -c:v libx264: H.264 video codec
+    // -crf 28: quality (lower = better, 23 is default, 28 is good for mobile)
+    // -preset fast: encoding speed vs compression ratio
+    // -c:a aac: AAC audio codec
+    // -b:a 128k: audio bitrate
+    // -movflags +faststart: optimize for web streaming
+    const cmd = [
+      FFMPEG_PATH,
+      '-y', // Overwrite output file
+      '-ss', startTime.toString(), // Seek to start time
+      '-i', tmpInput,
+      '-t', duration.toString(), // Duration
+      '-c:v', 'libx264',
+      '-crf', '28',
+      '-preset', 'fast',
+      '-c:a', 'aac',
+      '-b:a', '128k',
+      '-movflags', '+faststart',
+      '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2', // Ensure even dimensions
+      tmpOutput,
+    ].join(' ');
+
+    console.log(`[VideoProcess] Running: ${cmd}`);
+    execSync(cmd, {
+      maxBuffer: 50 * 1024 * 1024, // 50MB buffer
+      timeout: 120000, // 2 minute timeout
+    });
+
+    const outputSize = fs.statSync(tmpOutput).size;
+    console.log(`[VideoProcess] Output file size: ${outputSize} bytes`);
+
+    // Upload processed video back to S3
+    const processedKey = key.replace(/(\.[^.]+)$/, '_processed$1');
+    console.log(`[VideoProcess] Uploading to s3://${bucket}/${processedKey}`);
+
+    await s3.send(new PutObjectCommand({
+      Bucket: bucket,
+      Key: processedKey,
+      Body: fs.readFileSync(tmpOutput),
+      ContentType: 'video/mp4',
+    }));
+
+    console.log('[VideoProcess] Upload complete');
+
+    // Clean up temp files
+    fs.unlinkSync(tmpInput);
+    fs.unlinkSync(tmpOutput);
+
+    // Delete original file
+    try {
+      await s3.send(new DeleteObjectCommand({
+        Bucket: bucket,
+        Key: key,
+      }));
+      console.log('[VideoProcess] Deleted original file');
+    } catch (e) {
+      console.warn('[VideoProcess] Failed to delete original:', e.message);
+    }
+
+    return processedKey;
+  } catch (error) {
+    console.error('[VideoProcess] Error:', error);
+    // Clean up temp files on error
+    try { fs.unlinkSync(tmpInput); } catch (e) {}
+    try { fs.unlinkSync(tmpOutput); } catch (e) {}
+    // Return original key on error
+    return key;
+  }
+}
 
 // ---------- CORS + response helpers ----------
 
@@ -3741,11 +3866,27 @@ module.exports.handler = async (event) => {
       if (!userId) return bad('Unauthorized', 401);
 
       const body = JSON.parse(event.body || '{}');
-      const { mediaKey, mediaType, mediaAspectRatio, textOverlays } = body;
+      const { mediaKey, mediaType, mediaAspectRatio, textOverlays, trimParams } = body;
 
       if (!mediaKey) return bad('Missing mediaKey', 400);
       if (!mediaType || !['image', 'video'].includes(mediaType)) {
         return bad('Invalid mediaType', 400);
+      }
+
+      // Process video if trim params are provided
+      let finalMediaKey = mediaKey;
+      if (mediaType === 'video' && trimParams && MEDIA_BUCKET) {
+        const { startTime, endTime } = trimParams;
+        if (typeof startTime === 'number' && typeof endTime === 'number' && endTime > startTime) {
+          console.log(`[CreateScoop] Processing video with trim: ${startTime}s - ${endTime}s`);
+          try {
+            finalMediaKey = await processVideo(MEDIA_BUCKET, mediaKey, startTime, endTime);
+            console.log(`[CreateScoop] Video processed, new key: ${finalMediaKey}`);
+          } catch (e) {
+            console.error('[CreateScoop] Video processing failed:', e);
+            // Continue with original key if processing fails
+          }
+        }
       }
 
       const now = Date.now();
@@ -3768,7 +3909,7 @@ module.exports.handler = async (event) => {
         userId,
         handle,
         avatarKey,
-        mediaKey,
+        mediaKey: finalMediaKey,
         mediaType,
         mediaAspectRatio: mediaAspectRatio || null,
         textOverlays: textOverlays || [],
@@ -3788,7 +3929,7 @@ module.exports.handler = async (event) => {
         userId,
         handle,
         avatarKey,
-        mediaKey,
+        mediaKey: finalMediaKey,
         mediaType,
         mediaAspectRatio,
         textOverlays,

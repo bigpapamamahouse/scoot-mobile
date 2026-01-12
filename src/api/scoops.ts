@@ -1,11 +1,17 @@
 import { api } from './client';
 import { Scoop, ScoopViewer, UserScoops, ScoopTextOverlay, ScoopMediaType } from '../types';
 
+export interface VideoTrimParams {
+  startTime: number;
+  endTime: number;
+}
+
 export interface CreateScoopPayload {
   mediaKey: string;
   mediaType: ScoopMediaType;
   mediaAspectRatio?: number;
   textOverlays?: ScoopTextOverlay[];
+  trimParams?: VideoTrimParams;
 }
 
 /**

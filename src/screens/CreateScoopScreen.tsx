@@ -82,8 +82,7 @@ export default function CreateScoopScreen({ navigation }: any) {
           mediaType: editorState.type,
           mediaAspectRatio: editorState.aspectRatio,
           textOverlays: textOverlays.length > 0 ? textOverlays : undefined,
-          // Note: trimParams would be passed to backend for server-side video trimming
-          // For now, we log it - full implementation would require FFmpeg on server
+          trimParams: trimParams || undefined,
         });
 
         console.log('[CreateScoopScreen] Scoop created:', result);
