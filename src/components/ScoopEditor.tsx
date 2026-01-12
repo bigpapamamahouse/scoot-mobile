@@ -169,6 +169,23 @@ export const ScoopEditor: React.FC<ScoopEditorProps> = ({
     player.play();
   });
 
+  // Handle trimmed video playback - loop only within the trimmed segment
+  useEffect(() => {
+    if (!player || !trimParams) return;
+
+    // Seek to trim start
+    player.currentTime = trimParams.startTime;
+
+    // Set up interval to check if we've passed the end time
+    const checkInterval = setInterval(() => {
+      if (player.currentTime >= trimParams.endTime) {
+        player.currentTime = trimParams.startTime;
+      }
+    }, 100);
+
+    return () => clearInterval(checkInterval);
+  }, [player, trimParams]);
+
   // Pan responder for cropping gestures
   const cropPanResponder = useRef(
     PanResponder.create({
