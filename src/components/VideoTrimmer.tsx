@@ -66,35 +66,64 @@ export const VideoTrimmer: React.FC<VideoTrimmerProps> = ({
   useEffect(() => {
     if (!player) return;
 
+    console.log('[VideoTrimmer] Setting up player listeners for:', videoUri);
+
     const subscription = player.addListener('statusChange', (status) => {
-      if (status.status === 'readyToPlay' && status.duration) {
-        setDuration(status.duration);
+      console.log('[VideoTrimmer] Status change:', JSON.stringify(status));
+      if (status.status === 'readyToPlay') {
+        console.log('[VideoTrimmer] Ready to play, duration from status:', status.duration);
+        // Try to get duration from status or from player directly
+        const videoDuration = status.duration || player.duration;
+        console.log('[VideoTrimmer] Player duration property:', player.duration);
+        if (videoDuration && videoDuration > 0) {
+          console.log('[VideoTrimmer] Setting duration:', videoDuration);
+          setDuration(videoDuration);
+        }
       }
     });
 
-    return () => subscription.remove();
-  }, [player]);
+    // Fallback: poll for duration if status event doesn't provide it
+    const durationPollInterval = setInterval(() => {
+      if (player.duration && player.duration > 0 && duration === 0) {
+        console.log('[VideoTrimmer] Got duration from polling:', player.duration);
+        setDuration(player.duration);
+      }
+    }, 200);
+
+    return () => {
+      subscription.remove();
+      clearInterval(durationPollInterval);
+    };
+  }, [player, videoUri, duration]);
 
   // Generate thumbnails
   useEffect(() => {
-    if (duration <= 0) return;
+    if (duration <= 0) {
+      console.log('[VideoTrimmer] Skipping thumbnail generation, duration:', duration);
+      return;
+    }
 
     const generateThumbnails = async () => {
+      console.log('[VideoTrimmer] Starting thumbnail generation for duration:', duration);
       setIsLoadingThumbnails(true);
       const newThumbnails: string[] = [];
 
       try {
         for (let i = 0; i < THUMBNAIL_COUNT; i++) {
           const time = (i / THUMBNAIL_COUNT) * duration * 1000; // Convert to milliseconds
+          console.log(`[VideoTrimmer] Generating thumbnail ${i + 1}/${THUMBNAIL_COUNT} at ${time}ms`);
           const thumbnail = await VideoThumbnails.getThumbnailAsync(videoUri, {
             time,
             quality: 0.5,
           });
           newThumbnails.push(thumbnail.uri);
         }
+        console.log('[VideoTrimmer] All thumbnails generated successfully');
         setThumbnails(newThumbnails);
       } catch (error) {
         console.error('[VideoTrimmer] Failed to generate thumbnails:', error);
+        // Still allow trimming even if thumbnails fail
+        setThumbnails([]);
       }
 
       setIsLoadingThumbnails(false);
@@ -229,9 +258,17 @@ export const VideoTrimmer: React.FC<VideoTrimmerProps> = ({
         <View style={styles.timeline}>
           {/* Thumbnails */}
           <View style={styles.thumbnailsContainer}>
-            {isLoadingThumbnails ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
+            {duration <= 0 ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="small" color="#fff" />
+                <Text style={styles.loadingText}>Loading video...</Text>
+              </View>
+            ) : isLoadingThumbnails ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="small" color="#fff" />
+                <Text style={styles.loadingText}>Generating preview...</Text>
+              </View>
+            ) : thumbnails.length > 0 ? (
               thumbnails.map((uri, index) => (
                 <Image
                   key={index}
@@ -239,6 +276,10 @@ export const VideoTrimmer: React.FC<VideoTrimmerProps> = ({
                   style={[styles.thumbnail, { width: TIMELINE_WIDTH / THUMBNAIL_COUNT }]}
                 />
               ))
+            ) : (
+              <View style={styles.noThumbnails}>
+                <Text style={styles.loadingText}>Preview unavailable</Text>
+              </View>
             )}
           </View>
 
@@ -359,10 +400,26 @@ const styles = StyleSheet.create({
     height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: 'rgba(50,50,50,0.8)',
   },
   thumbnail: {
     height: '100%',
     resizeMode: 'cover',
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  loadingText: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: typography.fontSize.sm,
+  },
+  noThumbnails: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   selectionOverlay: {
     position: 'absolute',
