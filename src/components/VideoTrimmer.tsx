@@ -45,6 +45,17 @@ export const VideoTrimmer: React.FC<VideoTrimmerProps> = ({
 
   const selectionRef = useRef({ startTime: 0, isDragging: false });
   const playbackIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const durationRef = useRef(0);
+  const playerRef = useRef(player);
+
+  // Keep refs updated with current values for pan responder
+  useEffect(() => {
+    durationRef.current = duration;
+  }, [duration]);
+
+  useEffect(() => {
+    playerRef.current = player;
+  }, [player]);
 
   // Calculate end time based on start time
   const endTime = useMemo(() => {
@@ -162,29 +173,30 @@ export const VideoTrimmer: React.FC<VideoTrimmerProps> = ({
   }, [isPlaying, player, startTime, endTime]);
 
   // Pan responder for dragging the selection window
+  // Uses refs to access current values since PanResponder captures values at creation time
   const selectionPanResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
       onPanResponderGrant: () => {
-        selectionRef.current.startTime = startTime;
         selectionRef.current.isDragging = true;
       },
       onPanResponderMove: (_, gestureState) => {
-        if (duration <= 0) return;
+        const currentDuration = durationRef.current;
+        if (currentDuration <= 0) return;
 
         // Calculate time change from drag
-        const timePerPixel = duration / TIMELINE_WIDTH;
+        const timePerPixel = currentDuration / TIMELINE_WIDTH;
         const timeDelta = gestureState.dx * timePerPixel;
         let newStartTime = selectionRef.current.startTime + timeDelta;
 
         // Clamp to valid range
-        newStartTime = Math.max(0, Math.min(duration - MAX_DURATION, newStartTime));
+        newStartTime = Math.max(0, Math.min(currentDuration - MAX_DURATION, newStartTime));
         setStartTime(newStartTime);
 
         // Update video position
-        if (player) {
-          player.currentTime = newStartTime;
+        if (playerRef.current) {
+          playerRef.current.currentTime = newStartTime;
           setCurrentTime(newStartTime);
         }
       },
@@ -193,6 +205,13 @@ export const VideoTrimmer: React.FC<VideoTrimmerProps> = ({
       },
     })
   ).current;
+
+  // Keep selectionRef.startTime in sync with startTime state
+  useEffect(() => {
+    if (!selectionRef.current.isDragging) {
+      selectionRef.current.startTime = startTime;
+    }
+  }, [startTime]);
 
   const handlePlayPause = useCallback(() => {
     if (!player) return;
