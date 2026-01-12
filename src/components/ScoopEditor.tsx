@@ -128,6 +128,7 @@ export const ScoopEditor: React.FC<ScoopEditorProps> = ({
   const needsTrimming = isFromGallery && mediaType === 'video' && (videoDuration ?? 0) > 10;
   const [isTrimming, setIsTrimming] = useState(needsTrimming);
   const [trimParams, setTrimParams] = useState<VideoTrimParams | null>(null);
+  const [detectedVideoDuration, setDetectedVideoDuration] = useState<number | null>(null);
 
   // Animation values for cropping
   const cropScale = useRef(new Animated.Value(1)).current;
@@ -185,6 +186,38 @@ export const ScoopEditor: React.FC<ScoopEditorProps> = ({
 
     return () => clearInterval(checkInterval);
   }, [player, trimParams]);
+
+  // For videos that skip the trimmer, detect duration and set default trimParams for compression
+  useEffect(() => {
+    if (!isVideo || isTrimming || trimParams) return;
+
+    // If we have videoDuration from props, use it
+    if (videoDuration && videoDuration > 0) {
+      console.log('[ScoopEditor] Setting default trimParams from prop duration:', videoDuration);
+      const endTime = Math.min(videoDuration, 10); // Cap at 10 seconds
+      setTrimParams({ startTime: 0, endTime });
+      setDetectedVideoDuration(videoDuration);
+      return;
+    }
+
+    // Otherwise, try to get duration from player
+    if (!player) return;
+
+    const checkDuration = () => {
+      if (player.duration && player.duration > 0 && !detectedVideoDuration) {
+        console.log('[ScoopEditor] Setting default trimParams from player duration:', player.duration);
+        const endTime = Math.min(player.duration, 10); // Cap at 10 seconds
+        setTrimParams({ startTime: 0, endTime });
+        setDetectedVideoDuration(player.duration);
+      }
+    };
+
+    // Check immediately and poll
+    checkDuration();
+    const pollInterval = setInterval(checkDuration, 200);
+
+    return () => clearInterval(pollInterval);
+  }, [isVideo, isTrimming, trimParams, videoDuration, player, detectedVideoDuration]);
 
   // Pan responder for cropping gestures
   const cropPanResponder = useRef(
