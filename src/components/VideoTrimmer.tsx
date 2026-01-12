@@ -1,7 +1,7 @@
 /**
  * VideoTrimmer Component
- * Allows users to select a 10-second segment from a longer video
- * Shows video preview, timeline with thumbnails, and selection handles
+ * Allows users to select up to a 10-second segment from a longer video
+ * Shows video preview, timeline with thumbnails, and draggable selection handles
  */
 
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
@@ -22,8 +22,10 @@ import { spacing, typography } from '../theme';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const MAX_DURATION = 10; // Max 10 seconds
+const MIN_DURATION = 1; // Min 1 second
 const TIMELINE_WIDTH = SCREEN_WIDTH - 48; // Padding on each side
 const THUMBNAIL_COUNT = 10; // Number of thumbnails to show
+const HANDLE_WIDTH = 16; // Width of drag handles
 
 interface VideoTrimmerProps {
   videoUri: string;
@@ -38,17 +40,20 @@ export const VideoTrimmer: React.FC<VideoTrimmerProps> = ({
 }) => {
   const [duration, setDuration] = useState(0);
   const [startTime, setStartTime] = useState(0);
+  const [endTime, setEndTime] = useState(0);
   const [thumbnails, setThumbnails] = useState<string[]>([]);
   const [isLoadingThumbnails, setIsLoadingThumbnails] = useState(true);
   const [currentTime, setCurrentTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
 
-  const selectionRef = useRef({ startTime: 0, isDragging: false });
+  const selectionRef = useRef({ startTime: 0, endTime: 0, isDragging: false, dragType: '' as 'left' | 'right' | 'middle' | '' });
   const playbackIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const durationRef = useRef(0);
   const playerRef = useRef(player);
+  const startTimeRef = useRef(0);
+  const endTimeRef = useRef(0);
 
-  // Keep refs updated with current values for pan responder
+  // Keep refs updated with current values for pan responders
   useEffect(() => {
     durationRef.current = duration;
   }, [duration]);
@@ -57,10 +62,21 @@ export const VideoTrimmer: React.FC<VideoTrimmerProps> = ({
     playerRef.current = player;
   }, [player]);
 
-  // Calculate end time based on start time
-  const endTime = useMemo(() => {
-    return Math.min(startTime + MAX_DURATION, duration);
-  }, [startTime, duration]);
+  useEffect(() => {
+    startTimeRef.current = startTime;
+  }, [startTime]);
+
+  useEffect(() => {
+    endTimeRef.current = endTime;
+  }, [endTime]);
+
+  // Initialize endTime when duration is first set
+  useEffect(() => {
+    if (duration > 0 && endTime === 0) {
+      const initialEnd = Math.min(duration, MAX_DURATION);
+      setEndTime(initialEnd);
+    }
+  }, [duration, endTime]);
 
   // Calculate actual selection duration
   const selectionDuration = useMemo(() => {
@@ -172,29 +188,31 @@ export const VideoTrimmer: React.FC<VideoTrimmerProps> = ({
     };
   }, [isPlaying, player, startTime, endTime]);
 
-  // Pan responder for dragging the selection window
-  // Uses refs to access current values since PanResponder captures values at creation time
-  const selectionPanResponder = useRef(
+  // Pan responder for left handle (adjusts start time)
+  const leftHandlePanResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
       onPanResponderGrant: () => {
+        selectionRef.current.startTime = startTimeRef.current;
         selectionRef.current.isDragging = true;
+        selectionRef.current.dragType = 'left';
       },
       onPanResponderMove: (_, gestureState) => {
         const currentDuration = durationRef.current;
+        const currentEndTime = endTimeRef.current;
         if (currentDuration <= 0) return;
 
-        // Calculate time change from drag
         const timePerPixel = currentDuration / TIMELINE_WIDTH;
         const timeDelta = gestureState.dx * timePerPixel;
         let newStartTime = selectionRef.current.startTime + timeDelta;
 
-        // Clamp to valid range
-        newStartTime = Math.max(0, Math.min(currentDuration - MAX_DURATION, newStartTime));
+        // Clamp: can't go below 0, can't get closer than MIN_DURATION to end, can't exceed MAX_DURATION
+        const minStart = Math.max(0, currentEndTime - MAX_DURATION);
+        const maxStart = currentEndTime - MIN_DURATION;
+        newStartTime = Math.max(minStart, Math.min(maxStart, newStartTime));
         setStartTime(newStartTime);
 
-        // Update video position
         if (playerRef.current) {
           playerRef.current.currentTime = newStartTime;
           setCurrentTime(newStartTime);
@@ -202,16 +220,89 @@ export const VideoTrimmer: React.FC<VideoTrimmerProps> = ({
       },
       onPanResponderRelease: () => {
         selectionRef.current.isDragging = false;
+        selectionRef.current.dragType = '';
       },
     })
   ).current;
 
-  // Keep selectionRef.startTime in sync with startTime state
-  useEffect(() => {
-    if (!selectionRef.current.isDragging) {
-      selectionRef.current.startTime = startTime;
-    }
-  }, [startTime]);
+  // Pan responder for right handle (adjusts end time)
+  const rightHandlePanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: () => {
+        selectionRef.current.endTime = endTimeRef.current;
+        selectionRef.current.isDragging = true;
+        selectionRef.current.dragType = 'right';
+      },
+      onPanResponderMove: (_, gestureState) => {
+        const currentDuration = durationRef.current;
+        const currentStartTime = startTimeRef.current;
+        if (currentDuration <= 0) return;
+
+        const timePerPixel = currentDuration / TIMELINE_WIDTH;
+        const timeDelta = gestureState.dx * timePerPixel;
+        let newEndTime = selectionRef.current.endTime + timeDelta;
+
+        // Clamp: can't exceed duration, must be at least MIN_DURATION from start, can't exceed MAX_DURATION
+        const minEnd = currentStartTime + MIN_DURATION;
+        const maxEnd = Math.min(currentDuration, currentStartTime + MAX_DURATION);
+        newEndTime = Math.max(minEnd, Math.min(maxEnd, newEndTime));
+        setEndTime(newEndTime);
+      },
+      onPanResponderRelease: () => {
+        selectionRef.current.isDragging = false;
+        selectionRef.current.dragType = '';
+      },
+    })
+  ).current;
+
+  // Pan responder for middle area (moves entire selection)
+  const middlePanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: () => {
+        selectionRef.current.startTime = startTimeRef.current;
+        selectionRef.current.endTime = endTimeRef.current;
+        selectionRef.current.isDragging = true;
+        selectionRef.current.dragType = 'middle';
+      },
+      onPanResponderMove: (_, gestureState) => {
+        const currentDuration = durationRef.current;
+        if (currentDuration <= 0) return;
+
+        const timePerPixel = currentDuration / TIMELINE_WIDTH;
+        const timeDelta = gestureState.dx * timePerPixel;
+        const selectionLength = selectionRef.current.endTime - selectionRef.current.startTime;
+
+        let newStartTime = selectionRef.current.startTime + timeDelta;
+        let newEndTime = selectionRef.current.endTime + timeDelta;
+
+        // Clamp to valid range
+        if (newStartTime < 0) {
+          newStartTime = 0;
+          newEndTime = selectionLength;
+        }
+        if (newEndTime > currentDuration) {
+          newEndTime = currentDuration;
+          newStartTime = currentDuration - selectionLength;
+        }
+
+        setStartTime(newStartTime);
+        setEndTime(newEndTime);
+
+        if (playerRef.current) {
+          playerRef.current.currentTime = newStartTime;
+          setCurrentTime(newStartTime);
+        }
+      },
+      onPanResponderRelease: () => {
+        selectionRef.current.isDragging = false;
+        selectionRef.current.dragType = '';
+      },
+    })
+  ).current;
 
   const handlePlayPause = useCallback(() => {
     if (!player) return;
@@ -272,7 +363,7 @@ export const VideoTrimmer: React.FC<VideoTrimmerProps> = ({
 
       {/* Timeline */}
       <View style={styles.timelineContainer}>
-        <Text style={styles.timelineLabel}>Drag to select 10 seconds</Text>
+        <Text style={styles.timelineLabel}>Drag handles to select up to 10 seconds</Text>
 
         <View style={styles.timeline}>
           {/* Thumbnails */}
@@ -311,15 +402,26 @@ export const VideoTrimmer: React.FC<VideoTrimmerProps> = ({
                 width: selectionWidth,
               },
             ]}
-            {...selectionPanResponder.panHandlers}
           >
-            {/* Left handle */}
-            <View style={[styles.handle, styles.handleLeft]}>
+            {/* Left handle - draggable */}
+            <View
+              style={[styles.handle, styles.handleLeft]}
+              {...leftHandlePanResponder.panHandlers}
+            >
               <View style={styles.handleBar} />
             </View>
 
-            {/* Right handle */}
-            <View style={[styles.handle, styles.handleRight]}>
+            {/* Middle area - draggable to move whole selection */}
+            <View
+              style={styles.middleArea}
+              {...middlePanResponder.panHandlers}
+            />
+
+            {/* Right handle - draggable */}
+            <View
+              style={[styles.handle, styles.handleRight]}
+              {...rightHandlePanResponder.panHandlers}
+            >
               <View style={styles.handleBar} />
             </View>
           </View>
@@ -444,35 +546,39 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 0,
     bottom: 0,
-    borderWidth: 2,
+    borderTopWidth: 2,
+    borderBottomWidth: 2,
     borderColor: '#007AFF',
     backgroundColor: 'transparent',
     zIndex: 10,
+    flexDirection: 'row',
+    alignItems: 'stretch',
   },
   handle: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
     width: 16,
     backgroundColor: '#007AFF',
     justifyContent: 'center',
     alignItems: 'center',
   },
   handleLeft: {
-    left: -2,
     borderTopLeftRadius: 4,
     borderBottomLeftRadius: 4,
+    marginLeft: -2,
   },
   handleRight: {
-    right: -2,
     borderTopRightRadius: 4,
     borderBottomRightRadius: 4,
+    marginRight: -2,
   },
   handleBar: {
     width: 4,
     height: 24,
     backgroundColor: '#fff',
     borderRadius: 2,
+  },
+  middleArea: {
+    flex: 1,
+    height: '100%',
   },
   dimmedArea: {
     position: 'absolute',
