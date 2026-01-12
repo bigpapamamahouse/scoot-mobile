@@ -48,22 +48,38 @@ export default function CreateScoopScreen({ navigation }: any) {
 
       try {
         // Upload the media
+        console.log('[CreateScoopScreen] Uploading media:', {
+          uri: editorState.uri,
+          type: editorState.type,
+          aspectRatio: editorState.aspectRatio,
+        });
+
         const mediaKey = await uploadMedia({
           uri: editorState.uri,
           intent: 'scoop-media',
         });
+
+        console.log('[CreateScoopScreen] Media uploaded, key:', mediaKey);
 
         if (!mediaKey) {
           throw new Error('Failed to upload media');
         }
 
         // Create the scoop
-        await ScoopsAPI.createScoop({
+        console.log('[CreateScoopScreen] Creating scoop with:', {
+          mediaKey,
+          mediaType: editorState.type,
+          mediaAspectRatio: editorState.aspectRatio,
+        });
+
+        const result = await ScoopsAPI.createScoop({
           mediaKey,
           mediaType: editorState.type,
           mediaAspectRatio: editorState.aspectRatio,
           textOverlays: textOverlays.length > 0 ? textOverlays : undefined,
         });
+
+        console.log('[CreateScoopScreen] Scoop created:', result);
 
         Alert.alert('Success', 'Your scoop has been shared!', [
           {

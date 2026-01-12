@@ -11,6 +11,7 @@ import {
   StyleSheet,
   Dimensions,
   TouchableWithoutFeedback,
+  TouchableOpacity,
   Animated,
   ActivityIndicator,
   PanResponder,
@@ -37,6 +38,7 @@ interface ScoopViewerProps {
   onPauseChange: (paused: boolean) => void;
   isOwner?: boolean;
   onViewViewers?: () => void;
+  onDelete?: () => void;
 }
 
 const getFontStyle = (fontFamily: ScoopFontFamily) => {
@@ -62,6 +64,7 @@ export const ScoopViewer: React.FC<ScoopViewerProps> = ({
   onPauseChange,
   isOwner = false,
   onViewViewers,
+  onDelete,
 }) => {
   const { colors } = useTheme();
   const progressAnim = useRef(new Animated.Value(0)).current;
@@ -366,6 +369,13 @@ export const ScoopViewer: React.FC<ScoopViewerProps> = ({
             <Text style={styles.timeRemainingText}>{timeRemaining}</Text>
           </View>
 
+          {/* Delete button */}
+          {onDelete && (
+            <TouchableOpacity style={styles.deleteButton} onPress={onDelete}>
+              <Ionicons name="trash-outline" size={22} color="#fff" />
+            </TouchableOpacity>
+          )}
+
           {/* Swipe up hint */}
           <Animated.View style={[styles.swipeHint, { transform: [{ translateY: Animated.multiply(swipeAnim, -0.3) }] }]}>
             <Ionicons name="chevron-up" size={20} color="rgba(255,255,255,0.8)" />
@@ -492,6 +502,14 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: typography.fontSize.sm,
     fontWeight: '500',
+  },
+  deleteButton: {
+    backgroundColor: 'rgba(255,59,48,0.8)',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   swipeHint: {
     alignItems: 'center',

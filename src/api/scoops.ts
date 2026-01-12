@@ -28,6 +28,7 @@ export async function getScoopsFeed(): Promise<UserScoops[]> {
 export async function getMyScoops(): Promise<Scoop[]> {
   try {
     const response = await api('/scoops/me');
+    console.log('[ScoopsAPI] getMyScoops response:', JSON.stringify(response, null, 2));
     return response.items || response || [];
   } catch (error: any) {
     console.warn('[ScoopsAPI] Failed to get my scoops:', error?.message);

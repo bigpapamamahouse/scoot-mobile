@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { View, StyleSheet, Dimensions, StatusBar } from 'react-native';
+import { View, StyleSheet, Dimensions, StatusBar, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ScoopViewer } from '../components/ScoopViewer';
 import { ScoopsAPI } from '../api';
@@ -26,9 +26,10 @@ export default function ScoopViewerScreen({ navigation, route }: any) {
   const { currentUser } = useCurrentUser();
 
   // Get scoops from either userScoops or direct scoops array
-  const scoops = params.userScoops?.scoops || params.scoops || [];
+  const initialScoops = params.userScoops?.scoops || params.scoops || [];
   const isOwner = params.isOwner ?? (params.userScoops?.userId === currentUser?.id);
 
+  const [scoops, setScoops] = useState<Scoop[]>(initialScoops);
   const [currentIndex, setCurrentIndex] = useState(params.initialIndex || 0);
   const [isPaused, setIsPaused] = useState(false);
   const [viewedScoops, setViewedScoops] = useState<Set<string>>(new Set());
@@ -68,6 +69,42 @@ export default function ScoopViewerScreen({ navigation, route }: any) {
       navigation.navigate('ScoopViewers', { scoopId: currentScoop.id });
     }
   }, [currentScoop, navigation]);
+
+  const handleDelete = useCallback(() => {
+    if (!currentScoop || !isOwner) return;
+
+    Alert.alert(
+      'Delete Scoop',
+      'Are you sure you want to delete this scoop?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await ScoopsAPI.deleteScoop(currentScoop.id);
+
+              // Remove from local state
+              const newScoops = scoops.filter(s => s.id !== currentScoop.id);
+
+              if (newScoops.length === 0) {
+                navigation.goBack();
+              } else {
+                setScoops(newScoops);
+                // Adjust index if needed
+                if (currentIndex >= newScoops.length) {
+                  setCurrentIndex(newScoops.length - 1);
+                }
+              }
+            } catch (error: any) {
+              Alert.alert('Error', error?.message || 'Failed to delete scoop');
+            }
+          },
+        },
+      ]
+    );
+  }, [currentScoop, isOwner, scoops, currentIndex, navigation]);
 
   if (!currentScoop || scoops.length === 0) {
     navigation.goBack();
@@ -112,6 +149,7 @@ export default function ScoopViewerScreen({ navigation, route }: any) {
         onPauseChange={setIsPaused}
         isOwner={isOwner}
         onViewViewers={handleViewViewers}
+        onDelete={isOwner ? handleDelete : undefined}
       />
     </View>
   );
