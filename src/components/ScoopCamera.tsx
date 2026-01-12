@@ -14,8 +14,6 @@ import {
   Animated,
   Alert,
   PanResponder,
-  GestureResponderEvent,
-  PanResponderGestureState,
 } from 'react-native';
 import { CameraView, CameraType, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
@@ -51,8 +49,13 @@ export const ScoopCamera: React.FC<ScoopCameraProps> = ({
   const pressTimer = useRef<NodeJS.Timeout | null>(null);
   const isLongPress = useRef(false);
   const isRecordingRef = useRef(false);
-  const initialY = useRef(0);
-  const zoomRef = useRef(0);
+  const shutterStartY = useRef(0);
+  const isCameraReadyRef = useRef(false);
+
+  // Refs for functions that pan responder needs to call
+  const startRecordingRef = useRef<() => void>(() => {});
+  const stopRecordingRef = useRef<() => void>(() => {});
+  const takePhotoRef = useRef<() => void>(() => {});
 
   // Keep refs in sync with state
   useEffect(() => {
@@ -60,26 +63,62 @@ export const ScoopCamera: React.FC<ScoopCameraProps> = ({
   }, [isRecording]);
 
   useEffect(() => {
-    zoomRef.current = zoom;
-  }, [zoom]);
+    isCameraReadyRef.current = isCameraReady;
+  }, [isCameraReady]);
 
-  // Pan responder for zoom gesture during recording
-  const panResponder = useRef(
+  // Shutter button pan responder - handles press, hold for video, and zoom gesture
+  const shutterPanResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponder: (_, gestureState) => {
-        // Only capture pan if we're recording and there's significant vertical movement
-        return isRecordingRef.current && Math.abs(gestureState.dy) > 10;
-      },
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
       onPanResponderGrant: (_, gestureState) => {
-        initialY.current = gestureState.y0;
+        shutterStartY.current = gestureState.y0;
+        isLongPress.current = false;
+
+        // Start timer to detect long press for video recording
+        pressTimer.current = setTimeout(() => {
+          isLongPress.current = true;
+          // Start recording via ref
+          if (cameraRef.current && !isRecordingRef.current && isCameraReadyRef.current) {
+            startRecordingRef.current();
+          }
+        }, 200);
       },
       onPanResponderMove: (_, gestureState) => {
-        // Moving up (negative dy) increases zoom
-        // Scale so full screen swipe goes from 0 to MAX_ZOOM
-        const zoomDelta = -gestureState.dy / (SCREEN_HEIGHT * 0.5) * MAX_ZOOM;
-        const newZoom = Math.max(0, Math.min(MAX_ZOOM, zoomRef.current + zoomDelta * 0.05));
-        setZoom(newZoom);
+        // Only zoom while recording
+        if (isRecordingRef.current) {
+          // Moving up (negative dy) increases zoom
+          const zoomDelta = -(gestureState.y0 - shutterStartY.current + gestureState.dy) / (SCREEN_HEIGHT * 0.3);
+          const newZoom = Math.max(0, Math.min(MAX_ZOOM, zoomDelta));
+          setZoom(newZoom);
+        }
+      },
+      onPanResponderRelease: () => {
+        if (pressTimer.current) {
+          clearTimeout(pressTimer.current);
+          pressTimer.current = null;
+        }
+
+        if (isRecordingRef.current) {
+          // Was recording, stop it
+          stopRecordingRef.current();
+        } else if (!isLongPress.current) {
+          // Was a short tap, take photo
+          takePhotoRef.current();
+        }
+
+        // Reset zoom when releasing
+        setZoom(0);
+      },
+      onPanResponderTerminate: () => {
+        if (pressTimer.current) {
+          clearTimeout(pressTimer.current);
+          pressTimer.current = null;
+        }
+        if (isRecordingRef.current) {
+          stopRecordingRef.current();
+        }
+        setZoom(0);
       },
     })
   ).current;
@@ -201,30 +240,18 @@ export const ScoopCamera: React.FC<ScoopCameraProps> = ({
     }
   }, [isRecording, recordingProgress]);
 
-  const handlePressIn = useCallback(() => {
-    isLongPress.current = false;
+  // Update function refs so pan responder can call them
+  useEffect(() => {
+    takePhotoRef.current = takePhoto;
+  }, [takePhoto]);
 
-    // Start timer to detect long press
-    pressTimer.current = setTimeout(() => {
-      isLongPress.current = true;
-      startRecording();
-    }, 200);
+  useEffect(() => {
+    startRecordingRef.current = startRecording;
   }, [startRecording]);
 
-  const handlePressOut = useCallback(() => {
-    if (pressTimer.current) {
-      clearTimeout(pressTimer.current);
-      pressTimer.current = null;
-    }
-
-    if (isRecording) {
-      // Was recording, stop it
-      stopRecording();
-    } else if (!isLongPress.current) {
-      // Was a short tap, take photo
-      takePhoto();
-    }
-  }, [isRecording, stopRecording, takePhoto]);
+  useEffect(() => {
+    stopRecordingRef.current = stopRecording;
+  }, [stopRecording]);
 
   const pickFromGallery = useCallback(async () => {
     try {
@@ -281,7 +308,7 @@ export const ScoopCamera: React.FC<ScoopCameraProps> = ({
   });
 
   return (
-    <View style={styles.container} {...panResponder.panHandlers}>
+    <View style={styles.container}>
       <CameraView
         ref={cameraRef}
         style={styles.camera}
@@ -322,7 +349,7 @@ export const ScoopCamera: React.FC<ScoopCameraProps> = ({
       {/* Bottom controls - redesigned layout */}
       <View style={styles.bottomControls}>
         <Text style={styles.hintText}>
-          {!isCameraReady ? 'Loading camera...' : isRecording ? 'Recording...' : 'Tap for photo, hold for video'}
+          {!isCameraReady ? 'Loading camera...' : isRecording ? 'Slide up to zoom' : 'Tap for photo, hold for video'}
         </Text>
 
         <View style={styles.controlsRow}>
@@ -335,15 +362,13 @@ export const ScoopCamera: React.FC<ScoopCameraProps> = ({
             <Ionicons name="images-outline" size={28} color="#fff" />
           </TouchableOpacity>
 
-          {/* Shutter button */}
-          <TouchableOpacity
+          {/* Shutter button with pan responder for zoom */}
+          <View
             style={[
               styles.shutterButton,
               isRecording && styles.shutterButtonRecording,
             ]}
-            onPressIn={handlePressIn}
-            onPressOut={handlePressOut}
-            activeOpacity={0.8}
+            {...shutterPanResponder.panHandlers}
           >
             <View
               style={[
@@ -351,7 +376,7 @@ export const ScoopCamera: React.FC<ScoopCameraProps> = ({
                 isRecording && styles.shutterInnerRecording,
               ]}
             />
-          </TouchableOpacity>
+          </View>
 
           {/* Flip camera button */}
           <TouchableOpacity
