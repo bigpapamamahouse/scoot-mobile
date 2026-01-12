@@ -85,6 +85,36 @@ async function processVideo(bucket, key, startTime, endTime) {
   const tmpOutput = `/tmp/output_${timestamp}.mp4`;
 
   try {
+    // Log Lambda environment info for debugging
+    console.log('[VideoProcess] === Environment Debug Info ===');
+    console.log(`[VideoProcess] FFMPEG_PATH env: ${process.env.FFMPEG_PATH || '(not set, using default)'}`);
+    console.log(`[VideoProcess] Expected FFmpeg location: ${FFMPEG_PATH}`);
+    console.log(`[VideoProcess] Lambda memory: ${process.env.AWS_LAMBDA_FUNCTION_MEMORY_SIZE || 'unknown'} MB`);
+    console.log(`[VideoProcess] Lambda temp space: checking /tmp...`);
+
+    // Check /opt directory (where Lambda layers are mounted)
+    try {
+      const optContents = fs.existsSync('/opt') ? fs.readdirSync('/opt') : [];
+      console.log(`[VideoProcess] /opt contents: ${JSON.stringify(optContents)}`);
+      if (fs.existsSync('/opt/bin')) {
+        const optBinContents = fs.readdirSync('/opt/bin');
+        console.log(`[VideoProcess] /opt/bin contents: ${JSON.stringify(optBinContents)}`);
+      } else {
+        console.log('[VideoProcess] /opt/bin does NOT exist - Lambda layer may not be attached!');
+      }
+    } catch (e) {
+      console.error('[VideoProcess] Error checking /opt:', e.message);
+    }
+
+    // Check /tmp space
+    try {
+      const tmpStats = execSync('df -h /tmp 2>/dev/null || echo "df not available"', { encoding: 'utf8' });
+      console.log(`[VideoProcess] /tmp disk space:\n${tmpStats}`);
+    } catch (e) {
+      console.log('[VideoProcess] Could not check /tmp space');
+    }
+
+    console.log('[VideoProcess] === Starting Video Processing ===');
     console.log(`[VideoProcess] Downloading video from s3://${bucket}/${key}`);
 
     // Download video from S3
@@ -107,9 +137,15 @@ async function processVideo(bucket, key, startTime, endTime) {
 
     // Check if FFmpeg is available
     try {
-      execSync(`${FFMPEG_PATH} -version`, { stdio: 'pipe' });
+      const ffmpegVersion = execSync(`${FFMPEG_PATH} -version`, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
+      const versionLine = ffmpegVersion.split('\n')[0];
+      console.log(`[VideoProcess] FFmpeg found: ${versionLine}`);
     } catch (e) {
       console.error('[VideoProcess] FFmpeg not available at', FFMPEG_PATH);
+      console.error('[VideoProcess] FFmpeg check error:', e.message);
+      if (e.stderr) console.error('[VideoProcess] FFmpeg stderr:', e.stderr.toString());
+      // Check if file exists
+      console.log(`[VideoProcess] File exists at ${FFMPEG_PATH}:`, fs.existsSync(FFMPEG_PATH));
       // Return original key if FFmpeg is not available
       fs.unlinkSync(tmpInput);
       return key;
@@ -141,13 +177,40 @@ async function processVideo(bucket, key, startTime, endTime) {
     ].join(' ');
 
     console.log(`[VideoProcess] Running: ${cmd}`);
-    execSync(cmd, {
-      maxBuffer: 50 * 1024 * 1024, // 50MB buffer
-      timeout: 120000, // 2 minute timeout
-    });
+    const inputSize = fs.statSync(tmpInput).size;
+    const startProcessTime = Date.now();
 
+    try {
+      const result = execSync(cmd, {
+        maxBuffer: 50 * 1024 * 1024, // 50MB buffer
+        timeout: 120000, // 2 minute timeout
+        encoding: 'utf8',
+        stdio: ['pipe', 'pipe', 'pipe'],
+      });
+      if (result) console.log(`[VideoProcess] FFmpeg stdout: ${result}`);
+    } catch (execError) {
+      // FFmpeg outputs progress to stderr, so we need to check if output file was created
+      if (execError.stderr) {
+        console.log(`[VideoProcess] FFmpeg stderr (last 500 chars): ${execError.stderr.toString().slice(-500)}`);
+      }
+      // Check if output file was created despite error
+      if (!fs.existsSync(tmpOutput)) {
+        console.error('[VideoProcess] FFmpeg failed - no output file created');
+        console.error('[VideoProcess] FFmpeg error:', execError.message);
+        throw execError;
+      }
+      console.log('[VideoProcess] FFmpeg completed (stderr had content but output file exists)');
+    }
+
+    const processTime = Date.now() - startProcessTime;
     const outputSize = fs.statSync(tmpOutput).size;
-    console.log(`[VideoProcess] Output file size: ${outputSize} bytes`);
+    const compressionRatio = ((1 - outputSize / inputSize) * 100).toFixed(1);
+
+    console.log(`[VideoProcess] === Processing Results ===`);
+    console.log(`[VideoProcess] Input size: ${(inputSize / 1024 / 1024).toFixed(2)} MB`);
+    console.log(`[VideoProcess] Output size: ${(outputSize / 1024 / 1024).toFixed(2)} MB`);
+    console.log(`[VideoProcess] Compression: ${compressionRatio}% reduction`);
+    console.log(`[VideoProcess] Processing time: ${(processTime / 1000).toFixed(1)}s`);
 
     // Upload processed video back to S3
     const processedKey = key.replace(/(\.[^.]+)$/, '_processed$1');
@@ -3875,8 +3938,11 @@ module.exports.handler = async (event) => {
 
       // Process video if trim params are provided
       let finalMediaKey = mediaKey;
+      console.log(`[CreateScoop] Video processing check - mediaType: ${mediaType}, trimParams: ${JSON.stringify(trimParams)}, MEDIA_BUCKET: ${MEDIA_BUCKET ? 'set' : 'NOT SET'}`);
+
       if (mediaType === 'video' && trimParams && MEDIA_BUCKET) {
         const { startTime, endTime } = trimParams;
+        console.log(`[CreateScoop] trimParams validation - startTime: ${startTime} (${typeof startTime}), endTime: ${endTime} (${typeof endTime})`);
         if (typeof startTime === 'number' && typeof endTime === 'number' && endTime > startTime) {
           console.log(`[CreateScoop] Processing video with trim: ${startTime}s - ${endTime}s`);
           try {
@@ -3886,6 +3952,16 @@ module.exports.handler = async (event) => {
             console.error('[CreateScoop] Video processing failed:', e);
             // Continue with original key if processing fails
           }
+        } else {
+          console.log(`[CreateScoop] Skipping video processing - invalid trimParams`);
+        }
+      } else {
+        if (mediaType !== 'video') {
+          console.log(`[CreateScoop] Skipping video processing - mediaType is '${mediaType}', not 'video'`);
+        } else if (!trimParams) {
+          console.log(`[CreateScoop] Skipping video processing - no trimParams provided`);
+        } else if (!MEDIA_BUCKET) {
+          console.log(`[CreateScoop] Skipping video processing - MEDIA_BUCKET not configured`);
         }
       }
 
