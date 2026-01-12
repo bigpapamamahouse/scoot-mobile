@@ -110,7 +110,7 @@ export const VideoTrimmer: React.FC<VideoTrimmerProps> = ({
 
       try {
         for (let i = 0; i < THUMBNAIL_COUNT; i++) {
-          const time = (i / THUMBNAIL_COUNT) * duration * 1000; // Convert to milliseconds
+          const time = Math.floor((i / THUMBNAIL_COUNT) * duration * 1000); // Convert to milliseconds (must be integer)
           console.log(`[VideoTrimmer] Generating thumbnail ${i + 1}/${THUMBNAIL_COUNT} at ${time}ms`);
           const thumbnail = await VideoThumbnails.getThumbnailAsync(videoUri, {
             time,
