@@ -188,10 +188,15 @@ export const ScoopsBar: React.FC<ScoopsBarProps> = ({
 const createStyles = (colors: any) =>
   StyleSheet.create({
     container: {
-      backgroundColor: colors.background.primary,
+      backgroundColor: colors.background.elevated,
       paddingVertical: spacing[3],
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border.light,
+      borderRadius: 16,
+      marginBottom: spacing[3],
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.05,
+      shadowRadius: 2,
+      elevation: 1,
     },
     minimalContainer: {
       flexDirection: 'row',

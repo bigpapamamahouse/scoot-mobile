@@ -4,8 +4,8 @@
  * Supports navigation between multiple scoops
  */
 
-import React, { useState, useCallback, useEffect } from 'react';
-import { View, StyleSheet, Dimensions, StatusBar, Alert } from 'react-native';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { View, StyleSheet, Dimensions, StatusBar, Alert, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ScoopViewer } from '../components/ScoopViewer';
 import { ScoopsAPI } from '../api';
@@ -33,8 +33,18 @@ export default function ScoopViewerScreen({ navigation, route }: any) {
   const [currentIndex, setCurrentIndex] = useState(params.initialIndex || 0);
   const [isPaused, setIsPaused] = useState(false);
   const [viewedScoops, setViewedScoops] = useState<Set<string>>(new Set());
+  const [currentProgress, setCurrentProgress] = useState(0);
 
   const currentScoop = scoops[currentIndex];
+
+  // Reset progress when scoop changes
+  useEffect(() => {
+    setCurrentProgress(0);
+  }, [currentIndex]);
+
+  const handleProgressUpdate = useCallback((progress: number) => {
+    setCurrentProgress(progress);
+  }, []);
 
   // Mark scoop as viewed when displayed
   useEffect(() => {
@@ -117,26 +127,35 @@ export default function ScoopViewerScreen({ navigation, route }: any) {
 
       {/* Progress indicators for all scoops */}
       <View style={styles.progressBarsContainer}>
-        {scoops.map((scoop, index) => (
-          <View
-            key={scoop.id}
-            style={[
-              styles.progressBarWrapper,
-              { width: (SCREEN_WIDTH - 32 - (scoops.length - 1) * 4) / scoops.length },
-            ]}
-          >
-            <View style={styles.progressBarBackground}>
-              <View
-                style={[
-                  styles.progressBarFill,
-                  {
-                    width: index < currentIndex ? '100%' : index === currentIndex ? '0%' : '0%',
-                  },
-                ]}
-              />
+        {scoops.map((scoop, index) => {
+          let fillWidth: string;
+          if (index < currentIndex) {
+            fillWidth = '100%';
+          } else if (index === currentIndex) {
+            fillWidth = `${currentProgress * 100}%`;
+          } else {
+            fillWidth = '0%';
+          }
+
+          return (
+            <View
+              key={scoop.id}
+              style={[
+                styles.progressBarWrapper,
+                { width: (SCREEN_WIDTH - 32 - (scoops.length - 1) * 4) / scoops.length },
+              ]}
+            >
+              <View style={styles.progressBarBackground}>
+                <View
+                  style={[
+                    styles.progressBarFill,
+                    { width: fillWidth },
+                  ]}
+                />
+              </View>
             </View>
-          </View>
-        ))}
+          );
+        })}
       </View>
 
       <ScoopViewer
@@ -150,6 +169,8 @@ export default function ScoopViewerScreen({ navigation, route }: any) {
         isOwner={isOwner}
         onViewViewers={handleViewViewers}
         onDelete={isOwner ? handleDelete : undefined}
+        onProgressUpdate={handleProgressUpdate}
+        hideProgressBar={scoops.length > 1}
       />
     </View>
   );

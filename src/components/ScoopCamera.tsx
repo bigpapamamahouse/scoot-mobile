@@ -13,6 +13,9 @@ import {
   Dimensions,
   Animated,
   Alert,
+  PanResponder,
+  GestureResponderEvent,
+  PanResponderGestureState,
 } from 'react-native';
 import { CameraView, CameraType, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
@@ -22,6 +25,7 @@ import { ScoopMediaType } from '../types';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const MAX_VIDEO_DURATION = 10000; // 10 seconds
+const MAX_ZOOM = 0.5; // Maximum zoom level (0-1 range for expo-camera)
 
 interface ScoopCameraProps {
   onCapture: (uri: string, type: ScoopMediaType, aspectRatio: number) => void;
@@ -40,11 +44,45 @@ export const ScoopCamera: React.FC<ScoopCameraProps> = ({
   const [isRecording, setIsRecording] = useState(false);
   const [isCameraReady, setIsCameraReady] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
+  const [zoom, setZoom] = useState(0);
   const recordingProgress = useRef(new Animated.Value(0)).current;
   const recordingTimer = useRef<NodeJS.Timeout | null>(null);
   const durationTimer = useRef<NodeJS.Timeout | null>(null);
   const pressTimer = useRef<NodeJS.Timeout | null>(null);
   const isLongPress = useRef(false);
+  const isRecordingRef = useRef(false);
+  const initialY = useRef(0);
+  const zoomRef = useRef(0);
+
+  // Keep refs in sync with state
+  useEffect(() => {
+    isRecordingRef.current = isRecording;
+  }, [isRecording]);
+
+  useEffect(() => {
+    zoomRef.current = zoom;
+  }, [zoom]);
+
+  // Pan responder for zoom gesture during recording
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        // Only capture pan if we're recording and there's significant vertical movement
+        return isRecordingRef.current && Math.abs(gestureState.dy) > 10;
+      },
+      onPanResponderGrant: (_, gestureState) => {
+        initialY.current = gestureState.y0;
+      },
+      onPanResponderMove: (_, gestureState) => {
+        // Moving up (negative dy) increases zoom
+        // Scale so full screen swipe goes from 0 to MAX_ZOOM
+        const zoomDelta = -gestureState.dy / (SCREEN_HEIGHT * 0.5) * MAX_ZOOM;
+        const newZoom = Math.max(0, Math.min(MAX_ZOOM, zoomRef.current + zoomDelta * 0.05));
+        setZoom(newZoom);
+      },
+    })
+  ).current;
 
   // Request permissions on mount
   useEffect(() => {
@@ -106,6 +144,7 @@ export const ScoopCamera: React.FC<ScoopCameraProps> = ({
 
     setIsRecording(true);
     setRecordingDuration(0);
+    setZoom(0); // Reset zoom when starting recording
 
     // Start progress animation
     recordingProgress.setValue(0);
@@ -242,12 +281,13 @@ export const ScoopCamera: React.FC<ScoopCameraProps> = ({
   });
 
   return (
-    <View style={styles.container}>
+    <View style={styles.container} {...panResponder.panHandlers}>
       <CameraView
         ref={cameraRef}
         style={styles.camera}
         facing={facing}
         mode="video"
+        zoom={zoom}
         onCameraReady={handleCameraReady}
       />
 
@@ -259,9 +299,16 @@ export const ScoopCamera: React.FC<ScoopCameraProps> = ({
               style={[styles.progressFill, { width: progressWidth }]}
             />
           </View>
-          <Text style={styles.durationText}>
-            {formatDuration(recordingDuration)} / 10s
-          </Text>
+          <View style={styles.recordingInfo}>
+            <Text style={styles.durationText}>
+              {formatDuration(recordingDuration)} / 10s
+            </Text>
+            {zoom > 0 && (
+              <Text style={styles.zoomText}>
+                {(1 + zoom * 4).toFixed(1)}x
+              </Text>
+            )}
+          </View>
         </View>
       )}
 
@@ -376,11 +423,26 @@ const styles = StyleSheet.create({
     backgroundColor: '#FF3B30',
     borderRadius: 2,
   },
+  recordingInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: spacing[2],
+    gap: spacing[3],
+  },
   durationText: {
     color: '#fff',
     fontSize: typography.fontSize.sm,
-    marginTop: spacing[2],
     fontWeight: '600',
+  },
+  zoomText: {
+    color: '#fff',
+    fontSize: typography.fontSize.sm,
+    fontWeight: '600',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    paddingHorizontal: spacing[2],
+    paddingVertical: 2,
+    borderRadius: 4,
   },
   topControls: {
     position: 'absolute',

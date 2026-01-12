@@ -15,6 +15,8 @@ import {
   Animated,
   ActivityIndicator,
   PanResponder,
+  Modal,
+  Pressable,
 } from 'react-native';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { Ionicons } from '@expo/vector-icons';
@@ -39,6 +41,8 @@ interface ScoopViewerProps {
   isOwner?: boolean;
   onViewViewers?: () => void;
   onDelete?: () => void;
+  onProgressUpdate?: (progress: number) => void;
+  hideProgressBar?: boolean;
 }
 
 const getFontStyle = (fontFamily: ScoopFontFamily) => {
@@ -65,12 +69,15 @@ export const ScoopViewer: React.FC<ScoopViewerProps> = ({
   isOwner = false,
   onViewViewers,
   onDelete,
+  onProgressUpdate,
+  hideProgressBar = false,
 }) => {
   const { colors } = useTheme();
   const progressAnim = useRef(new Animated.Value(0)).current;
   const animationRef = useRef<Animated.CompositeAnimation | null>(null);
   const [mediaLoaded, setMediaLoaded] = React.useState(false);
   const [videoDuration, setVideoDuration] = React.useState<number | null>(null);
+  const [showMenu, setShowMenu] = React.useState(false);
 
   const mediaUrl = mediaUrlFromKey(scoop.mediaKey);
   const isVideo = scoop.mediaType === 'video';
@@ -88,6 +95,7 @@ export const ScoopViewer: React.FC<ScoopViewerProps> = ({
   useEffect(() => {
     if (!isActive || !mediaLoaded) {
       progressAnim.setValue(0);
+      onProgressUpdate?.(0);
       return;
     }
 
@@ -100,6 +108,7 @@ export const ScoopViewer: React.FC<ScoopViewerProps> = ({
     let currentValue = 0;
     progressAnim.addListener(({ value }) => {
       currentValue = value;
+      onProgressUpdate?.(value);
     });
 
     const remainingDuration = duration * (1 - currentValue);
@@ -120,7 +129,7 @@ export const ScoopViewer: React.FC<ScoopViewerProps> = ({
       progressAnim.removeAllListeners();
       animationRef.current?.stop();
     };
-  }, [isActive, mediaLoaded, isPaused, duration, progressAnim, onComplete]);
+  }, [isActive, mediaLoaded, isPaused, duration, progressAnim, onComplete, onProgressUpdate]);
 
   // Reset progress when scoop changes
   useEffect(() => {
@@ -334,14 +343,16 @@ export const ScoopViewer: React.FC<ScoopViewerProps> = ({
         pointerEvents="none"
       />
 
-      {/* Progress bar */}
-      <View style={styles.progressContainer}>
-        <View style={styles.progressBackground}>
-          <Animated.View
-            style={[styles.progressFill, { width: progressWidth }]}
-          />
+      {/* Progress bar - hidden when using external progress bars */}
+      {!hideProgressBar && (
+        <View style={styles.progressContainer}>
+          <View style={styles.progressBackground}>
+            <Animated.View
+              style={[styles.progressFill, { width: progressWidth }]}
+            />
+          </View>
         </View>
-      </View>
+      )}
 
       {/* Header */}
       <View style={styles.header}>
@@ -353,12 +364,44 @@ export const ScoopViewer: React.FC<ScoopViewerProps> = ({
           </View>
         </View>
 
-        <TouchableWithoutFeedback onPress={onClose}>
-          <View style={styles.closeButton}>
-            <Ionicons name="close" size={28} color="#fff" />
-          </View>
-        </TouchableWithoutFeedback>
+        <View style={styles.headerButtons}>
+          {/* 3-dot menu for owner */}
+          {isOwner && onDelete && (
+            <TouchableOpacity style={styles.menuButton} onPress={() => setShowMenu(true)}>
+              <Ionicons name="ellipsis-vertical" size={24} color="#fff" />
+            </TouchableOpacity>
+          )}
+
+          <TouchableWithoutFeedback onPress={onClose}>
+            <View style={styles.closeButton}>
+              <Ionicons name="close" size={28} color="#fff" />
+            </View>
+          </TouchableWithoutFeedback>
+        </View>
       </View>
+
+      {/* Menu modal */}
+      <Modal
+        visible={showMenu}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowMenu(false)}
+      >
+        <Pressable style={styles.menuOverlay} onPress={() => setShowMenu(false)}>
+          <View style={styles.menuContainer}>
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => {
+                setShowMenu(false);
+                onDelete?.();
+              }}
+            >
+              <Ionicons name="trash-outline" size={22} color="#FF3B30" />
+              <Text style={styles.menuItemTextDanger}>Delete Scoop</Text>
+            </TouchableOpacity>
+          </View>
+        </Pressable>
+      </Modal>
 
       {/* Footer for owner */}
       {isOwner && (
@@ -368,13 +411,6 @@ export const ScoopViewer: React.FC<ScoopViewerProps> = ({
             <Ionicons name="time-outline" size={18} color="#fff" />
             <Text style={styles.timeRemainingText}>{timeRemaining}</Text>
           </View>
-
-          {/* Delete button */}
-          {onDelete && (
-            <TouchableOpacity style={styles.deleteButton} onPress={onDelete}>
-              <Ionicons name="trash-outline" size={22} color="#fff" />
-            </TouchableOpacity>
-          )}
 
           {/* Swipe up hint */}
           <Animated.View style={[styles.swipeHint, { transform: [{ translateY: Animated.multiply(swipeAnim, -0.3) }] }]}>
@@ -465,11 +501,52 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.7)',
     fontSize: typography.fontSize.xs,
   },
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[2],
+  },
+  menuButton: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   closeButton: {
     width: 40,
     height: 40,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  menuOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-start',
+    alignItems: 'flex-end',
+    paddingTop: 110,
+    paddingRight: spacing[4],
+  },
+  menuContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    minWidth: 180,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing[4],
+    gap: spacing[3],
+  },
+  menuItemTextDanger: {
+    fontSize: typography.fontSize.base,
+    color: '#FF3B30',
+    fontWeight: '500',
   },
   textOverlay: {
     position: 'absolute',
@@ -502,14 +579,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: typography.fontSize.sm,
     fontWeight: '500',
-  },
-  deleteButton: {
-    backgroundColor: 'rgba(255,59,48,0.8)',
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   swipeHint: {
     alignItems: 'center',
