@@ -57,7 +57,11 @@ async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: numbe
   }
 }
 
-export async function api(path: string, init: RequestInit = {}) {
+export interface ApiOptions extends RequestInit {
+  timeoutMs?: number;
+}
+
+export async function api(path: string, init: ApiOptions = {}) {
   let lastText = '';
   let attempt = 0;
   let token: string | null | undefined;
@@ -74,8 +78,9 @@ export async function api(path: string, init: RequestInit = {}) {
     const { headers, token: currentToken } = await buildRequestInit(init);
     token = currentToken;
 
-    // Use 10-second timeout to prevent hanging requests
-    const res = await fetchWithTimeout(fullUrl, { ...init, headers }, 10000);
+    // Use configurable timeout (default 10 seconds) to prevent hanging requests
+    const { timeoutMs, ...fetchInit } = init;
+    const res = await fetchWithTimeout(fullUrl, { ...fetchInit, headers }, timeoutMs ?? 10000);
 
     if (res.ok) {
       const ct = res.headers.get('content-type') || '';
