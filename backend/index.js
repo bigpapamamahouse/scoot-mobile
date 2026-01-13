@@ -172,7 +172,7 @@ async function processVideo(bucket, key, startTime, endTime) {
       '-c:a', 'aac',
       '-b:a', '128k',
       '-movflags', '+faststart',
-      '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2', // Ensure even dimensions
+      '-vf', '"scale=trunc(iw/2)*2:trunc(ih/2)*2"', // Ensure even dimensions
       tmpOutput,
     ].join(' ');
 
