@@ -57,11 +57,13 @@ export async function getUserScoops(userId: string): Promise<Scoop[]> {
 
 /**
  * Create a new scoop
+ * Uses a longer timeout (120s) since video processing can take up to 2 minutes
  */
 export async function createScoop(payload: CreateScoopPayload): Promise<Scoop> {
   const response = await api('/scoops', {
     method: 'POST',
     body: JSON.stringify(payload),
+    timeoutMs: 120000, // 2 minute timeout for video processing
   });
   console.log('[ScoopsAPI] Scoop created successfully:', response);
   return response;
