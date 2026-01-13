@@ -14,6 +14,7 @@ import {
   Animated,
   Alert,
   PanResponder,
+  Platform,
 } from 'react-native';
 import { CameraView, CameraType, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
@@ -24,6 +25,7 @@ import { ScoopMediaType } from '../types';
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const MAX_VIDEO_DURATION = 10000; // 10 seconds
 const MAX_ZOOM = 0.5; // Maximum zoom level (0-1 range for expo-camera)
+const ZOOM_SENSITIVITY = 0.6; // How much of screen height to reach max zoom (higher = less sensitive)
 
 interface ScoopCameraProps {
   onCapture: (uri: string, type: ScoopMediaType, aspectRatio: number, isFromGallery: boolean, videoDuration?: number) => void;
@@ -39,6 +41,7 @@ export const ScoopCamera: React.FC<ScoopCameraProps> = ({
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [micPermission, requestMicPermission] = useMicrophonePermissions();
   const [facing, setFacing] = useState<CameraType>('back');
+  const [cameraKey, setCameraKey] = useState(0); // Force camera remount when switching
   const [isRecording, setIsRecording] = useState(false);
   const [isCameraReady, setIsCameraReady] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
@@ -88,7 +91,8 @@ export const ScoopCamera: React.FC<ScoopCameraProps> = ({
         // Only zoom while recording
         if (isRecordingRef.current) {
           // Moving up (negative dy) increases zoom
-          const zoomDelta = -(gestureState.y0 - shutterStartY.current + gestureState.dy) / (SCREEN_HEIGHT * 0.3);
+          // ZOOM_SENSITIVITY controls how much screen movement = full zoom
+          const zoomDelta = -(gestureState.y0 - shutterStartY.current + gestureState.dy) / (SCREEN_HEIGHT * ZOOM_SENSITIVITY);
           const newZoom = Math.max(0, Math.min(MAX_ZOOM, zoomDelta));
           setZoom(newZoom);
         }
@@ -147,6 +151,8 @@ export const ScoopCamera: React.FC<ScoopCameraProps> = ({
   const toggleFacing = useCallback(() => {
     setIsCameraReady(false);
     setFacing((prev) => (prev === 'back' ? 'front' : 'back'));
+    // Increment key to force camera remount - fixes front camera recording issues
+    setCameraKey((prev) => prev + 1);
   }, []);
 
   const handleCameraReady = useCallback(() => {
@@ -271,6 +277,8 @@ export const ScoopCamera: React.FC<ScoopCameraProps> = ({
         allowsEditing: false, // We'll handle cropping in the editor
         quality: 1.0, // Keep full quality, we'll compress later
         videoMaxDuration: 10,
+        // On iOS, copy the media locally to handle iCloud files that aren't downloaded
+        ...(Platform.OS === 'ios' && { copyLocalMedia: true }),
       });
 
       if (!result.canceled && result.assets[0]) {
@@ -323,6 +331,7 @@ export const ScoopCamera: React.FC<ScoopCameraProps> = ({
   return (
     <View style={styles.container}>
       <CameraView
+        key={cameraKey}
         ref={cameraRef}
         style={styles.camera}
         facing={facing}

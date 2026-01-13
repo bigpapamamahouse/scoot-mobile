@@ -123,6 +123,7 @@ export const ScoopEditor: React.FC<ScoopEditorProps> = ({
   const [isCropping, setIsCropping] = useState(isFromGallery && mediaType === 'image');
   const [croppedUri, setCroppedUri] = useState<string | null>(null);
   const [imageSize, setImageSize] = useState<{ width: number; height: number } | null>(null);
+  const imageSizeRef = useRef<{ width: number; height: number } | null>(null);
 
   // Video trimming state
   const needsTrimming = isFromGallery && mediaType === 'video' && (videoDuration ?? 0) > 10;
@@ -151,7 +152,9 @@ export const ScoopEditor: React.FC<ScoopEditorProps> = ({
       Image.getSize(
         mediaUri,
         (width, height) => {
-          setImageSize({ width, height });
+          const size = { width, height };
+          setImageSize(size);
+          imageSizeRef.current = size; // Update ref for pan responder
           // Calculate initial scale to fit screen while covering it
           const imgAspectRatio = width / height;
           const minScale = getMinScale(imgAspectRatio);
@@ -230,6 +233,7 @@ export const ScoopEditor: React.FC<ScoopEditorProps> = ({
       },
       onPanResponderMove: (evt, gestureState) => {
         const touches = evt.nativeEvent.touches;
+        const currentImageSize = imageSizeRef.current; // Use ref for current value
 
         if (touches.length === 2) {
           // Pinch to zoom
@@ -244,7 +248,7 @@ export const ScoopEditor: React.FC<ScoopEditorProps> = ({
             pinchStartDistance.current = distance;
           } else {
             const scaleFactor = distance / pinchStartDistance.current;
-            const minScale = imageSize ? getMinScale(imageSize.width / imageSize.height) : 1;
+            const minScale = currentImageSize ? getMinScale(currentImageSize.width / currentImageSize.height) : 1;
             const newScale = Math.max(minScale, Math.min(3, baseScale.current * scaleFactor));
             cropScale.setValue(newScale);
             lastScale.current = newScale;
@@ -255,8 +259,8 @@ export const ScoopEditor: React.FC<ScoopEditorProps> = ({
           const newTranslateY = lastTranslateY.current + gestureState.dy;
 
           // Calculate bounds based on current scale and image size
-          if (imageSize) {
-            const imgAspectRatio = imageSize.width / imageSize.height;
+          if (currentImageSize) {
+            const imgAspectRatio = currentImageSize.width / currentImageSize.height;
             const screenAspectRatio = SCREEN_WIDTH / SCREEN_HEIGHT;
 
             let displayWidth, displayHeight;
