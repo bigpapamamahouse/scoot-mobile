@@ -121,13 +121,16 @@ export const ScoopEditor: React.FC<ScoopEditorProps> = ({
   const [tapPosition, setTapPosition] = useState<{ x: number; y: number }>({ x: 50, y: 50 });
   const textInputRef = useRef<TextInput>(null);
 
-  // Ref to store PanResponders and gesture state for each overlay
+  // Ref to store gesture state for each overlay (for direct touch handling)
   const overlayGestureRefs = useRef<Map<string, {
-    panResponder: ReturnType<typeof PanResponder.create>;
     initialDistance: number;
     initialAngle: number;
     baseScale: number;
     baseRotation: number;
+    baseX: number;
+    baseY: number;
+    startX: number;
+    startY: number;
     isMultiTouch: boolean;
   }>>(new Map());
 
@@ -489,97 +492,120 @@ export const ScoopEditor: React.FC<ScoopEditorProps> = ({
   }, []);
 
   // Helper function to calculate distance between two touches
-  const getDistance = (touches: any[]) => {
-    const dx = touches[0].pageX - touches[1].pageX;
-    const dy = touches[0].pageY - touches[1].pageY;
+  const getDistance = (t1: any, t2: any) => {
+    const dx = t1.pageX - t2.pageX;
+    const dy = t1.pageY - t2.pageY;
     return Math.sqrt(dx * dx + dy * dy);
   };
 
   // Helper function to calculate angle between two touches
-  const getAngle = (touches: any[]) => {
-    const dx = touches[1].pageX - touches[0].pageX;
-    const dy = touches[1].pageY - touches[0].pageY;
+  const getAngle = (t1: any, t2: any) => {
+    const dx = t2.pageX - t1.pageX;
+    const dy = t2.pageY - t1.pageY;
     return (Math.atan2(dy, dx) * 180) / Math.PI;
   };
 
-  // Get or create PanResponder for an overlay (persists across renders)
-  const getOverlayPanResponder = useCallback((overlay: TextOverlayState) => {
-    const existing = overlayGestureRefs.current.get(overlay.id);
-    if (existing) {
-      return existing.panResponder;
+  // Get or create gesture state for an overlay
+  const getGestureState = (overlayId: string) => {
+    let state = overlayGestureRefs.current.get(overlayId);
+    if (!state) {
+      state = {
+        initialDistance: 0,
+        initialAngle: 0,
+        baseScale: 1,
+        baseRotation: 0,
+        baseX: 0,
+        baseY: 0,
+        startX: 0,
+        startY: 0,
+        isMultiTouch: false,
+      };
+      overlayGestureRefs.current.set(overlayId, state);
     }
+    return state;
+  };
 
-    // Create gesture state for this overlay
-    const gestureState = {
-      initialDistance: 0,
-      initialAngle: 0,
-      baseScale: 1,
-      baseRotation: 0,
-      isMultiTouch: false,
-      panResponder: null as any,
-    };
+  // Touch event handlers for overlays
+  const handleOverlayTouchStart = useCallback((overlay: TextOverlayState, e: any) => {
+    e.stopPropagation();
+    const touches = e.nativeEvent.touches;
+    const state = getGestureState(overlay.id);
 
-    gestureState.panResponder = PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: () => {
-        setSelectedOverlayId(overlay.id);
-        overlay.pan.setOffset({
-          x: (overlay.pan.x as any)._value,
-          y: (overlay.pan.y as any)._value,
-        });
-        overlay.pan.setValue({ x: 0, y: 0 });
-        gestureState.baseScale = (overlay.scaleValue as any)._value || 1;
-        gestureState.baseRotation = (overlay.rotationValue as any)._value || 0;
-        gestureState.isMultiTouch = false;
-        gestureState.initialDistance = 0;
-        gestureState.initialAngle = 0;
-      },
-      onPanResponderMove: (evt, gs) => {
-        const touches = evt.nativeEvent.touches;
+    setSelectedOverlayId(overlay.id);
 
-        if (touches.length >= 2) {
-          // Two-finger gesture for scale and rotation
-          gestureState.isMultiTouch = true;
-          const currentDistance = getDistance(touches);
-          const currentAngle = getAngle(touches);
+    // Store base values
+    state.baseX = (overlay.pan.x as any)._value || 0;
+    state.baseY = (overlay.pan.y as any)._value || 0;
+    state.baseScale = (overlay.scaleValue as any)._value || 1;
+    state.baseRotation = (overlay.rotationValue as any)._value || 0;
 
-          if (gestureState.initialDistance === 0) {
-            // First two-finger touch - record initial values
-            gestureState.initialDistance = currentDistance;
-            gestureState.initialAngle = currentAngle;
-          } else {
-            // Calculate scale from distance ratio
-            const scaleFactor = currentDistance / gestureState.initialDistance;
-            const newScale = Math.max(0.5, Math.min(3, gestureState.baseScale * scaleFactor));
-            overlay.scaleValue.setValue(newScale);
+    if (touches.length >= 2) {
+      state.isMultiTouch = true;
+      state.initialDistance = getDistance(touches[0], touches[1]);
+      state.initialAngle = getAngle(touches[0], touches[1]);
+    } else {
+      state.isMultiTouch = false;
+      state.startX = touches[0].pageX;
+      state.startY = touches[0].pageY;
+    }
+  }, []);
 
-            // Calculate rotation from angle difference
-            let angleDiff = currentAngle - gestureState.initialAngle;
-            // Normalize to -180 to 180
-            while (angleDiff > 180) angleDiff -= 360;
-            while (angleDiff < -180) angleDiff += 360;
-            overlay.rotationValue.setValue(gestureState.baseRotation + angleDiff);
-          }
-        } else if (!gestureState.isMultiTouch) {
-          // Single finger pan (only if we didn't start with multi-touch)
-          Animated.event(
-            [null, { dx: overlay.pan.x, dy: overlay.pan.y }],
-            { useNativeDriver: false }
-          )(evt, gs);
-        }
-      },
-      onPanResponderRelease: () => {
-        overlay.pan.flattenOffset();
-        // Reset for next gesture
-        gestureState.initialDistance = 0;
-        gestureState.initialAngle = 0;
-        gestureState.isMultiTouch = false;
-      },
-    });
+  const handleOverlayTouchMove = useCallback((overlay: TextOverlayState, e: any) => {
+    const touches = e.nativeEvent.touches;
+    const state = getGestureState(overlay.id);
 
-    overlayGestureRefs.current.set(overlay.id, gestureState);
-    return gestureState.panResponder;
+    if (touches.length >= 2) {
+      // Two-finger gesture - scale and rotate
+      if (!state.isMultiTouch) {
+        // Just switched to multi-touch
+        state.isMultiTouch = true;
+        state.initialDistance = getDistance(touches[0], touches[1]);
+        state.initialAngle = getAngle(touches[0], touches[1]);
+        state.baseScale = (overlay.scaleValue as any)._value || 1;
+        state.baseRotation = (overlay.rotationValue as any)._value || 0;
+      }
+
+      const currentDistance = getDistance(touches[0], touches[1]);
+      const currentAngle = getAngle(touches[0], touches[1]);
+
+      // Scale
+      if (state.initialDistance > 0) {
+        const scaleFactor = currentDistance / state.initialDistance;
+        const newScale = Math.max(0.5, Math.min(3, state.baseScale * scaleFactor));
+        overlay.scaleValue.setValue(newScale);
+      }
+
+      // Rotation
+      let angleDiff = currentAngle - state.initialAngle;
+      while (angleDiff > 180) angleDiff -= 360;
+      while (angleDiff < -180) angleDiff += 360;
+      overlay.rotationValue.setValue(state.baseRotation + angleDiff);
+
+    } else if (!state.isMultiTouch && touches.length === 1) {
+      // Single finger pan
+      const dx = touches[0].pageX - state.startX;
+      const dy = touches[0].pageY - state.startY;
+      overlay.pan.setValue({ x: state.baseX + dx, y: state.baseY + dy });
+    }
+  }, []);
+
+  const handleOverlayTouchEnd = useCallback((overlay: TextOverlayState, e: any) => {
+    const state = getGestureState(overlay.id);
+    const remainingTouches = e.nativeEvent.touches;
+
+    if (remainingTouches.length === 0) {
+      // All fingers lifted - reset state
+      state.isMultiTouch = false;
+      state.initialDistance = 0;
+      state.initialAngle = 0;
+    } else if (remainingTouches.length === 1 && state.isMultiTouch) {
+      // Went from 2 fingers to 1 - switch to pan mode
+      state.isMultiTouch = false;
+      state.startX = remainingTouches[0].pageX;
+      state.startY = remainingTouches[0].pageY;
+      state.baseX = (overlay.pan.x as any)._value || 0;
+      state.baseY = (overlay.pan.y as any)._value || 0;
+    }
   }, []);
 
   // Calculate image display dimensions for cropping view
@@ -708,7 +734,6 @@ export const ScoopEditor: React.FC<ScoopEditorProps> = ({
 
         {/* Text overlays */}
         {textOverlays.map((overlay) => {
-          const panResponder = getOverlayPanResponder(overlay);
           // Create rotation interpolation for string output
           const rotateStr = overlay.rotationValue.interpolate({
             inputRange: [-360, 360],
@@ -728,7 +753,9 @@ export const ScoopEditor: React.FC<ScoopEditorProps> = ({
                 },
                 selectedOverlayId === overlay.id && styles.selectedOverlay,
               ]}
-              {...panResponder.panHandlers}
+              onTouchStart={(e) => handleOverlayTouchStart(overlay, e)}
+              onTouchMove={(e) => handleOverlayTouchMove(overlay, e)}
+              onTouchEnd={(e) => handleOverlayTouchEnd(overlay, e)}
             >
               <Text
                 style={[
