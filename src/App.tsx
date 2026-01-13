@@ -5,6 +5,7 @@ import RootNavigator from './navigation';
 import { NotificationsProvider } from './lib/notifications';
 import { ThemeProvider } from './theme';
 import { CurrentUserProvider } from './contexts/CurrentUserContext';
+import { UploadProvider } from './contexts/UploadContext';
 
 export default function App() {
   return (
@@ -12,7 +13,9 @@ export default function App() {
       <ThemeProvider>
         <CurrentUserProvider>
           <NotificationsProvider>
-            <RootNavigator />
+            <UploadProvider>
+              <RootNavigator />
+            </UploadProvider>
           </NotificationsProvider>
         </CurrentUserProvider>
       </ThemeProvider>

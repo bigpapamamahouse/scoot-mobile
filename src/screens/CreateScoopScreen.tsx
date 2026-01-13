@@ -1,19 +1,17 @@
 /**
  * CreateScoopScreen
  * Full-screen experience for creating a new scoop
- * Flow: Camera -> Editor -> Publish
+ * Flow: Camera -> Editor -> Publish (background upload)
  */
 
 import React, { useState, useCallback } from 'react';
-import { View, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ScoopCamera } from '../components/ScoopCamera';
 import { ScoopEditor } from '../components/ScoopEditor';
-import { ScoopsAPI } from '../api';
-import { uploadMedia } from '../lib/upload';
 import { ScoopMediaType, ScoopTextOverlay } from '../types';
-import { useTheme } from '../theme';
 import { VideoTrimParams } from '../components/ScoopEditor';
+import { useUpload } from '../contexts/UploadContext';
 
 type EditorState = {
   uri: string;
@@ -24,9 +22,8 @@ type EditorState = {
 };
 
 export default function CreateScoopScreen({ navigation }: any) {
-  const { colors } = useTheme();
   const [editorState, setEditorState] = useState<EditorState | null>(null);
-  const [isPublishing, setIsPublishing] = useState(false);
+  const { startUpload } = useUpload();
 
   const handleCapture = useCallback(
     (uri: string, type: ScoopMediaType, aspectRatio: number, isFromGallery: boolean, videoDuration?: number) => {
@@ -44,72 +41,30 @@ export default function CreateScoopScreen({ navigation }: any) {
   }, [navigation]);
 
   const handlePublish = useCallback(
-    async (textOverlays: ScoopTextOverlay[], trimParams?: VideoTrimParams) => {
+    (textOverlays: ScoopTextOverlay[], trimParams?: VideoTrimParams) => {
       if (!editorState) return;
 
-      setIsPublishing(true);
+      console.log('[CreateScoopScreen] Starting background upload:', {
+        uri: editorState.uri,
+        type: editorState.type,
+        aspectRatio: editorState.aspectRatio,
+        trimParams,
+      });
 
-      try {
-        // Upload the media
-        console.log('[CreateScoopScreen] Uploading media:', {
-          uri: editorState.uri,
-          type: editorState.type,
-          aspectRatio: editorState.aspectRatio,
-          trimParams,
-        });
+      // Start background upload and navigate back immediately
+      startUpload({
+        uri: editorState.uri,
+        mediaType: editorState.type,
+        aspectRatio: editorState.aspectRatio,
+        textOverlays,
+        trimParams,
+      });
 
-        const mediaKey = await uploadMedia({
-          uri: editorState.uri,
-          intent: 'scoop-media',
-        });
-
-        console.log('[CreateScoopScreen] Media uploaded, key:', mediaKey);
-
-        if (!mediaKey) {
-          throw new Error('Failed to upload media');
-        }
-
-        // Create the scoop with optional trim params for server-side processing
-        console.log('[CreateScoopScreen] Creating scoop with:', {
-          mediaKey,
-          mediaType: editorState.type,
-          mediaAspectRatio: editorState.aspectRatio,
-          trimParams,
-        });
-
-        const result = await ScoopsAPI.createScoop({
-          mediaKey,
-          mediaType: editorState.type,
-          mediaAspectRatio: editorState.aspectRatio,
-          textOverlays: textOverlays.length > 0 ? textOverlays : undefined,
-          trimParams: trimParams || undefined,
-        });
-
-        console.log('[CreateScoopScreen] Scoop created:', result);
-
-        Alert.alert('Success', 'Your scoop has been shared!', [
-          {
-            text: 'OK',
-            onPress: () => navigation.goBack(),
-          },
-        ]);
-      } catch (error: any) {
-        console.error('[CreateScoopScreen] Failed to publish scoop:', error);
-        Alert.alert('Error', error?.message || 'Failed to share your scoop');
-      } finally {
-        setIsPublishing(false);
-      }
+      // Navigate back immediately - upload continues in background
+      navigation.goBack();
     },
-    [editorState, navigation]
+    [editorState, navigation, startUpload]
   );
-
-  if (isPublishing) {
-    return (
-      <View style={[styles.loadingContainer, { backgroundColor: colors.background.primary }]}>
-        <ActivityIndicator size="large" color={colors.primary[500]} />
-      </View>
-    );
-  }
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -134,10 +89,5 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#000',
-  },
-  loadingContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
 });
