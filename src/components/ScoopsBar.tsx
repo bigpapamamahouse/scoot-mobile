@@ -80,6 +80,15 @@ export const ScoopsBar: React.FC<ScoopsBarProps> = ({
     [colors.text.secondary, onPressScoops]
   );
 
+  // Sort scoops feed to show unviewed first
+  const sortedScoopsFeed = React.useMemo(() => {
+    return [...scoopsFeed].sort((a, b) => {
+      if (a.hasUnviewed && !b.hasUnviewed) return -1;
+      if (!a.hasUnviewed && b.hasUnviewed) return 1;
+      return 0;
+    });
+  }, [scoopsFeed]);
+
   const styles = React.useMemo(
     () => createStyles(colors),
     [colors]
@@ -92,15 +101,6 @@ export const ScoopsBar: React.FC<ScoopsBarProps> = ({
       </View>
     );
   }
-
-  // Sort scoops feed to show unviewed first
-  const sortedScoopsFeed = React.useMemo(() => {
-    return [...scoopsFeed].sort((a, b) => {
-      if (a.hasUnviewed && !b.hasUnviewed) return -1;
-      if (!a.hasUnviewed && b.hasUnviewed) return 1;
-      return 0;
-    });
-  }, [scoopsFeed]);
 
   // Show minimal bar when there are no other users' scoops
   if (sortedScoopsFeed.length === 0) {
