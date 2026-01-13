@@ -213,7 +213,11 @@ async function processVideo(bucket, key, startTime, endTime) {
     console.log(`[VideoProcess] Processing time: ${(processTime / 1000).toFixed(1)}s`);
 
     // Upload processed video back to S3
-    const processedKey = key.replace(/(\.[^.]+)$/, '_processed$1');
+    // Handle keys with or without file extensions
+    const hasExtension = /\.[^./]+$/.test(key);
+    const processedKey = hasExtension
+      ? key.replace(/(\.[^.]+)$/, '_processed$1')
+      : `${key}_processed`;
     console.log(`[VideoProcess] Uploading to s3://${bucket}/${processedKey}`);
 
     await s3.send(new PutObjectCommand({
@@ -229,15 +233,17 @@ async function processVideo(bucket, key, startTime, endTime) {
     fs.unlinkSync(tmpInput);
     fs.unlinkSync(tmpOutput);
 
-    // Delete original file
-    try {
-      await s3.send(new DeleteObjectCommand({
-        Bucket: bucket,
-        Key: key,
-      }));
-      console.log('[VideoProcess] Deleted original file');
-    } catch (e) {
-      console.warn('[VideoProcess] Failed to delete original:', e.message);
+    // Delete original file (only if different from processed key)
+    if (key !== processedKey) {
+      try {
+        await s3.send(new DeleteObjectCommand({
+          Bucket: bucket,
+          Key: key,
+        }));
+        console.log('[VideoProcess] Deleted original file');
+      } catch (e) {
+        console.warn('[VideoProcess] Failed to delete original:', e.message);
+      }
     }
 
     return processedKey;
