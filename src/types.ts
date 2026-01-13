@@ -99,7 +99,8 @@ export interface ScoopTextOverlay {
   fontSize: number;
   color: string;
   backgroundColor?: string;
-  rotation?: number;
+  rotation?: number; // degrees
+  scale?: number; // 1.0 = normal size
 }
 
 export interface Scoop {

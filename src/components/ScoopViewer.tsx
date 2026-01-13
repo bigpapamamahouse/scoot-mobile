@@ -300,7 +300,10 @@ export const ScoopViewer: React.FC<ScoopViewerProps> = ({
                 {
                   left: `${overlay.x}%`,
                   top: `${overlay.y}%`,
-                  transform: [{ rotate: `${overlay.rotation || 0}deg` }],
+                  transform: [
+                    { scale: overlay.scale || 1 },
+                    { rotate: `${overlay.rotation || 0}deg` },
+                  ],
                 },
               ]}
             >

@@ -48,6 +48,8 @@ interface ScoopEditorProps {
 interface TextOverlayState extends Omit<ScoopTextOverlay, 'id'> {
   id: string;
   pan: Animated.ValueXY;
+  scaleValue: Animated.Value;
+  rotationValue: Animated.Value;
 }
 
 interface CropState {
@@ -415,6 +417,8 @@ export const ScoopEditor: React.FC<ScoopEditorProps> = ({
       color: selectedColor,
       backgroundColor: selectedColor === '#FFFFFF' ? 'rgba(0,0,0,0.5)' : undefined,
       pan: new Animated.ValueXY({ x: pixelX - 50, y: pixelY - 20 }),
+      scaleValue: new Animated.Value(1),
+      rotationValue: new Animated.Value(0),
     };
 
     setTextOverlays((prev) => [...prev, newOverlay]);
@@ -448,6 +452,8 @@ export const ScoopEditor: React.FC<ScoopEditorProps> = ({
       // Get final position from animated value
       const x = (overlay.pan.x as any)._value || 0;
       const y = (overlay.pan.y as any)._value || 0;
+      const scale = (overlay.scaleValue as any)._value || 1;
+      const rotation = (overlay.rotationValue as any)._value || 0;
 
       return {
         id: overlay.id,
@@ -458,6 +464,8 @@ export const ScoopEditor: React.FC<ScoopEditorProps> = ({
         fontSize: overlay.fontSize,
         color: overlay.color,
         backgroundColor: overlay.backgroundColor,
+        scale: scale,
+        rotation: rotation,
       };
     });
 
@@ -470,8 +478,28 @@ export const ScoopEditor: React.FC<ScoopEditorProps> = ({
     setIsTrimming(false);
   }, []);
 
+  // Helper function to calculate distance between two touches
+  const getDistance = (touches: any[]) => {
+    const dx = touches[0].pageX - touches[1].pageX;
+    const dy = touches[0].pageY - touches[1].pageY;
+    return Math.sqrt(dx * dx + dy * dy);
+  };
+
+  // Helper function to calculate angle between two touches
+  const getAngle = (touches: any[]) => {
+    const dx = touches[1].pageX - touches[0].pageX;
+    const dy = touches[1].pageY - touches[0].pageY;
+    return (Math.atan2(dy, dx) * 180) / Math.PI;
+  };
+
   const createPanResponder = useCallback(
     (overlay: TextOverlayState) => {
+      let initialDistance = 0;
+      let initialAngle = 0;
+      let baseScale = 1;
+      let baseRotation = 0;
+      let isMultiTouch = false;
+
       return PanResponder.create({
         onStartShouldSetPanResponder: () => true,
         onMoveShouldSetPanResponder: () => true,
@@ -482,13 +510,50 @@ export const ScoopEditor: React.FC<ScoopEditorProps> = ({
             y: (overlay.pan.y as any)._value,
           });
           overlay.pan.setValue({ x: 0, y: 0 });
+          baseScale = (overlay.scaleValue as any)._value || 1;
+          baseRotation = (overlay.rotationValue as any)._value || 0;
+          isMultiTouch = false;
         },
-        onPanResponderMove: Animated.event(
-          [null, { dx: overlay.pan.x, dy: overlay.pan.y }],
-          { useNativeDriver: false }
-        ),
+        onPanResponderMove: (evt, gestureState) => {
+          const touches = evt.nativeEvent.touches;
+
+          if (touches.length >= 2) {
+            // Two-finger gesture for scale and rotation
+            isMultiTouch = true;
+            const currentDistance = getDistance(touches);
+            const currentAngle = getAngle(touches);
+
+            if (initialDistance === 0) {
+              // First two-finger touch - record initial values
+              initialDistance = currentDistance;
+              initialAngle = currentAngle;
+            } else {
+              // Calculate scale from distance ratio
+              const scaleFactor = currentDistance / initialDistance;
+              const newScale = Math.max(0.5, Math.min(3, baseScale * scaleFactor));
+              overlay.scaleValue.setValue(newScale);
+
+              // Calculate rotation from angle difference
+              let angleDiff = currentAngle - initialAngle;
+              // Normalize to -180 to 180
+              while (angleDiff > 180) angleDiff -= 360;
+              while (angleDiff < -180) angleDiff += 360;
+              overlay.rotationValue.setValue(baseRotation + angleDiff);
+            }
+          } else if (!isMultiTouch) {
+            // Single finger pan (only if we didn't start with multi-touch)
+            Animated.event(
+              [null, { dx: overlay.pan.x, dy: overlay.pan.y }],
+              { useNativeDriver: false }
+            )(evt, gestureState);
+          }
+        },
         onPanResponderRelease: () => {
           overlay.pan.flattenOffset();
+          // Reset for next gesture
+          initialDistance = 0;
+          initialAngle = 0;
+          isMultiTouch = false;
         },
       });
     },
@@ -622,13 +687,22 @@ export const ScoopEditor: React.FC<ScoopEditorProps> = ({
         {/* Text overlays */}
         {textOverlays.map((overlay) => {
           const panResponder = createPanResponder(overlay);
+          // Create rotation interpolation for string output
+          const rotateStr = overlay.rotationValue.interpolate({
+            inputRange: [-360, 360],
+            outputRange: ['-360deg', '360deg'],
+          });
           return (
             <Animated.View
               key={overlay.id}
               style={[
                 styles.textOverlay,
                 {
-                  transform: overlay.pan.getTranslateTransform(),
+                  transform: [
+                    ...overlay.pan.getTranslateTransform(),
+                    { scale: overlay.scaleValue },
+                    { rotate: rotateStr },
+                  ],
                 },
                 selectedOverlayId === overlay.id && styles.selectedOverlay,
               ]}
@@ -669,7 +743,7 @@ export const ScoopEditor: React.FC<ScoopEditorProps> = ({
 
       {/* Bottom controls */}
       <View style={styles.bottomControls}>
-        <Text style={styles.hintText}>Tap anywhere to add text</Text>
+        <Text style={styles.hintText}>Tap to add text • Two fingers to resize/rotate</Text>
         <TouchableOpacity
           style={styles.publishButton}
           onPress={handlePublish}
