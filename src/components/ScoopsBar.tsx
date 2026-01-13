@@ -93,10 +93,35 @@ export const ScoopsBar: React.FC<ScoopsBarProps> = ({
     );
   }
 
+  // Sort scoops feed to show unviewed first
+  const sortedScoopsFeed = React.useMemo(() => {
+    return [...scoopsFeed].sort((a, b) => {
+      if (a.hasUnviewed && !b.hasUnviewed) return -1;
+      if (!a.hasUnviewed && b.hasUnviewed) return 1;
+      return 0;
+    });
+  }, [scoopsFeed]);
+
   // Show minimal bar when there are no other users' scoops
-  if (scoopsFeed.length === 0) {
+  if (sortedScoopsFeed.length === 0) {
     return (
       <View style={[styles.container, styles.minimalContainer]}>
+        {/* Add scoop button - always visible, shown first */}
+        <View style={styles.scoopItem}>
+          <ScoopAvatar
+            avatarKey={currentUser?.avatarKey}
+            size={64}
+            hasUnviewed={false}
+            onPress={onPressCreate}
+            showAddButton
+          />
+          <Text
+            style={[styles.handle, { color: colors.text.secondary }]}
+            numberOfLines={1}
+          >
+            Add Scoop
+          </Text>
+        </View>
         {/* User's scoop - shown when they have scoops */}
         {myScoops.length > 0 && (
           <View style={styles.scoopItem}>
@@ -114,22 +139,6 @@ export const ScoopsBar: React.FC<ScoopsBarProps> = ({
             </Text>
           </View>
         )}
-        {/* Add scoop button - always visible */}
-        <View style={styles.scoopItem}>
-          <ScoopAvatar
-            avatarKey={currentUser?.avatarKey}
-            size={64}
-            hasUnviewed={false}
-            onPress={onPressCreate}
-            showAddButton
-          />
-          <Text
-            style={[styles.handle, { color: colors.text.secondary }]}
-            numberOfLines={1}
-          >
-            Add Scoop
-          </Text>
-        </View>
       </View>
     );
   }
@@ -138,13 +147,29 @@ export const ScoopsBar: React.FC<ScoopsBarProps> = ({
     <View style={styles.container}>
       <FlatList
         horizontal
-        data={scoopsFeed}
+        data={sortedScoopsFeed}
         keyExtractor={(item) => item.userId}
         renderItem={renderScoopItem}
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.listContent}
         ListHeaderComponent={
           <>
+            {/* Add scoop button - always visible, shown first */}
+            <View style={styles.scoopItem}>
+              <ScoopAvatar
+                avatarKey={currentUser?.avatarKey}
+                size={64}
+                hasUnviewed={false}
+                onPress={onPressCreate}
+                showAddButton
+              />
+              <Text
+                style={[styles.handle, { color: colors.text.secondary }]}
+                numberOfLines={1}
+              >
+                Add Scoop
+              </Text>
+            </View>
             {/* User's scoop - shown when they have scoops */}
             {myScoops.length > 0 && (
               <View style={styles.scoopItem}>
@@ -162,22 +187,6 @@ export const ScoopsBar: React.FC<ScoopsBarProps> = ({
                 </Text>
               </View>
             )}
-            {/* Add scoop button - always visible */}
-            <View style={styles.scoopItem}>
-              <ScoopAvatar
-                avatarKey={currentUser?.avatarKey}
-                size={64}
-                hasUnviewed={false}
-                onPress={onPressCreate}
-                showAddButton
-              />
-              <Text
-                style={[styles.handle, { color: colors.text.secondary }]}
-                numberOfLines={1}
-              >
-                Add Scoop
-              </Text>
-            </View>
           </>
         }
       />

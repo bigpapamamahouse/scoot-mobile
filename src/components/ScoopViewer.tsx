@@ -205,14 +205,17 @@ export const ScoopViewer: React.FC<ScoopViewerProps> = ({
     onPauseChange(false);
   }, [onPauseChange]);
 
-  // Swipe up gesture for viewers (owner only)
+  // Swipe up gesture for viewers (owner only) - works from anywhere on screen
   const swipeAnim = useRef(new Animated.Value(0)).current;
+  const isOwnerRef = useRef(isOwner);
+  isOwnerRef.current = isOwner;
+
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => false,
       onMoveShouldSetPanResponder: (_, gestureState) => {
-        // Only respond to vertical swipes when owner
-        return isOwner && Math.abs(gestureState.dy) > 10 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx);
+        // Only respond to upward vertical swipes when owner
+        return isOwnerRef.current && gestureState.dy < -10 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx);
       },
       onPanResponderGrant: () => {
         onPauseChange(true);
@@ -255,18 +258,8 @@ export const ScoopViewer: React.FC<ScoopViewerProps> = ({
     return `${hours}h ago`;
   }, [scoop.createdAt]);
 
-  const timeRemaining = React.useMemo(() => {
-    const now = Date.now();
-    const remaining = scoop.expiresAt - now;
-    if (remaining <= 0) return 'Expired';
-    const hours = Math.floor(remaining / (1000 * 60 * 60));
-    const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
-    if (hours > 0) return `${hours}h ${minutes}m left`;
-    return `${minutes}m left`;
-  }, [scoop.expiresAt]);
-
   return (
-    <View style={styles.container}>
+    <View style={styles.container} {...panResponder.panHandlers}>
       {/* Media */}
       <TouchableWithoutFeedback
         onPress={handlePress}
@@ -403,20 +396,13 @@ export const ScoopViewer: React.FC<ScoopViewerProps> = ({
         </Pressable>
       </Modal>
 
-      {/* Footer for owner */}
+      {/* Footer for owner - swipe up hint centered */}
       {isOwner && (
-        <View style={styles.ownerFooter} {...panResponder.panHandlers}>
-          {/* Time remaining */}
-          <View style={styles.timeRemainingBadge}>
-            <Ionicons name="time-outline" size={18} color="#fff" />
-            <Text style={styles.timeRemainingText}>{timeRemaining}</Text>
-          </View>
-
-          {/* Swipe up hint */}
+        <View style={styles.ownerFooter}>
           <Animated.View style={[styles.swipeHint, { transform: [{ translateY: Animated.multiply(swipeAnim, -0.3) }] }]}>
             <Ionicons name="chevron-up" size={20} color="rgba(255,255,255,0.8)" />
             <Text style={styles.swipeHintText}>
-              {scoop.viewCount} {scoop.viewCount === 1 ? 'view' : 'views'}
+              {scoop.viewCount ?? 0} {scoop.viewCount === 1 ? 'view' : 'views'}
             </Text>
           </Animated.View>
         </View>
@@ -562,23 +548,8 @@ const styles = StyleSheet.create({
     bottom: 50,
     left: spacing[4],
     right: spacing[4],
-    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  timeRemainingBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    paddingHorizontal: spacing[3],
-    paddingVertical: spacing[2],
-    borderRadius: 20,
-    gap: spacing[1],
-  },
-  timeRemainingText: {
-    color: '#fff',
-    fontSize: typography.fontSize.sm,
-    fontWeight: '500',
+    justifyContent: 'center',
   },
   swipeHint: {
     alignItems: 'center',

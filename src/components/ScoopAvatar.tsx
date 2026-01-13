@@ -32,7 +32,7 @@ export const ScoopAvatar: React.FC<ScoopAvatarProps> = ({
   const outerSize = size + (ringWidth + ringGap) * 2;
 
   const gradientColors = hasUnviewed
-    ? ['#FF6B6B', '#FF8E53', '#FFA726', '#FFD93D'] as const // Vibrant gradient for unviewed
+    ? [colors.primary[400], colors.primary[500], colors.primary[600]] as const // Theme color gradient for unviewed
     : [colors.neutral[300], colors.neutral[400]] as const; // Gray for all viewed
 
   const content = (
