@@ -289,9 +289,20 @@ export const ScoopCamera: React.FC<ScoopCameraProps> = ({
         const durationInSeconds = isVideo && asset.duration ? asset.duration / 1000 : undefined;
         onCapture(asset.uri, isVideo ? 'video' : 'image', aspectRatio, true, durationInSeconds);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('[ScoopCamera] Gallery picker error:', error);
-      Alert.alert('Error', 'Failed to pick from gallery. Please try again.');
+
+      // Check for iCloud download error (PHPhotosErrorDomain error 3164)
+      const errorMessage = error?.message || error?.toString() || '';
+      if (errorMessage.includes('3164') || errorMessage.includes('PHPhotosErrorDomain')) {
+        Alert.alert(
+          'iCloud Video Not Available',
+          'This video is stored in iCloud and couldn\'t be downloaded. Please open the Photos app and download the video first, then try again.',
+          [{ text: 'OK' }]
+        );
+      } else {
+        Alert.alert('Error', 'Failed to pick from gallery. Please try again.');
+      }
     }
   }, [onCapture]);
 
