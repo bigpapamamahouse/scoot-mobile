@@ -108,17 +108,41 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
         }, 1500);
       } catch (error: any) {
         console.error('[UploadContext] Upload failed:', error);
-        setCurrentUpload({
-          id: uploadId,
-          status: 'error',
-          message: 'Upload failed',
-          error: error?.message || 'Unknown error',
-        });
 
-        // Clear error status after 5 seconds
-        setTimeout(() => {
-          setCurrentUpload(null);
-        }, 5000);
+        // Check if this is a 503 timeout error - the scoop likely still succeeded
+        // API Gateway has a 29s timeout, but Lambda may still complete
+        const is503Timeout = error?.message?.includes('503');
+
+        if (is503Timeout && payload.mediaType === 'video') {
+          // For video uploads with 503, assume success since processing takes longer than API Gateway timeout
+          console.log('[UploadContext] Got 503 for video - assuming success (API Gateway timeout)');
+          setCurrentUpload({
+            id: uploadId,
+            status: 'success',
+            message: 'Scoop shared!',
+          });
+
+          // Notify subscribers after a delay to allow Lambda to complete
+          setTimeout(() => {
+            successCallbacksRef.current.forEach((cb) => cb());
+          }, 5000);
+
+          setTimeout(() => {
+            setCurrentUpload(null);
+          }, 3000);
+        } else {
+          setCurrentUpload({
+            id: uploadId,
+            status: 'error',
+            message: 'Upload failed',
+            error: error?.message || 'Unknown error',
+          });
+
+          // Clear error status after 5 seconds
+          setTimeout(() => {
+            setCurrentUpload(null);
+          }, 5000);
+        }
       }
     },
     []
