@@ -3,7 +3,7 @@
  * Horizontal scrollable list of user scoops at the top of the feed
  */
 
-import React from 'react';
+import React, { forwardRef, useImperativeHandle } from 'react';
 import {
   View,
   Text,
@@ -24,11 +24,15 @@ interface ScoopsBarProps {
   onPressOwnScoops?: (scoops: Scoop[]) => void;
 }
 
-export const ScoopsBar: React.FC<ScoopsBarProps> = ({
+export interface ScoopsBarRef {
+  refresh: () => Promise<void>;
+}
+
+export const ScoopsBar = forwardRef<ScoopsBarRef, ScoopsBarProps>(({
   onPressScoops,
   onPressCreate,
   onPressOwnScoops,
-}) => {
+}, ref) => {
   const { colors } = useTheme();
   const { currentUser } = useCurrentUser();
   const { isUploading, onUploadSuccess } = useUpload();
@@ -54,6 +58,11 @@ export const ScoopsBar: React.FC<ScoopsBarProps> = ({
   React.useEffect(() => {
     loadScoops();
   }, [loadScoops]);
+
+  // Expose refresh method via ref
+  useImperativeHandle(ref, () => ({
+    refresh: loadScoops,
+  }), [loadScoops]);
 
   // Refresh scoops when upload succeeds
   React.useEffect(() => {
@@ -231,7 +240,7 @@ export const ScoopsBar: React.FC<ScoopsBarProps> = ({
       />
     </View>
   );
-};
+});
 
 const createStyles = (colors: any) =>
   StyleSheet.create({

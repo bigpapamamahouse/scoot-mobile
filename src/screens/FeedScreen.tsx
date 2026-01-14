@@ -3,7 +3,7 @@ import React from 'react';
 import { View, Text, FlatList, RefreshControl, StyleSheet, ActivityIndicator } from 'react-native';
 import { PostsAPI, ReactionsAPI } from '../api';
 import PostCard from '../components/PostCard';
-import { ScoopsBar } from '../components/ScoopsBar';
+import { ScoopsBar, ScoopsBarRef } from '../components/ScoopsBar';
 import { Post, UserScoops, Scoop } from '../types';
 import { resolveHandle } from '../lib/resolveHandle';
 import { IconButton } from '../components/ui';
@@ -21,6 +21,7 @@ export default function FeedScreen({ navigation }: any){
   const [page, setPage] = React.useState(0);
   const [reactionsMap, setReactionsMap] = React.useState<Map<string, any>>(new Map());
   const flatListRef = React.useRef<FlatList>(null);
+  const scoopsBarRef = React.useRef<ScoopsBarRef>(null);
 
   const openProfile = React.useCallback(
     (post: Post) => {
@@ -143,7 +144,11 @@ export default function FeedScreen({ navigation }: any){
     setRefreshing(true);
     setPage(0);
     setHasMore(true);
-    await load(0, false);
+    // Refresh both feed and scoops in parallel
+    await Promise.all([
+      load(0, false),
+      scoopsBarRef.current?.refresh(),
+    ]);
     setRefreshing(false);
   }, [load]);
 
@@ -204,6 +209,7 @@ export default function FeedScreen({ navigation }: any){
         ItemSeparatorComponent={() => <View style={{ height: spacing[3] }} />}
         ListHeaderComponent={
           <ScoopsBar
+            ref={scoopsBarRef}
             onPressScoops={handlePressScoops}
             onPressCreate={handlePressCreateScoop}
             onPressOwnScoops={handlePressOwnScoops}
