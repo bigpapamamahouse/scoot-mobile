@@ -57,7 +57,12 @@ async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: numbe
   }
 }
 
-export async function api(path: string, init: RequestInit = {}) {
+export interface ApiOptions extends RequestInit {
+  timeoutMs?: number;
+}
+
+export async function api(path: string, init: ApiOptions = {}) {
+  const { timeoutMs = 10000, ...requestInit } = init;
   let lastText = '';
   let attempt = 0;
   let token: string | null | undefined;
@@ -65,17 +70,17 @@ export async function api(path: string, init: RequestInit = {}) {
   const fullUrl = `${ENV.API_URL}${path}`;
 
   // Debug logging for DELETE requests
-  if (init.method === 'DELETE') {
-    console.log(`[API CLIENT] Making ${init.method} request to ${fullUrl}`);
+  if (requestInit.method === 'DELETE') {
+    console.log(`[API CLIENT] Making ${requestInit.method} request to ${fullUrl}`);
   }
 
   while (attempt < 2) {
     attempt += 1;
-    const { headers, token: currentToken } = await buildRequestInit(init);
+    const { headers, token: currentToken } = await buildRequestInit(requestInit);
     token = currentToken;
 
-    // Use 10-second timeout to prevent hanging requests
-    const res = await fetchWithTimeout(fullUrl, { ...init, headers }, 10000);
+    // Use configurable timeout (default 10s) to prevent hanging requests
+    const res = await fetchWithTimeout(fullUrl, { ...requestInit, headers }, timeoutMs);
 
     if (res.ok) {
       const ct = res.headers.get('content-type') || '';

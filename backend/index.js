@@ -2,6 +2,9 @@
 // ---------- CommonJS + AWS SDK v3 ----------
 const crypto = require('crypto');
 const { randomUUID } = require('crypto');
+const { execSync } = require('child_process');
+const fs = require('fs');
+const path = require('path');
 
 const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
 const {
@@ -35,6 +38,7 @@ const NOTIFICATIONS_TABLE = process.env.NOTIFICATIONS_TABLE; // NEW: pk USER#<ta
 const PUSH_TOKENS_TABLE = process.env.PUSH_TOKENS_TABLE; // pk: USER#<userId>, sk: TOKEN#<tokenHash>
 const REPORTS_TABLE = process.env.REPORTS_TABLE; // pk: REPORT#<reportId>, sk: <timestamp>
 const BLOCKS_TABLE = process.env.BLOCKS_TABLE; // pk: USER#<userId>, sk: BLOCKED#<blockedUserId>
+const SCOOPS_TABLE = process.env.SCOOPS_TABLE; // pk: USER#<userId>, sk: SCOOP#<ts>#<uuid> - Stories/Scoops
 const USER_POOL_ID = process.env.USER_POOL_ID;
 
 // ---------- Allowed origins for CORS ----------
@@ -61,6 +65,202 @@ const ddb = DynamoDBDocumentClient.from(ddbClient, {
 const s3 = new S3Client({});
 const cognito = new CognitoIdentityProviderClient({});
 const bedrock = new BedrockRuntimeClient({ region: 'us-east-1' });
+
+// ---------- Video Processing with FFmpeg ----------
+// FFmpeg is provided via Lambda Layer: arn:aws:lambda:us-east-1:678705476278:layer:ffmpeg:1
+// Or you can use a custom layer built from https://github.com/serverlesspub/ffmpeg-aws-lambda-layer
+const FFMPEG_PATH = process.env.FFMPEG_PATH || '/opt/bin/ffmpeg';
+
+/**
+ * Process video: trim to specified segment and compress
+ * @param {string} bucket - S3 bucket name
+ * @param {string} key - S3 object key
+ * @param {number} startTime - Start time in seconds
+ * @param {number} endTime - End time in seconds
+ * @returns {Promise<string>} - New S3 key for processed video
+ */
+async function processVideo(bucket, key, startTime, endTime) {
+  const timestamp = Date.now();
+  const tmpInput = `/tmp/input_${timestamp}.mp4`;
+  const tmpOutput = `/tmp/output_${timestamp}.mp4`;
+
+  try {
+    // Log Lambda environment info for debugging
+    console.log('[VideoProcess] === Environment Debug Info ===');
+    console.log(`[VideoProcess] FFMPEG_PATH env: ${process.env.FFMPEG_PATH || '(not set, using default)'}`);
+    console.log(`[VideoProcess] Expected FFmpeg location: ${FFMPEG_PATH}`);
+    console.log(`[VideoProcess] Lambda memory: ${process.env.AWS_LAMBDA_FUNCTION_MEMORY_SIZE || 'unknown'} MB`);
+    console.log(`[VideoProcess] Lambda temp space: checking /tmp...`);
+
+    // Check /opt directory (where Lambda layers are mounted)
+    try {
+      const optContents = fs.existsSync('/opt') ? fs.readdirSync('/opt') : [];
+      console.log(`[VideoProcess] /opt contents: ${JSON.stringify(optContents)}`);
+      if (fs.existsSync('/opt/bin')) {
+        const optBinContents = fs.readdirSync('/opt/bin');
+        console.log(`[VideoProcess] /opt/bin contents: ${JSON.stringify(optBinContents)}`);
+      } else {
+        console.log('[VideoProcess] /opt/bin does NOT exist - Lambda layer may not be attached!');
+      }
+    } catch (e) {
+      console.error('[VideoProcess] Error checking /opt:', e.message);
+    }
+
+    // Check /tmp space
+    try {
+      const tmpStats = execSync('df -h /tmp 2>/dev/null || echo "df not available"', { encoding: 'utf8' });
+      console.log(`[VideoProcess] /tmp disk space:\n${tmpStats}`);
+    } catch (e) {
+      console.log('[VideoProcess] Could not check /tmp space');
+    }
+
+    console.log('[VideoProcess] === Starting Video Processing ===');
+    console.log(`[VideoProcess] Downloading video from s3://${bucket}/${key}`);
+
+    // Download video from S3
+    const getResult = await s3.send(new GetObjectCommand({
+      Bucket: bucket,
+      Key: key,
+    }));
+
+    // Stream the body to a file
+    const chunks = [];
+    for await (const chunk of getResult.Body) {
+      chunks.push(chunk);
+    }
+    fs.writeFileSync(tmpInput, Buffer.concat(chunks));
+    console.log(`[VideoProcess] Downloaded ${fs.statSync(tmpInput).size} bytes`);
+
+    // Calculate duration
+    const duration = endTime - startTime;
+    console.log(`[VideoProcess] Trimming from ${startTime}s to ${endTime}s (${duration}s)`);
+
+    // Check if FFmpeg is available
+    try {
+      const ffmpegVersion = execSync(`${FFMPEG_PATH} -version`, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
+      const versionLine = ffmpegVersion.split('\n')[0];
+      console.log(`[VideoProcess] FFmpeg found: ${versionLine}`);
+    } catch (e) {
+      console.error('[VideoProcess] FFmpeg not available at', FFMPEG_PATH);
+      console.error('[VideoProcess] FFmpeg check error:', e.message);
+      if (e.stderr) console.error('[VideoProcess] FFmpeg stderr:', e.stderr.toString());
+      // Check if file exists
+      console.log(`[VideoProcess] File exists at ${FFMPEG_PATH}:`, fs.existsSync(FFMPEG_PATH));
+      // Return original key if FFmpeg is not available
+      fs.unlinkSync(tmpInput);
+      return key;
+    }
+
+    // Build FFmpeg command:
+    // -ss: seek to start time (before -i for fast seeking)
+    // -t: duration
+    // -c:v libx264: H.264 video codec
+    // -crf 28: quality (lower = better, 23 is default, 28 is good for mobile)
+    // -preset fast: encoding speed vs compression ratio
+    // -c:a aac: AAC audio codec
+    // -b:a 128k: audio bitrate
+    // -movflags +faststart: optimize for web streaming
+    const cmd = [
+      FFMPEG_PATH,
+      '-y', // Overwrite output file
+      '-ss', startTime.toString(), // Seek to start time
+      '-i', tmpInput,
+      '-t', duration.toString(), // Duration
+      '-c:v', 'libx264',
+      '-crf', '28',
+      '-preset', 'fast',
+      '-c:a', 'aac',
+      '-b:a', '128k',
+      '-movflags', '+faststart',
+      '-vf', '"scale=trunc(iw/2)*2:trunc(ih/2)*2"', // Ensure even dimensions
+      tmpOutput,
+    ].join(' ');
+
+    console.log(`[VideoProcess] Running: ${cmd}`);
+    const inputSize = fs.statSync(tmpInput).size;
+    const startProcessTime = Date.now();
+
+    try {
+      const result = execSync(cmd, {
+        maxBuffer: 50 * 1024 * 1024, // 50MB buffer
+        timeout: 120000, // 2 minute timeout
+        encoding: 'utf8',
+        stdio: ['pipe', 'pipe', 'pipe'],
+      });
+      if (result) console.log(`[VideoProcess] FFmpeg stdout: ${result}`);
+    } catch (execError) {
+      // FFmpeg outputs progress to stderr, so we need to check if output file was created
+      if (execError.stderr) {
+        console.log(`[VideoProcess] FFmpeg stderr (last 500 chars): ${execError.stderr.toString().slice(-500)}`);
+      }
+      // Check if output file was created despite error
+      if (!fs.existsSync(tmpOutput)) {
+        console.error('[VideoProcess] FFmpeg failed - no output file created');
+        console.error('[VideoProcess] FFmpeg error:', execError.message);
+        throw execError;
+      }
+      console.log('[VideoProcess] FFmpeg completed (stderr had content but output file exists)');
+    }
+
+    const processTime = Date.now() - startProcessTime;
+    const outputSize = fs.statSync(tmpOutput).size;
+    const compressionRatio = ((1 - outputSize / inputSize) * 100).toFixed(1);
+
+    console.log(`[VideoProcess] === Processing Results ===`);
+    console.log(`[VideoProcess] Input size: ${(inputSize / 1024 / 1024).toFixed(2)} MB`);
+    console.log(`[VideoProcess] Output size: ${(outputSize / 1024 / 1024).toFixed(2)} MB`);
+    console.log(`[VideoProcess] Compression: ${compressionRatio}% reduction`);
+    console.log(`[VideoProcess] Processing time: ${(processTime / 1000).toFixed(1)}s`);
+
+    // Upload processed video back to S3
+    // Ensure processed key always has .mp4 extension for proper playback
+    const hasExtension = /\.[^./]+$/.test(key);
+    let processedKey;
+    if (hasExtension) {
+      // Replace existing extension with _processed.mp4
+      processedKey = key.replace(/\.[^.]+$/, '_processed.mp4');
+    } else {
+      // No extension - add _processed.mp4
+      processedKey = `${key}_processed.mp4`;
+    }
+    console.log(`[VideoProcess] Uploading to s3://${bucket}/${processedKey}`);
+
+    await s3.send(new PutObjectCommand({
+      Bucket: bucket,
+      Key: processedKey,
+      Body: fs.readFileSync(tmpOutput),
+      ContentType: 'video/mp4',
+    }));
+
+    console.log('[VideoProcess] Upload complete');
+
+    // Clean up temp files
+    fs.unlinkSync(tmpInput);
+    fs.unlinkSync(tmpOutput);
+
+    // Delete original file (only if different from processed key)
+    if (key !== processedKey) {
+      try {
+        await s3.send(new DeleteObjectCommand({
+          Bucket: bucket,
+          Key: key,
+        }));
+        console.log('[VideoProcess] Deleted original file');
+      } catch (e) {
+        console.warn('[VideoProcess] Failed to delete original:', e.message);
+      }
+    }
+
+    return processedKey;
+  } catch (error) {
+    console.error('[VideoProcess] Error:', error);
+    // Clean up temp files on error
+    try { fs.unlinkSync(tmpInput); } catch (e) {}
+    try { fs.unlinkSync(tmpOutput); } catch (e) {}
+    // Return original key on error
+    return key;
+  }
+}
 
 // ---------- CORS + response helpers ----------
 
@@ -3548,6 +3748,465 @@ module.exports.handler = async (event) => {
 
       const blocked = await hasBlockBetween(userId, targetUserId);
       return ok({ blocked });
+    }
+
+    // ===================== SCOOPS (Stories) =====================
+    // SCOOPS_TABLE schema:
+    //   Partition key: "USER#<userId>" (String) - attribute name is literally "USER#<userId>"
+    //   Sort key: "SCOOP#<timestamp>#<uuid>" (String) - attribute name is literally "SCOOP#<timestamp>#<uuid>"
+    const SCOOP_PK = 'USER#<userId>';
+    const SCOOP_SK = 'SCOOP#<timestamp>#<uuid>';
+
+    // Get scoops feed - returns scoops from followed users grouped by user
+    if (route === 'GET /scoops/feed') {
+      if (!SCOOPS_TABLE) return bad('Scoops not enabled', 501);
+      if (!userId) return bad('Unauthorized', 401);
+
+      const now = Date.now();
+      const twentyFourHoursAgo = now - (24 * 60 * 60 * 1000);
+
+      // Get users this person follows
+      const followedUsers = [];
+      if (FOLLOWS_TABLE) {
+        const followsResult = await ddb.send(new QueryCommand({
+          TableName: FOLLOWS_TABLE,
+          KeyConditionExpression: 'pk = :pk',
+          ExpressionAttributeValues: { ':pk': `FOLLOWING#${userId}` },
+        }));
+        for (const item of (followsResult.Items || [])) {
+          if (item.followedId) followedUsers.push(item.followedId);
+        }
+      }
+
+      // Get all recent scoops with a single scan
+      const scoopsResult = await ddb.send(new ScanCommand({
+        TableName: SCOOPS_TABLE,
+        FilterExpression: 'expiresAt > :now AND createdAt > :minTime',
+        ExpressionAttributeValues: {
+          ':now': now,
+          ':minTime': twentyFourHoursAgo,
+        },
+      }));
+
+      // Group scoops by user
+      const userScoopsMap = new Map();
+
+      for (const s of (scoopsResult.Items || [])) {
+        // Only include scoops from followed users
+        if (!followedUsers.includes(s.userId)) continue;
+
+        const scoop = {
+          id: s.id,
+          pk: s[SCOOP_PK],
+          sk: s[SCOOP_SK],
+          userId: s.userId,
+          handle: s.handle,
+          avatarKey: s.avatarKey,
+          mediaKey: s.mediaKey,
+          mediaType: s.mediaType,
+          mediaAspectRatio: s.mediaAspectRatio,
+          textOverlays: s.textOverlays,
+          createdAt: s.createdAt,
+          expiresAt: s.expiresAt,
+          viewCount: s.viewCount || 0,
+          viewed: (s.viewers || []).includes(userId),
+        };
+
+        if (!userScoopsMap.has(s.userId)) {
+          userScoopsMap.set(s.userId, {
+            userId: s.userId,
+            handle: s.handle,
+            avatarKey: s.avatarKey,
+            scoops: [],
+            hasUnviewed: false,
+            latestScoopAt: 0,
+          });
+        }
+
+        const userEntry = userScoopsMap.get(s.userId);
+        userEntry.scoops.push(scoop);
+        if (!scoop.viewed) userEntry.hasUnviewed = true;
+        if (scoop.createdAt > userEntry.latestScoopAt) {
+          userEntry.latestScoopAt = scoop.createdAt;
+        }
+      }
+
+      // Sort scoops within each user by createdAt (oldest first)
+      for (const entry of userScoopsMap.values()) {
+        entry.scoops.sort((a, b) => a.createdAt - b.createdAt);
+      }
+
+      // Sort by latest scoop and prioritize unviewed
+      const items = Array.from(userScoopsMap.values())
+        .sort((a, b) => {
+          if (a.hasUnviewed !== b.hasUnviewed) return a.hasUnviewed ? -1 : 1;
+          return b.latestScoopAt - a.latestScoopAt;
+        });
+
+      return ok({ items });
+    }
+
+    // Get my own scoops
+    if (route === 'GET /scoops/me') {
+      if (!SCOOPS_TABLE) return bad('Scoops not enabled', 501);
+      if (!userId) return bad('Unauthorized', 401);
+
+      const now = Date.now();
+      const twentyFourHoursAgo = now - (24 * 60 * 60 * 1000);
+
+      // Query by partition key
+      const result = await ddb.send(new QueryCommand({
+        TableName: SCOOPS_TABLE,
+        KeyConditionExpression: '#pk = :pk AND #sk > :sk',
+        ExpressionAttributeNames: {
+          '#pk': SCOOP_PK,
+          '#sk': SCOOP_SK,
+        },
+        ExpressionAttributeValues: {
+          ':pk': `USER#${userId}`,
+          ':sk': `SCOOP#${twentyFourHoursAgo}`,
+        },
+        ScanIndexForward: true, // oldest first
+      }));
+
+      const items = (result.Items || [])
+        .filter(s => s.expiresAt > now)
+        .map(s => ({
+          id: s.id,
+          userId: s.userId,
+          handle: s.handle,
+          avatarKey: s.avatarKey,
+          mediaKey: s.mediaKey,
+          mediaType: s.mediaType,
+          mediaAspectRatio: s.mediaAspectRatio,
+          textOverlays: s.textOverlays,
+          createdAt: s.createdAt,
+          expiresAt: s.expiresAt,
+          viewCount: s.viewCount || 0,
+        }));
+
+      return ok({ items });
+    }
+
+    // Get scoops for a specific user
+    if (method === 'GET' && path.startsWith('/scoops/user/')) {
+      if (!SCOOPS_TABLE) return bad('Scoops not enabled', 501);
+      if (!userId) return bad('Unauthorized', 401);
+
+      const targetUserId = path.split('/')[3];
+      if (!targetUserId) return bad('Missing userId', 400);
+
+      const now = Date.now();
+      const twentyFourHoursAgo = now - (24 * 60 * 60 * 1000);
+
+      // Query by partition key
+      const result = await ddb.send(new QueryCommand({
+        TableName: SCOOPS_TABLE,
+        KeyConditionExpression: '#pk = :pk AND #sk > :sk',
+        ExpressionAttributeNames: {
+          '#pk': SCOOP_PK,
+          '#sk': SCOOP_SK,
+        },
+        ExpressionAttributeValues: {
+          ':pk': `USER#${targetUserId}`,
+          ':sk': `SCOOP#${twentyFourHoursAgo}`,
+        },
+        ScanIndexForward: true, // oldest first
+      }));
+
+      const items = (result.Items || [])
+        .filter(s => s.expiresAt > now)
+        .map(s => ({
+          id: s.id,
+          userId: s.userId,
+          handle: s.handle,
+          avatarKey: s.avatarKey,
+          mediaKey: s.mediaKey,
+          mediaType: s.mediaType,
+          mediaAspectRatio: s.mediaAspectRatio,
+          textOverlays: s.textOverlays,
+          createdAt: s.createdAt,
+          expiresAt: s.expiresAt,
+          viewCount: s.viewCount || 0,
+          viewed: (s.viewers || []).includes(userId),
+        }));
+
+      return ok({ items });
+    }
+
+    // Create a new scoop
+    if (route === 'POST /scoops') {
+      if (!SCOOPS_TABLE) return bad('Scoops not enabled', 501);
+      if (!userId) return bad('Unauthorized', 401);
+
+      const body = JSON.parse(event.body || '{}');
+      const { mediaKey, mediaType, mediaAspectRatio, textOverlays, trimParams } = body;
+
+      if (!mediaKey) return bad('Missing mediaKey', 400);
+      if (!mediaType || !['image', 'video'].includes(mediaType)) {
+        return bad('Invalid mediaType', 400);
+      }
+
+      // Process video if trim params are provided
+      let finalMediaKey = mediaKey;
+      console.log(`[CreateScoop] Video processing check - mediaType: ${mediaType}, trimParams: ${JSON.stringify(trimParams)}, MEDIA_BUCKET: ${MEDIA_BUCKET ? 'set' : 'NOT SET'}`);
+
+      if (mediaType === 'video' && trimParams && MEDIA_BUCKET) {
+        const { startTime, endTime } = trimParams;
+        console.log(`[CreateScoop] trimParams validation - startTime: ${startTime} (${typeof startTime}), endTime: ${endTime} (${typeof endTime})`);
+        if (typeof startTime === 'number' && typeof endTime === 'number' && endTime > startTime) {
+          console.log(`[CreateScoop] Processing video with trim: ${startTime}s - ${endTime}s`);
+          try {
+            finalMediaKey = await processVideo(MEDIA_BUCKET, mediaKey, startTime, endTime);
+            console.log(`[CreateScoop] Video processed, new key: ${finalMediaKey}`);
+          } catch (e) {
+            console.error('[CreateScoop] Video processing failed:', e);
+            // Continue with original key if processing fails
+          }
+        } else {
+          console.log(`[CreateScoop] Skipping video processing - invalid trimParams`);
+        }
+      } else {
+        if (mediaType !== 'video') {
+          console.log(`[CreateScoop] Skipping video processing - mediaType is '${mediaType}', not 'video'`);
+        } else if (!trimParams) {
+          console.log(`[CreateScoop] Skipping video processing - no trimParams provided`);
+        } else if (!MEDIA_BUCKET) {
+          console.log(`[CreateScoop] Skipping video processing - MEDIA_BUCKET not configured`);
+        }
+      }
+
+      const now = Date.now();
+      const id = randomUUID();
+      const expiresAt = now + (24 * 60 * 60 * 1000); // 24 hours from now
+
+      // Get user info
+      const handle = await getHandleForUserId(userId);
+      const userInfo = await ddb.send(new GetCommand({
+        TableName: USERS_TABLE,
+        Key: { pk: `USER#${userId}` },
+      }));
+      const avatarKey = userInfo.Item?.avatarKey || null;
+
+      // Create item with literal key attribute names
+      const item = {
+        [SCOOP_PK]: `USER#${userId}`,
+        [SCOOP_SK]: `SCOOP#${now}#${id}`,
+        id,
+        userId,
+        handle,
+        avatarKey,
+        mediaKey: finalMediaKey,
+        mediaType,
+        mediaAspectRatio: mediaAspectRatio || null,
+        textOverlays: textOverlays || [],
+        createdAt: now,
+        expiresAt,
+        viewCount: 0,
+        viewers: [],
+      };
+
+      await ddb.send(new PutCommand({
+        TableName: SCOOPS_TABLE,
+        Item: item,
+      }));
+
+      return ok({
+        id,
+        userId,
+        handle,
+        avatarKey,
+        mediaKey: finalMediaKey,
+        mediaType,
+        mediaAspectRatio,
+        textOverlays,
+        createdAt: now,
+        expiresAt,
+        viewCount: 0,
+      });
+    }
+
+    // Get a single scoop by ID
+    if (method === 'GET' && path.match(/^\/scoops\/[^\/]+$/) && !path.includes('/user/')) {
+      if (!SCOOPS_TABLE) return bad('Scoops not enabled', 501);
+
+      const scoopId = path.split('/')[2];
+      if (!scoopId || scoopId === 'feed' || scoopId === 'me') {
+        return bad('Not found', 404);
+      }
+
+      // Scan to find scoop by ID (since we need both pk and sk for GetCommand)
+      // Note: No Limit here - Limit would only scan N items, not find N matches
+      const result = await ddb.send(new ScanCommand({
+        TableName: SCOOPS_TABLE,
+        FilterExpression: 'id = :id',
+        ExpressionAttributeValues: { ':id': scoopId },
+      }));
+
+      const scoop = (result.Items || [])[0];
+      if (!scoop) return bad('Scoop not found', 404);
+
+      return ok({
+        id: scoop.id,
+        userId: scoop.userId,
+        handle: scoop.handle,
+        avatarKey: scoop.avatarKey,
+        mediaKey: scoop.mediaKey,
+        mediaType: scoop.mediaType,
+        mediaAspectRatio: scoop.mediaAspectRatio,
+        textOverlays: scoop.textOverlays,
+        createdAt: scoop.createdAt,
+        expiresAt: scoop.expiresAt,
+        viewCount: scoop.viewCount || 0,
+        viewed: userId ? (scoop.viewers || []).includes(userId) : false,
+      });
+    }
+
+    // Delete a scoop
+    if (method === 'DELETE' && path.startsWith('/scoops/')) {
+      if (!SCOOPS_TABLE) return bad('Scoops not enabled', 501);
+      if (!userId) return bad('Unauthorized', 401);
+
+      const scoopId = path.split('/')[2];
+      if (!scoopId) return bad('Missing scoopId', 400);
+
+      // Find the scoop first (no Limit - it would only scan N items, not find N matches)
+      const result = await ddb.send(new ScanCommand({
+        TableName: SCOOPS_TABLE,
+        FilterExpression: 'id = :id',
+        ExpressionAttributeValues: { ':id': scoopId },
+      }));
+
+      const scoop = (result.Items || [])[0];
+      if (!scoop) return bad('Scoop not found', 404);
+      if (scoop.userId !== userId) return bad('Forbidden', 403);
+
+      // Delete from S3
+      if (scoop.mediaKey) {
+        try {
+          await s3.send(new DeleteObjectCommand({
+            Bucket: MEDIA_BUCKET,
+            Key: scoop.mediaKey,
+          }));
+        } catch (e) {
+          console.warn('Failed to delete scoop media from S3:', e);
+        }
+      }
+
+      // Delete from DynamoDB using the actual key values
+      await ddb.send(new DeleteCommand({
+        TableName: SCOOPS_TABLE,
+        Key: {
+          [SCOOP_PK]: scoop[SCOOP_PK],
+          [SCOOP_SK]: scoop[SCOOP_SK],
+        },
+      }));
+
+      return ok({ success: true });
+    }
+
+    // Mark a scoop as viewed
+    if (method === 'POST' && path.match(/^\/scoops\/[^\/]+\/view$/)) {
+      if (!SCOOPS_TABLE) return bad('Scoops not enabled', 501);
+      if (!userId) return bad('Unauthorized', 401);
+
+      const scoopId = path.split('/')[2];
+      if (!scoopId) return bad('Missing scoopId', 400);
+
+      // Find the scoop (no Limit - it would only scan N items, not find N matches)
+      const result = await ddb.send(new ScanCommand({
+        TableName: SCOOPS_TABLE,
+        FilterExpression: 'id = :id',
+        ExpressionAttributeValues: { ':id': scoopId },
+      }));
+
+      const scoop = (result.Items || [])[0];
+      if (!scoop) return bad('Scoop not found', 404);
+
+      // Don't track views on own scoops
+      if (scoop.userId === userId) {
+        return ok({ success: true });
+      }
+
+      // Check if already viewed
+      const viewers = scoop.viewers || [];
+      if (viewers.includes(userId)) {
+        return ok({ success: true });
+      }
+
+      // Add viewer and increment count
+      await ddb.send(new UpdateCommand({
+        TableName: SCOOPS_TABLE,
+        Key: {
+          [SCOOP_PK]: scoop[SCOOP_PK],
+          [SCOOP_SK]: scoop[SCOOP_SK],
+        },
+        UpdateExpression: 'SET viewers = list_append(if_not_exists(viewers, :empty), :viewer), viewCount = if_not_exists(viewCount, :zero) + :one',
+        ExpressionAttributeValues: {
+          ':viewer': [userId],
+          ':empty': [],
+          ':zero': 0,
+          ':one': 1,
+        },
+      }));
+
+      return ok({ success: true });
+    }
+
+    // Get scoop viewers
+    if (method === 'GET' && path.match(/^\/scoops\/[^\/]+\/viewers$/)) {
+      if (!SCOOPS_TABLE) return bad('Scoops not enabled', 501);
+      if (!userId) return bad('Unauthorized', 401);
+
+      const scoopId = path.split('/')[2];
+      if (!scoopId) return bad('Missing scoopId', 400);
+
+      // Query user's scoops and filter by id (more efficient than scan)
+      const now = Date.now();
+      const twentyFourHoursAgo = now - (24 * 60 * 60 * 1000);
+
+      const result = await ddb.send(new QueryCommand({
+        TableName: SCOOPS_TABLE,
+        KeyConditionExpression: '#pk = :pk AND #sk > :sk',
+        FilterExpression: 'id = :id',
+        ExpressionAttributeNames: {
+          '#pk': SCOOP_PK,
+          '#sk': SCOOP_SK,
+        },
+        ExpressionAttributeValues: {
+          ':pk': `USER#${userId}`,
+          ':sk': `SCOOP#${twentyFourHoursAgo}`,
+          ':id': scoopId,
+        },
+      }));
+
+      const scoop = (result.Items || [])[0];
+      if (!scoop) return bad('Scoop not found', 404);
+
+      // Only owner can see viewers
+      if (scoop.userId !== userId) return bad('Forbidden', 403);
+
+      const viewerIds = scoop.viewers || [];
+
+      // Fetch viewer details
+      const items = [];
+      for (const viewerId of viewerIds) {
+        const userResult = await ddb.send(new GetCommand({
+          TableName: USERS_TABLE,
+          Key: { pk: `USER#${viewerId}` },
+        }));
+        const user = userResult.Item;
+        if (user) {
+          items.push({
+            userId: viewerId,
+            handle: user.handle || null,
+            avatarKey: user.avatarKey || null,
+            viewedAt: Date.now(), // We're not tracking exact view time, using now as placeholder
+          });
+        }
+      }
+
+      return ok({ items });
     }
 
     // ----- default -----

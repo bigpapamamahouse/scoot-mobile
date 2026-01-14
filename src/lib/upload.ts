@@ -357,7 +357,7 @@ export async function uploadMedia({
 }: UploadMediaOptions): Promise<string> {
   const filename = fileName || uri.split('/').pop() || 'upload.jpg';
   const match = /\.(\w+)$/.exec(filename);
-  const type = contentType || (match ? `image/${match[1]}` : 'image/jpeg');
+  const type = contentType || guessContentType(match ? match[1] : null);
   const token = await readIdToken();
   const authHeader: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
 
@@ -381,16 +381,28 @@ export async function uploadMedia({
   return performDirectUpload(uri, filename, type, uploadPaths, authHeader, lastError);
 }
 
+function guessContentType(ext: string | null): string {
+  if (!ext) {
+    return Platform.OS === 'ios' ? 'image/heic' : 'image/jpeg';
+  }
+  const e = ext.toLowerCase();
+  // Video types
+  if (e === 'mp4' || e === 'm4v') return 'video/mp4';
+  if (e === 'mov') return 'video/quicktime';
+  if (e === 'webm') return 'video/webm';
+  if (e === 'avi') return 'video/x-msvideo';
+  if (e === '3gp') return 'video/3gpp';
+  // Image types
+  if (e === 'jpg' || e === 'jpeg') return 'image/jpeg';
+  if (e === 'png') return 'image/png';
+  if (e === 'webp') return 'image/webp';
+  if (e === 'gif') return 'image/gif';
+  if (e === 'heic' || e === 'heif') return 'image/heic';
+  return `image/${e}`;
+}
+
 export function guessImageContentType(uri: string): string {
   const filename = uri.split('/').pop() || '';
   const match = /\.(\w+)$/.exec(filename);
-  if (!match) {
-    return Platform.OS === 'ios' ? 'image/heic' : 'image/jpeg';
-  }
-  const ext = match[1].toLowerCase();
-  if (ext === 'jpg' || ext === 'jpeg') return 'image/jpeg';
-  if (ext === 'png') return 'image/png';
-  if (ext === 'webp') return 'image/webp';
-  if (ext === 'heic' || ext === 'heif') return 'image/heic';
-  return `image/${ext}`;
+  return guessContentType(match ? match[1] : null);
 }

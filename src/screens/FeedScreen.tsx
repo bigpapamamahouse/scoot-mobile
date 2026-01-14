@@ -3,7 +3,8 @@ import React from 'react';
 import { View, Text, FlatList, RefreshControl, StyleSheet, ActivityIndicator } from 'react-native';
 import { PostsAPI, ReactionsAPI } from '../api';
 import PostCard from '../components/PostCard';
-import { Post } from '../types';
+import { ScoopsBar, ScoopsBarRef } from '../components/ScoopsBar';
+import { Post, UserScoops, Scoop } from '../types';
 import { resolveHandle } from '../lib/resolveHandle';
 import { IconButton } from '../components/ui';
 import { useTheme, spacing, shadows } from '../theme';
@@ -20,6 +21,7 @@ export default function FeedScreen({ navigation }: any){
   const [page, setPage] = React.useState(0);
   const [reactionsMap, setReactionsMap] = React.useState<Map<string, any>>(new Map());
   const flatListRef = React.useRef<FlatList>(null);
+  const scoopsBarRef = React.useRef<ScoopsBarRef>(null);
 
   const openProfile = React.useCallback(
     (post: Post) => {
@@ -142,21 +144,41 @@ export default function FeedScreen({ navigation }: any){
     setRefreshing(true);
     setPage(0);
     setHasMore(true);
-    await load(0, false);
+    // Refresh both feed and scoops in parallel
+    await Promise.all([
+      load(0, false),
+      scoopsBarRef.current?.refresh(),
+    ]);
     setRefreshing(false);
   }, [load]);
 
   React.useEffect(()=>{ load(0); }, [load]);
 
-  // Refresh feed when screen comes into focus
+  // Refresh feed and scoops when screen comes into focus
   React.useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
       setPage(0);
       setHasMore(true);
       load(0);
+      // Also refresh scoops to update viewed status
+      scoopsBarRef.current?.refresh();
     });
     return unsubscribe;
   }, [navigation, load]);
+
+  // Scoop handlers
+  const handlePressScoops = React.useCallback((userScoops: UserScoops) => {
+    navigation.navigate('ScoopViewer', { userScoops });
+  }, [navigation]);
+
+  const handlePressCreateScoop = React.useCallback(() => {
+    navigation.navigate('CreateScoop');
+  }, [navigation]);
+
+  const handlePressOwnScoops = React.useCallback((scoops: Scoop[]) => {
+    // Go directly to viewer for immediate viewing experience
+    navigation.navigate('ScoopViewer', { scoops, isOwner: true });
+  }, [navigation]);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background.secondary }}>
@@ -187,6 +209,14 @@ export default function FeedScreen({ navigation }: any){
           />
         )}
         ItemSeparatorComponent={() => <View style={{ height: spacing[3] }} />}
+        ListHeaderComponent={
+          <ScoopsBar
+            ref={scoopsBarRef}
+            onPressScoops={handlePressScoops}
+            onPressCreate={handlePressCreateScoop}
+            onPressOwnScoops={handlePressOwnScoops}
+          />
+        }
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
