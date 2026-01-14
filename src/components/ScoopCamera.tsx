@@ -26,6 +26,7 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const MAX_VIDEO_DURATION = 10000; // 10 seconds
 const MAX_ZOOM = 0.5; // Maximum zoom level (0-1 range for expo-camera)
 const ZOOM_SENSITIVITY = 0.6; // How much of screen height to reach max zoom (higher = less sensitive)
+const MIN_PINCH_DISTANCE = 50; // Minimum distance between fingers to trigger pinch
 
 interface ScoopCameraProps {
   onCapture: (uri: string, type: ScoopMediaType, aspectRatio: number, isFromGallery: boolean, videoDuration?: number) => void;
@@ -54,6 +55,10 @@ export const ScoopCamera: React.FC<ScoopCameraProps> = ({
   const isRecordingRef = useRef(false);
   const shutterStartY = useRef(0);
   const isCameraReadyRef = useRef(false);
+
+  // Pinch-to-zoom state
+  const initialPinchDistance = useRef<number | null>(null);
+  const pinchZoomStart = useRef<number>(0);
 
   // Refs for functions that pan responder needs to call
   const startRecordingRef = useRef<() => void>(() => {});
@@ -189,7 +194,7 @@ export const ScoopCamera: React.FC<ScoopCameraProps> = ({
 
     setIsRecording(true);
     setRecordingDuration(0);
-    setZoom(0); // Reset zoom when starting recording
+    // Keep the pinch zoom level when starting recording
 
     // Start progress animation
     recordingProgress.setValue(0);
@@ -258,6 +263,48 @@ export const ScoopCamera: React.FC<ScoopCameraProps> = ({
   useEffect(() => {
     stopRecordingRef.current = stopRecording;
   }, [stopRecording]);
+
+  // Calculate distance between two touch points
+  const getDistance = (touches: any[]) => {
+    if (touches.length < 2) return 0;
+    const dx = touches[0].pageX - touches[1].pageX;
+    const dy = touches[0].pageY - touches[1].pageY;
+    return Math.sqrt(dx * dx + dy * dy);
+  };
+
+  // Pinch-to-zoom handlers for camera preview
+  const handleCameraTouchStart = useCallback((e: any) => {
+    const touches = e.nativeEvent.touches;
+    if (touches.length === 2) {
+      // Start pinch gesture
+      const distance = getDistance(touches);
+      if (distance > MIN_PINCH_DISTANCE) {
+        initialPinchDistance.current = distance;
+        pinchZoomStart.current = zoom;
+      }
+    }
+  }, [zoom]);
+
+  const handleCameraTouchMove = useCallback((e: any) => {
+    const touches = e.nativeEvent.touches;
+    if (touches.length === 2 && initialPinchDistance.current !== null) {
+      const currentDistance = getDistance(touches);
+      // Calculate zoom based on pinch scale
+      const scale = currentDistance / initialPinchDistance.current;
+      // Convert scale to zoom delta (pinch out = zoom in)
+      const zoomDelta = (scale - 1) * 0.5; // Adjust sensitivity
+      const newZoom = Math.max(0, Math.min(MAX_ZOOM, pinchZoomStart.current + zoomDelta));
+      setZoom(newZoom);
+    }
+  }, []);
+
+  const handleCameraTouchEnd = useCallback((e: any) => {
+    const touches = e.nativeEvent.touches;
+    // Reset pinch state when fewer than 2 touches remain
+    if (touches.length < 2) {
+      initialPinchDistance.current = null;
+    }
+  }, []);
 
   const pickFromGallery = useCallback(async () => {
     try {
@@ -341,15 +388,22 @@ export const ScoopCamera: React.FC<ScoopCameraProps> = ({
 
   return (
     <View style={styles.container}>
-      <CameraView
-        key={cameraKey}
-        ref={cameraRef}
-        style={styles.camera}
-        facing={facing}
-        mode="video"
-        zoom={zoom}
-        onCameraReady={handleCameraReady}
-      />
+      <View
+        style={styles.cameraContainer}
+        onTouchStart={handleCameraTouchStart}
+        onTouchMove={handleCameraTouchMove}
+        onTouchEnd={handleCameraTouchEnd}
+      >
+        <CameraView
+          key={cameraKey}
+          ref={cameraRef}
+          style={styles.camera}
+          facing={facing}
+          mode="video"
+          zoom={zoom}
+          onCameraReady={handleCameraReady}
+        />
+      </View>
 
       {/* Recording progress bar */}
       {isRecording && (
@@ -372,6 +426,15 @@ export const ScoopCamera: React.FC<ScoopCameraProps> = ({
         </View>
       )}
 
+      {/* Zoom indicator when not recording but zoomed */}
+      {!isRecording && zoom > 0 && (
+        <View style={styles.zoomIndicator}>
+          <Text style={styles.zoomText}>
+            {(1 + zoom * 4).toFixed(1)}x
+          </Text>
+        </View>
+      )}
+
       {/* Top controls - close button only */}
       <View style={styles.topControls}>
         <TouchableOpacity style={styles.closeButton} onPress={onClose}>
@@ -382,7 +445,7 @@ export const ScoopCamera: React.FC<ScoopCameraProps> = ({
       {/* Bottom controls - redesigned layout */}
       <View style={styles.bottomControls}>
         <Text style={styles.hintText}>
-          {!isCameraReady ? 'Loading camera...' : isRecording ? 'Slide up to zoom' : 'Tap for photo, hold for video'}
+          {!isCameraReady ? 'Loading camera...' : isRecording ? 'Slide up to zoom' : 'Tap for photo, hold for video • Pinch to zoom'}
         </Text>
 
         <View style={styles.controlsRow}>
@@ -429,6 +492,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#000',
+  },
+  cameraContainer: {
+    flex: 1,
   },
   camera: {
     flex: 1,
@@ -501,6 +567,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing[2],
     paddingVertical: 2,
     borderRadius: 4,
+  },
+  zoomIndicator: {
+    position: 'absolute',
+    top: 70,
+    alignSelf: 'center',
   },
   topControls: {
     position: 'absolute',
