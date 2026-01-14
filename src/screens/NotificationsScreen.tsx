@@ -289,7 +289,9 @@ export default function NotificationsScreen(){
       const hasRelatedPost = !!(item.postId || item.relatedPostId);
       const postId = item.postId || item.relatedPostId;
       const postPreview = item.postPreview;
-      const imageUri = postPreview?.imageKey ? mediaUrlFromKey(postPreview.imageKey) : null;
+      // Check for new multi-image format first, fall back to legacy imageKey
+      const imageKey = postPreview?.images?.[0]?.key ?? postPreview?.imageKey;
+      const imageUri = imageKey ? mediaUrlFromKey(imageKey) : null;
       const textPreview = postPreview?.text ? postPreview.text.substring(0, 100) + (postPreview.text.length > 100 ? '...' : '') : null;
 
       return (
