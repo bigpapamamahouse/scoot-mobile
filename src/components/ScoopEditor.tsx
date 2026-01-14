@@ -21,6 +21,7 @@ import {
   Animated,
   ScrollView,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme, spacing, typography } from '../theme';
@@ -112,6 +113,7 @@ export const ScoopEditor: React.FC<ScoopEditorProps> = ({
   isFromGallery = false,
 }) => {
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const [textOverlays, setTextOverlays] = useState<TextOverlayState[]>([]);
   const [isAddingText, setIsAddingText] = useState(false);
   const [currentText, setCurrentText] = useState('');
@@ -816,6 +818,7 @@ export const ScoopEditor: React.FC<ScoopEditorProps> = ({
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.textInputOverlay}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
         >
           <TouchableOpacity
             style={styles.textInputBackground}
@@ -823,7 +826,23 @@ export const ScoopEditor: React.FC<ScoopEditorProps> = ({
             onPress={() => addTextOverlay()}
           />
 
-          <View style={styles.textInputContainer}>
+          <View style={[styles.textInputContainer, { paddingBottom: Math.max(insets.bottom, spacing[6]) }]}>
+            {/* Live text preview */}
+            <View style={styles.textPreview}>
+              <Text
+                style={[
+                  styles.previewText,
+                  getFontStyle(selectedFont),
+                  {
+                    color: selectedColor,
+                    backgroundColor: selectedColor === '#FFFFFF' ? 'rgba(0,0,0,0.5)' : 'transparent',
+                  },
+                ]}
+              >
+                {currentText || 'Preview'}
+              </Text>
+            </View>
+
             {/* Font options */}
             <ScrollView
               horizontal
@@ -1053,6 +1072,20 @@ const styles = StyleSheet.create({
   textInputContainer: {
     backgroundColor: 'rgba(0,0,0,0.9)',
     paddingBottom: spacing[6],
+  },
+  textPreview: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing[4],
+    paddingHorizontal: spacing[4],
+    minHeight: 60,
+  },
+  previewText: {
+    fontSize: 24,
+    textAlign: 'center',
+    paddingHorizontal: spacing[2],
+    paddingVertical: spacing[1],
+    borderRadius: 4,
   },
   fontOptions: {
     maxHeight: 50,
