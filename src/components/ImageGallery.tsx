@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useMemo } from 'react';
 import {
   View,
   ScrollView,
@@ -10,10 +10,19 @@ import {
   NativeScrollEvent,
   ViewStyle,
   Text,
+  LayoutAnimation,
+  Platform,
+  UIManager,
+  LayoutChangeEvent,
 } from 'react-native';
 import { PostImage } from '../types';
-import { mediaUrlFromKey, optimizedMediaUrl, ImagePresets } from '../lib/media';
+import { mediaUrlFromKey } from '../lib/media';
 import { useTheme, borderRadius, typography } from '../theme';
+
+// Enable LayoutAnimation on Android
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 interface ImageGalleryProps {
   images: PostImage[];
@@ -30,12 +39,34 @@ export function ImageGallery({ images, onPress, style }: ImageGalleryProps) {
   const [containerWidth, setContainerWidth] = useState(0);
   const scrollViewRef = useRef<ScrollView>(null);
 
+  // Calculate heights for each image based on aspect ratio and container width
+  const imageHeights = useMemo(() => {
+    if (containerWidth === 0) return images.map(() => 0);
+    return images.map((image) => {
+      const aspectRatio = image.aspectRatio || 4 / 3;
+      const calculatedHeight = containerWidth / aspectRatio;
+      return Math.min(calculatedHeight, MAX_IMAGE_HEIGHT);
+    });
+  }, [images, containerWidth]);
+
+  // Get the current container height based on current image
+  const currentHeight = imageHeights[currentIndex] || 0;
+
   const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
     if (containerWidth === 0) return; // Wait until width is measured
     const offsetX = event.nativeEvent.contentOffset.x;
     const index = Math.round(offsetX / containerWidth);
-    setCurrentIndex(index);
-  }, [containerWidth]);
+    if (index !== currentIndex && index >= 0 && index < images.length) {
+      // Animate the height change
+      LayoutAnimation.configureNext({
+        duration: 200,
+        update: {
+          type: LayoutAnimation.Types.easeInEaseOut,
+        },
+      });
+      setCurrentIndex(index);
+    }
+  }, [containerWidth, currentIndex, images.length]);
 
   // Don't show gallery if no images
   if (!images || images.length === 0) {
@@ -67,12 +98,21 @@ export function ImageGallery({ images, onPress, style }: ImageGalleryProps) {
   }
 
   // Multiple images - show carousel with pagination
+  // Use current image height for dynamic sizing, or max height if not yet measured
+  const displayHeight = containerWidth > 0 && currentHeight > 0 ? currentHeight : undefined;
+
   return (
     <View
-      style={[styles.container, style]}
-      onLayout={(e) => {
+      style={[
+        styles.container,
+        style,
+        displayHeight ? { height: displayHeight } : undefined,
+      ]}
+      onLayout={(e: LayoutChangeEvent) => {
         const width = e.nativeEvent.layout.width;
-        setContainerWidth(width);
+        if (width !== containerWidth) {
+          setContainerWidth(width);
+        }
       }}
     >
       <ScrollView
@@ -85,12 +125,14 @@ export function ImageGallery({ images, onPress, style }: ImageGalleryProps) {
         decelerationRate="fast"
         snapToAlignment="start"
         snapToInterval={containerWidth > 0 ? containerWidth : undefined}
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollViewContent}
       >
         {images.map((image, index) => {
           const imageUri = mediaUrlFromKey(image.key);
           if (!imageUri) return null;
 
-          const aspectRatio = image.aspectRatio || 4 / 3;
+          const imageHeight = imageHeights[index] || 0;
 
           return (
             <Pressable
@@ -98,7 +140,10 @@ export function ImageGallery({ images, onPress, style }: ImageGalleryProps) {
               onPress={() => onPress?.(index)}
               style={[
                 styles.imageContainer,
-                containerWidth > 0 && { width: containerWidth }
+                containerWidth > 0 && {
+                  width: containerWidth,
+                  height: currentHeight,
+                },
               ]}
             >
               <Image
@@ -106,8 +151,8 @@ export function ImageGallery({ images, onPress, style }: ImageGalleryProps) {
                 style={[
                   styles.image,
                   {
-                    aspectRatio,
-                    maxHeight: MAX_IMAGE_HEIGHT,
+                    width: containerWidth,
+                    height: imageHeight,
                   }
                 ]}
                 resizeMode="cover"
@@ -152,12 +197,20 @@ const styles = StyleSheet.create({
   container: {
     width: '100%',
     position: 'relative',
+    overflow: 'hidden',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollViewContent: {
+    alignItems: 'center',
   },
   imageContainer: {
     width: '100%', // Fallback, will be overridden by inline style
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   image: {
-    width: '100%',
     borderRadius: borderRadius.base,
   },
   singleImage: {
