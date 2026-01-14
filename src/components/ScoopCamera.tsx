@@ -444,10 +444,6 @@ export const ScoopCamera: React.FC<ScoopCameraProps> = ({
 
       {/* Bottom controls - redesigned layout */}
       <View style={styles.bottomControls}>
-        <Text style={styles.hintText}>
-          {!isCameraReady ? 'Loading camera...' : isRecording ? 'Slide up to zoom' : 'Tap for photo, hold for video • Pinch to zoom'}
-        </Text>
-
         <View style={styles.controlsRow}>
           {/* Gallery button */}
           <TouchableOpacity
@@ -595,11 +591,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     alignItems: 'center',
-  },
-  hintText: {
-    color: 'rgba(255,255,255,0.7)',
-    fontSize: typography.fontSize.sm,
-    marginBottom: spacing[4],
   },
   controlsRow: {
     flexDirection: 'row',

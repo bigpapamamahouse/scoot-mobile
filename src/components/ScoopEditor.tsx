@@ -834,7 +834,7 @@ export const ScoopEditor: React.FC<ScoopEditorProps> = ({
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.textInputOverlay}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 20}
         >
           <TouchableOpacity
             style={styles.textInputBackground}
@@ -1087,6 +1087,7 @@ const styles = StyleSheet.create({
   },
   textInputContainer: {
     backgroundColor: 'rgba(0,0,0,0.9)',
+    paddingTop: spacing[4],
     paddingBottom: spacing[6],
   },
   textPreview: {
