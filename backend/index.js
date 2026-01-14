@@ -213,11 +213,16 @@ async function processVideo(bucket, key, startTime, endTime) {
     console.log(`[VideoProcess] Processing time: ${(processTime / 1000).toFixed(1)}s`);
 
     // Upload processed video back to S3
-    // Handle keys with or without file extensions
+    // Ensure processed key always has .mp4 extension for proper playback
     const hasExtension = /\.[^./]+$/.test(key);
-    const processedKey = hasExtension
-      ? key.replace(/(\.[^.]+)$/, '_processed$1')
-      : `${key}_processed`;
+    let processedKey;
+    if (hasExtension) {
+      // Replace existing extension with _processed.mp4
+      processedKey = key.replace(/\.[^.]+$/, '_processed.mp4');
+    } else {
+      // No extension - add _processed.mp4
+      processedKey = `${key}_processed.mp4`;
+    }
     console.log(`[VideoProcess] Uploading to s3://${bucket}/${processedKey}`);
 
     await s3.send(new PutObjectCommand({
