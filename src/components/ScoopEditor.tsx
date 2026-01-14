@@ -833,7 +833,7 @@ export const ScoopEditor: React.FC<ScoopEditorProps> = ({
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.textInputOverlay}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 20}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
         >
           <TouchableOpacity
             style={styles.textInputBackground}
