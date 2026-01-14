@@ -6,7 +6,6 @@
 
 import React, { useState, useCallback } from 'react';
 import { View, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { ScoopCamera } from '../components/ScoopCamera';
 import { ScoopEditor } from '../components/ScoopEditor';
 import { ScoopMediaType, ScoopTextOverlay } from '../types';
@@ -67,7 +66,7 @@ export default function CreateScoopScreen({ navigation }: any) {
   );
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <View style={styles.container}>
       {editorState ? (
         <ScoopEditor
           mediaUri={editorState.uri}
@@ -81,7 +80,7 @@ export default function CreateScoopScreen({ navigation }: any) {
       ) : (
         <ScoopCamera onCapture={handleCapture} onClose={handleClose} />
       )}
-    </SafeAreaView>
+    </View>
   );
 }
 

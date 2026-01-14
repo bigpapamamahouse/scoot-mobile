@@ -715,7 +715,7 @@ export const ScoopEditor: React.FC<ScoopEditorProps> = ({
         </View>
 
         {/* Top controls */}
-        <View style={styles.topControls}>
+        <View style={[styles.topControls, { top: insets.top + 10 }]}>
           <TouchableOpacity style={styles.controlButton} onPress={onDiscard}>
             <Ionicons name="close" size={28} color="#fff" />
           </TouchableOpacity>
@@ -725,7 +725,7 @@ export const ScoopEditor: React.FC<ScoopEditorProps> = ({
         </View>
 
         {/* Bottom controls */}
-        <View style={styles.bottomControls}>
+        <View style={[styles.bottomControls, { bottom: Math.max(insets.bottom, 20) + 30 }]}>
           <TouchableOpacity style={styles.publishButton} onPress={applyCrop}>
             <Text style={styles.publishText}>Continue</Text>
             <Ionicons name="arrow-forward" size={20} color="#fff" />
@@ -811,14 +811,14 @@ export const ScoopEditor: React.FC<ScoopEditorProps> = ({
       </TouchableOpacity>
 
       {/* Top controls */}
-      <View style={styles.topControls}>
+      <View style={[styles.topControls, { top: insets.top + 10 }]}>
         <TouchableOpacity style={styles.controlButton} onPress={onDiscard}>
           <Ionicons name="close" size={28} color="#fff" />
         </TouchableOpacity>
       </View>
 
       {/* Bottom controls */}
-      <View style={styles.bottomControls}>
+      <View style={[styles.bottomControls, { bottom: Math.max(insets.bottom, 20) + 30 }]}>
         <TouchableOpacity
           style={styles.publishButton}
           onPress={handlePublish}
@@ -1017,7 +1017,6 @@ const styles = StyleSheet.create({
   },
   topControls: {
     position: 'absolute',
-    top: 60,
     left: spacing[4],
     right: spacing[4],
     flexDirection: 'row',
@@ -1033,7 +1032,6 @@ const styles = StyleSheet.create({
   },
   bottomControls: {
     position: 'absolute',
-    bottom: 50,
     left: spacing[4],
     right: spacing[4],
     alignItems: 'center',

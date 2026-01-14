@@ -17,6 +17,7 @@ import {
   Platform,
 } from 'react-native';
 import { CameraView, CameraType, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme, spacing, typography } from '../theme';
@@ -38,6 +39,7 @@ export const ScoopCamera: React.FC<ScoopCameraProps> = ({
   onClose,
 }) => {
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const cameraRef = useRef<CameraView>(null);
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [micPermission, requestMicPermission] = useMicrophonePermissions();
@@ -407,7 +409,7 @@ export const ScoopCamera: React.FC<ScoopCameraProps> = ({
 
       {/* Recording progress bar */}
       {isRecording && (
-        <View style={styles.progressContainer}>
+        <View style={[styles.progressContainer, { top: insets.top + 50 }]}>
           <View style={styles.progressBackground}>
             <Animated.View
               style={[styles.progressFill, { width: progressWidth }]}
@@ -428,7 +430,7 @@ export const ScoopCamera: React.FC<ScoopCameraProps> = ({
 
       {/* Zoom indicator when not recording but zoomed */}
       {!isRecording && zoom > 0 && (
-        <View style={styles.zoomIndicator}>
+        <View style={[styles.zoomIndicator, { top: insets.top + 60 }]}>
           <Text style={styles.zoomText}>
             {(1 + zoom * 4).toFixed(1)}x
           </Text>
@@ -436,14 +438,14 @@ export const ScoopCamera: React.FC<ScoopCameraProps> = ({
       )}
 
       {/* Top controls - close button only */}
-      <View style={styles.topControls}>
+      <View style={[styles.topControls, { top: insets.top + 10 }]}>
         <TouchableOpacity style={styles.closeButton} onPress={onClose}>
           <Ionicons name="close" size={32} color="#fff" />
         </TouchableOpacity>
       </View>
 
       {/* Bottom controls - redesigned layout */}
-      <View style={styles.bottomControls}>
+      <View style={[styles.bottomControls, { bottom: Math.max(insets.bottom, 20) + 20 }]}>
         <View style={styles.controlsRow}>
           {/* Gallery button */}
           <TouchableOpacity
@@ -526,7 +528,6 @@ const styles = StyleSheet.create({
   },
   progressContainer: {
     position: 'absolute',
-    top: 60,
     left: spacing[4],
     right: spacing[4],
     alignItems: 'center',
@@ -566,12 +567,10 @@ const styles = StyleSheet.create({
   },
   zoomIndicator: {
     position: 'absolute',
-    top: 70,
     alignSelf: 'center',
   },
   topControls: {
     position: 'absolute',
-    top: 16,
     left: spacing[4],
     right: spacing[4],
     flexDirection: 'row',
@@ -587,7 +586,6 @@ const styles = StyleSheet.create({
   },
   bottomControls: {
     position: 'absolute',
-    bottom: 40,
     left: 0,
     right: 0,
     alignItems: 'center',
