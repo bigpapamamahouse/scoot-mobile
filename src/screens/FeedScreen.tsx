@@ -154,12 +154,14 @@ export default function FeedScreen({ navigation }: any){
 
   React.useEffect(()=>{ load(0); }, [load]);
 
-  // Refresh feed when screen comes into focus
+  // Refresh feed and scoops when screen comes into focus
   React.useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
       setPage(0);
       setHasMore(true);
       load(0);
+      // Also refresh scoops to update viewed status
+      scoopsBarRef.current?.refresh();
     });
     return unsubscribe;
   }, [navigation, load]);
