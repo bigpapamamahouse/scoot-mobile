@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
-import { NotificationsAPI, PostsAPI } from '../api';
+import { NotificationsAPI, PostsAPI, UsersAPI } from '../api';
 import { Notification, Post } from '../types';
 import { isFollowRequestNotification, useNotifications } from '../lib/notifications';
 import { useTheme, spacing, borderRadius, shadows } from '../theme';
@@ -22,6 +22,7 @@ import { mediaUrlFromKey } from '../lib/media';
 type NotificationListItem = Notification & {
   handledAction?: 'accept' | 'decline';
   postPreview?: Post | null;
+  followedBack?: boolean;
 };
 
 const INITIAL_LOAD_COUNT = 20;
@@ -35,6 +36,7 @@ export default function NotificationsScreen(){
   const [loading, setLoading] = React.useState(true);
   const [refreshing, setRefreshing] = React.useState(false);
   const [actionLoading, setActionLoading] = React.useState<string | null>(null);
+  const [followBackLoading, setFollowBackLoading] = React.useState<string | null>(null);
 
   const styles = React.useMemo(() => createStyles(colors), [colors]);
 
@@ -176,6 +178,38 @@ export default function NotificationsScreen(){
     [refresh],
   );
 
+  const handleFollowBack = React.useCallback(
+    async (notification: NotificationListItem) => {
+      const handle = notification.fromHandle;
+      if (!handle) {
+        Alert.alert('Follow Back', 'Unable to follow this user.');
+        return;
+      }
+      setFollowBackLoading(notification.id);
+      try {
+        await UsersAPI.followUser(handle);
+        // Update both all items and displayed items to mark as followed back
+        const updateItems = (prev: NotificationListItem[]) =>
+          prev.map((item) =>
+            item.id === notification.id
+              ? { ...item, followedBack: true }
+              : item,
+          );
+        setAllItems(updateItems);
+        setDisplayedItems(updateItems);
+      } catch (error: any) {
+        console.warn('Unable to follow back', error);
+        Alert.alert(
+          'Follow Back',
+          error?.message || 'Unable to follow this user. Please try again.',
+        );
+      } finally {
+        setFollowBackLoading((current) => (current === notification.id ? null : current));
+      }
+    },
+    [],
+  );
+
   const handleNavigateToProfile = React.useCallback((userId: string, userHandle?: string) => {
     navigation.push('Profile', {
       userId,
@@ -247,6 +281,8 @@ export default function NotificationsScreen(){
       const declineKey = `${item.id}:decline`;
       const acceptBusy = actionLoading === acceptKey;
       const declineBusy = actionLoading === declineKey;
+      const followBackBusy = followBackLoading === item.id;
+      const followedBack = item.followedBack;
       const timestamp = item.createdAt ? new Date(item.createdAt) : null;
       const sender = item.fromHandle || item.fromUserId?.slice(0, 8) || 'unknown';
       // Check for both postId and relatedPostId (backend uses postId)
@@ -285,16 +321,33 @@ export default function NotificationsScreen(){
                 </TouchableOpacity>
               )}
               {followRequest && handledAction && (
-                <Text
-                  style={[
-                    styles.followStatus,
-                    handledAction === 'decline' && styles.followStatusDeclined,
-                  ]}
-                >
-                  {handledAction === 'accept'
-                    ? 'You accepted this follow request.'
-                    : 'You declined this follow request.'}
-                </Text>
+                <View style={styles.followStatusContainer}>
+                  <Text
+                    style={[
+                      styles.followStatus,
+                      handledAction === 'decline' && styles.followStatusDeclined,
+                    ]}
+                  >
+                    {handledAction === 'accept'
+                      ? followedBack
+                        ? 'You accepted and followed back.'
+                        : 'You accepted this follow request.'
+                      : 'You declined this follow request.'}
+                  </Text>
+                  {handledAction === 'accept' && !followedBack && (
+                    <TouchableOpacity
+                      style={[styles.actionButton, styles.followBackButton]}
+                      onPress={() => handleFollowBack(item)}
+                      disabled={followBackBusy}
+                    >
+                      {followBackBusy ? (
+                        <ActivityIndicator color="#fff" size="small" />
+                      ) : (
+                        <Text style={styles.actionLabel}>Follow Back</Text>
+                      )}
+                    </TouchableOpacity>
+                  )}
+                </View>
               )}
               {followRequest && !handledAction && (
                 <View style={styles.actionsRow}>
@@ -358,7 +411,7 @@ export default function NotificationsScreen(){
         </View>
       );
     },
-    [actionLoading, handleFollowAction, handleNavigateToProfile, handleNavigateToPost, renderClickableMessage, styles],
+    [actionLoading, followBackLoading, handleFollowAction, handleFollowBack, handleNavigateToProfile, handleNavigateToPost, renderClickableMessage, styles],
   );
 
   return (
@@ -471,13 +524,20 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontWeight: '700',
     color: colors.warning.dark,
   },
-  followStatus: {
+  followStatusContainer: {
     marginTop: spacing[3],
+  },
+  followStatus: {
     color: colors.success.dark,
     fontWeight: '600',
   },
   followStatusDeclined: {
     color: colors.error.dark,
+  },
+  followBackButton: {
+    backgroundColor: colors.primary[500],
+    marginTop: spacing[2],
+    alignSelf: 'flex-start',
   },
   separator: {
     height: spacing[3],
