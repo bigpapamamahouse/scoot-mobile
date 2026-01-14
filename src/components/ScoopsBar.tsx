@@ -16,6 +16,7 @@ import { ScoopsAPI } from '../api';
 import { UserScoops, Scoop } from '../types';
 import { useTheme, spacing, typography } from '../theme';
 import { useCurrentUser } from '../hooks/useCurrentUser';
+import { useUpload } from '../contexts/UploadContext';
 
 interface ScoopsBarProps {
   onPressScoops: (userScoops: UserScoops) => void;
@@ -30,6 +31,7 @@ export const ScoopsBar: React.FC<ScoopsBarProps> = ({
 }) => {
   const { colors } = useTheme();
   const { currentUser } = useCurrentUser();
+  const { isUploading, onUploadSuccess } = useUpload();
   const [scoopsFeed, setScoopsFeed] = React.useState<UserScoops[]>([]);
   const [myScoops, setMyScoops] = React.useState<Scoop[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -52,6 +54,15 @@ export const ScoopsBar: React.FC<ScoopsBarProps> = ({
   React.useEffect(() => {
     loadScoops();
   }, [loadScoops]);
+
+  // Refresh scoops when upload succeeds
+  React.useEffect(() => {
+    const unsubscribe = onUploadSuccess(() => {
+      console.log('[ScoopsBar] Upload succeeded, refreshing scoops');
+      loadScoops();
+    });
+    return unsubscribe;
+  }, [onUploadSuccess, loadScoops]);
 
   const handlePressViewMyScoop = React.useCallback(() => {
     if (myScoops.length > 0 && onPressOwnScoops) {
@@ -122,8 +133,22 @@ export const ScoopsBar: React.FC<ScoopsBarProps> = ({
             Add Scoop
           </Text>
         </View>
-        {/* User's scoop - shown when they have scoops */}
-        {myScoops.length > 0 && (
+        {/* Uploading indicator */}
+        {isUploading && (
+          <View style={styles.scoopItem}>
+            <View style={styles.uploadingAvatar}>
+              <ActivityIndicator size="small" color={colors.primary[500]} />
+            </View>
+            <Text
+              style={[styles.handle, { color: colors.text.secondary }]}
+              numberOfLines={1}
+            >
+              Uploading...
+            </Text>
+          </View>
+        )}
+        {/* User's scoop - shown when they have scoops (hide while uploading) */}
+        {!isUploading && myScoops.length > 0 && (
           <View style={styles.scoopItem}>
             <ScoopAvatar
               avatarKey={currentUser?.avatarKey}
@@ -170,8 +195,22 @@ export const ScoopsBar: React.FC<ScoopsBarProps> = ({
                 Add Scoop
               </Text>
             </View>
-            {/* User's scoop - shown when they have scoops */}
-            {myScoops.length > 0 && (
+            {/* Uploading indicator */}
+            {isUploading && (
+              <View style={styles.scoopItem}>
+                <View style={styles.uploadingAvatar}>
+                  <ActivityIndicator size="small" color={colors.primary[500]} />
+                </View>
+                <Text
+                  style={[styles.handle, { color: colors.text.secondary }]}
+                  numberOfLines={1}
+                >
+                  Uploading...
+                </Text>
+              </View>
+            )}
+            {/* User's scoop - shown when they have scoops (hide while uploading) */}
+            {!isUploading && myScoops.length > 0 && (
               <View style={styles.scoopItem}>
                 <ScoopAvatar
                   avatarKey={currentUser?.avatarKey}
@@ -229,6 +268,16 @@ const createStyles = (colors: any) =>
       fontSize: typography.fontSize.xs,
       textAlign: 'center',
       width: '100%',
+    },
+    uploadingAvatar: {
+      width: 64,
+      height: 64,
+      borderRadius: 32,
+      backgroundColor: colors.neutral[200],
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 2,
+      borderColor: colors.primary[400],
     },
   });
 
