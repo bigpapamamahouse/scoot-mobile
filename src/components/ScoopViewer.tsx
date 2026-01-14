@@ -17,6 +17,7 @@ import {
   PanResponder,
   Modal,
   Pressable,
+  Platform,
 } from 'react-native';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { Ionicons } from '@expo/vector-icons';
@@ -45,16 +46,32 @@ interface ScoopViewerProps {
   hideProgressBar?: boolean;
 }
 
-const getFontStyle = (fontFamily: ScoopFontFamily) => {
+const getFontStyle = (fontFamily: ScoopFontFamily): any => {
   switch (fontFamily) {
     case 'bold':
-      return { fontWeight: '800' as const };
+      // Serif font
+      return {
+        fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+        fontWeight: '400' as const,
+      };
     case 'script':
-      return { fontStyle: 'italic' as const, fontWeight: '500' as const };
+      // Script/handwriting font
+      return {
+        fontFamily: Platform.OS === 'ios' ? 'Snell Roundhand' : 'cursive',
+        fontWeight: '400' as const,
+      };
     case 'mono':
-      return { fontFamily: 'monospace' };
+      // Monospace font
+      return {
+        fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace',
+        fontWeight: '400' as const,
+      };
     default:
-      return { fontWeight: '600' as const };
+      // Sans-serif (system default)
+      return {
+        fontFamily: Platform.OS === 'ios' ? 'Helvetica Neue' : 'sans-serif',
+        fontWeight: '600' as const,
+      };
   }
 };
 

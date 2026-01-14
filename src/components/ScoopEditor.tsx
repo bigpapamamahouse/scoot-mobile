@@ -60,10 +60,10 @@ interface CropState {
 }
 
 const FONT_OPTIONS: { id: ScoopFontFamily; label: string }[] = [
-  { id: 'default', label: 'Aa' },
-  { id: 'bold', label: 'AB' },
-  { id: 'script', label: 'Aa' },
-  { id: 'mono', label: '</>' },
+  { id: 'default', label: 'Sans' },
+  { id: 'bold', label: 'Serif' },
+  { id: 'script', label: 'Script' },
+  { id: 'mono', label: 'Mono' },
 ];
 
 const COLOR_OPTIONS = [
@@ -78,16 +78,32 @@ const COLOR_OPTIONS = [
   '#FF2D55',
 ];
 
-const getFontStyle = (fontFamily: ScoopFontFamily) => {
+const getFontStyle = (fontFamily: ScoopFontFamily): any => {
   switch (fontFamily) {
     case 'bold':
-      return { fontWeight: '800' as const };
+      // Serif font
+      return {
+        fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+        fontWeight: '400' as const,
+      };
     case 'script':
-      return { fontStyle: 'italic' as const, fontWeight: '500' as const };
+      // Script/handwriting font
+      return {
+        fontFamily: Platform.OS === 'ios' ? 'Snell Roundhand' : 'cursive',
+        fontWeight: '400' as const,
+      };
     case 'mono':
-      return { fontFamily: 'monospace' };
+      // Monospace font
+      return {
+        fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace',
+        fontWeight: '400' as const,
+      };
     default:
-      return { fontWeight: '600' as const };
+      // Sans-serif (system default)
+      return {
+        fontFamily: Platform.OS === 'ios' ? 'Helvetica Neue' : 'sans-serif',
+        fontWeight: '600' as const,
+      };
   }
 };
 
@@ -1137,6 +1153,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: spacing[4],
     marginTop: spacing[3],
+    marginBottom: spacing[2],
   },
   textInput: {
     flex: 1,
