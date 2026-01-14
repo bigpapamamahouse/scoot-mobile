@@ -726,7 +726,6 @@ export const ScoopEditor: React.FC<ScoopEditorProps> = ({
 
         {/* Bottom controls */}
         <View style={styles.bottomControls}>
-          <Text style={styles.cropHintText}>Pinch to zoom • Drag to position</Text>
           <TouchableOpacity style={styles.publishButton} onPress={applyCrop}>
             <Text style={styles.publishText}>Continue</Text>
             <Ionicons name="arrow-forward" size={20} color="#fff" />
@@ -865,6 +864,7 @@ export const ScoopEditor: React.FC<ScoopEditorProps> = ({
               showsHorizontalScrollIndicator={false}
               style={styles.fontOptions}
               contentContainerStyle={styles.fontOptionsContent}
+              keyboardShouldPersistTaps="always"
             >
               {FONT_OPTIONS.map((font) => (
                 <TouchableOpacity
@@ -894,6 +894,7 @@ export const ScoopEditor: React.FC<ScoopEditorProps> = ({
               showsHorizontalScrollIndicator={false}
               style={styles.colorOptions}
               contentContainerStyle={styles.colorOptionsContent}
+              keyboardShouldPersistTaps="always"
             >
               {COLOR_OPTIONS.map((color) => (
                 <TouchableOpacity
@@ -1036,12 +1037,6 @@ const styles = StyleSheet.create({
     left: spacing[4],
     right: spacing[4],
     alignItems: 'center',
-  },
-  cropHintText: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: typography.fontSize.sm,
-    marginBottom: spacing[4],
-    textAlign: 'center',
   },
   publishButton: {
     flexDirection: 'row',
