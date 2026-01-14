@@ -134,6 +134,9 @@ export const ScoopEditor: React.FC<ScoopEditorProps> = ({
     isMultiTouch: boolean;
   }>>(new Map());
 
+  // Track if we're currently touching an overlay (to prevent media tap)
+  const isTouchingOverlayRef = useRef(false);
+
   // Cropping state (for images)
   const [isCropping, setIsCropping] = useState(isFromGallery && mediaType === 'image');
   const [croppedUri, setCroppedUri] = useState<string | null>(null);
@@ -441,6 +444,12 @@ export const ScoopEditor: React.FC<ScoopEditorProps> = ({
   }, [currentText, selectedFont, selectedColor, tapPosition]);
 
   const handleMediaTap = useCallback((event: any) => {
+    // Don't open keyboard if we just tapped on an overlay
+    if (isTouchingOverlayRef.current) {
+      isTouchingOverlayRef.current = false;
+      return;
+    }
+
     // Get tap position relative to the media container
     const { locationX, locationY } = event.nativeEvent;
     const xPercent = (locationX / SCREEN_WIDTH) * 100;
@@ -528,6 +537,7 @@ export const ScoopEditor: React.FC<ScoopEditorProps> = ({
   // Touch event handlers for overlays
   const handleOverlayTouchStart = useCallback((overlay: TextOverlayState, e: any) => {
     e.stopPropagation();
+    isTouchingOverlayRef.current = true; // Prevent media tap from opening keyboard
     const touches = e.nativeEvent.touches;
     const state = getGestureState(overlay.id);
 
