@@ -37,6 +37,20 @@ export default function ScoopViewerScreen({ navigation, route }: any) {
 
   const currentScoop = scoops[currentIndex];
 
+  // Pause when screen loses focus (e.g., navigating to viewers), resume when focused
+  useEffect(() => {
+    const unsubscribeFocus = navigation.addListener('focus', () => {
+      setIsPaused(false);
+    });
+    const unsubscribeBlur = navigation.addListener('blur', () => {
+      setIsPaused(true);
+    });
+    return () => {
+      unsubscribeFocus();
+      unsubscribeBlur();
+    };
+  }, [navigation]);
+
   // Reset progress when scoop changes
   useEffect(() => {
     setCurrentProgress(0);
