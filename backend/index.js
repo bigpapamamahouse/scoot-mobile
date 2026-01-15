@@ -3771,10 +3771,10 @@ module.exports.handler = async (event) => {
         const followsResult = await ddb.send(new QueryCommand({
           TableName: FOLLOWS_TABLE,
           KeyConditionExpression: 'pk = :pk',
-          ExpressionAttributeValues: { ':pk': `FOLLOWING#${userId}` },
+          ExpressionAttributeValues: { ':pk': userId },
         }));
         for (const item of (followsResult.Items || [])) {
-          if (item.followedId) followedUsers.push(item.followedId);
+          if (item.sk) followedUsers.push(item.sk);
         }
       }
 
