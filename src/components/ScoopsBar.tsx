@@ -187,7 +187,7 @@ export const ScoopsBar = forwardRef<ScoopsBarRef, ScoopsBarProps>(({
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.listContent}
         ListHeaderComponent={
-          <>
+          <View style={styles.headerRow}>
             {/* Add scoop button - always visible, shown first */}
             <View style={styles.scoopItem}>
               <ScoopAvatar
@@ -235,7 +235,7 @@ export const ScoopsBar = forwardRef<ScoopsBarRef, ScoopsBarProps>(({
                 </Text>
               </View>
             )}
-          </>
+          </View>
         }
       />
     </View>
@@ -266,6 +266,9 @@ const createStyles = (colors: any) =>
     },
     listContent: {
       paddingHorizontal: spacing[3],
+    },
+    headerRow: {
+      flexDirection: 'row',
     },
     scoopItem: {
       alignItems: 'center',
