@@ -143,7 +143,7 @@ export default function RootNavigator(){
         <Stack.Screen name="ComposePost" component={ComposePostScreen} options={{ headerShown: false, presentation: 'modal' }} />
         <Stack.Screen name="CreateScoop" component={CreateScoopScreen} options={{ headerShown: false, presentation: 'fullScreenModal' }} />
         <Stack.Screen name="ScoopViewer" component={ScoopViewerScreen} options={{ headerShown: false, presentation: 'fullScreenModal' }} />
-        <Stack.Screen name="ScoopViewers" component={ScoopViewersScreen} options={{ title: 'Viewers' }} />
+        <Stack.Screen name="ScoopViewers" component={ScoopViewersScreen} options={{ title: 'Viewers', presentation: 'modal' }} />
         <Stack.Screen name="MyScoops" component={MyScoopsScreen} options={{ headerShown: false }} />
         <Stack.Screen name="Search" component={SearchScreen as any} options={{ title: 'Search Users' }} />
         <Stack.Screen name="Profile" component={ProfileScreen} options={{ title: 'Profile' }} />

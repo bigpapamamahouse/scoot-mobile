@@ -37,6 +37,20 @@ export default function ScoopViewerScreen({ navigation, route }: any) {
 
   const currentScoop = scoops[currentIndex];
 
+  // Pause when screen loses focus (e.g., navigating to viewers), resume when focused
+  useEffect(() => {
+    const unsubscribeFocus = navigation.addListener('focus', () => {
+      setIsPaused(false);
+    });
+    const unsubscribeBlur = navigation.addListener('blur', () => {
+      setIsPaused(true);
+    });
+    return () => {
+      unsubscribeFocus();
+      unsubscribeBlur();
+    };
+  }, [navigation]);
+
   // Reset progress when scoop changes
   useEffect(() => {
     setCurrentProgress(0);
@@ -75,8 +89,12 @@ export default function ScoopViewerScreen({ navigation, route }: any) {
   }, [navigation]);
 
   const handleViewViewers = useCallback(() => {
+    console.log('[ScoopViewerScreen] handleViewViewers called, currentScoop:', currentScoop?.id);
     if (currentScoop) {
-      navigation.navigate('ScoopViewers', { scoopId: currentScoop.id });
+      console.log('[ScoopViewerScreen] Pushing ScoopViewers with scoopId:', currentScoop.id);
+      navigation.push('ScoopViewers', { scoopId: currentScoop.id });
+    } else {
+      console.log('[ScoopViewerScreen] currentScoop is falsy, not navigating');
     }
   }, [currentScoop, navigation]);
 

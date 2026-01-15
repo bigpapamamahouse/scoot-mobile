@@ -226,6 +226,10 @@ export const ScoopViewer: React.FC<ScoopViewerProps> = ({
   const swipeAnim = useRef(new Animated.Value(0)).current;
   const isOwnerRef = useRef(isOwner);
   isOwnerRef.current = isOwner;
+  const onViewViewersRef = useRef(onViewViewers);
+  onViewViewersRef.current = onViewViewers;
+  const onPauseChangeRef = useRef(onPauseChange);
+  onPauseChangeRef.current = onPauseChange;
 
   const panResponder = useRef(
     PanResponder.create({
@@ -235,7 +239,7 @@ export const ScoopViewer: React.FC<ScoopViewerProps> = ({
         return isOwnerRef.current && gestureState.dy < -10 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx);
       },
       onPanResponderGrant: () => {
-        onPauseChange(true);
+        onPauseChangeRef.current?.(true);
       },
       onPanResponderMove: (_, gestureState) => {
         // Only allow upward swipes (negative dy)
@@ -244,10 +248,12 @@ export const ScoopViewer: React.FC<ScoopViewerProps> = ({
         }
       },
       onPanResponderRelease: (_, gestureState) => {
-        onPauseChange(false);
+        onPauseChangeRef.current?.(false);
+        console.log('[ScoopViewer] Swipe release - dy:', gestureState.dy, 'hasCallback:', !!onViewViewersRef.current);
         // If swiped up enough, show viewers
-        if (gestureState.dy < -100 && onViewViewers) {
-          onViewViewers();
+        if (gestureState.dy < -100 && onViewViewersRef.current) {
+          console.log('[ScoopViewer] Triggering onViewViewers');
+          onViewViewersRef.current();
         }
         // Reset animation
         Animated.spring(swipeAnim, {
