@@ -75,8 +75,12 @@ export default function ScoopViewerScreen({ navigation, route }: any) {
   }, [navigation]);
 
   const handleViewViewers = useCallback(() => {
+    console.log('[ScoopViewerScreen] handleViewViewers called, currentScoop:', currentScoop?.id);
     if (currentScoop) {
+      console.log('[ScoopViewerScreen] Navigating to ScoopViewers with scoopId:', currentScoop.id);
       navigation.navigate('ScoopViewers', { scoopId: currentScoop.id });
+    } else {
+      console.log('[ScoopViewerScreen] currentScoop is falsy, not navigating');
     }
   }, [currentScoop, navigation]);
 
