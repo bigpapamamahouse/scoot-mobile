@@ -226,6 +226,8 @@ export const ScoopViewer: React.FC<ScoopViewerProps> = ({
   const swipeAnim = useRef(new Animated.Value(0)).current;
   const isOwnerRef = useRef(isOwner);
   isOwnerRef.current = isOwner;
+  const onViewViewersRef = useRef(onViewViewers);
+  onViewViewersRef.current = onViewViewers;
 
   const panResponder = useRef(
     PanResponder.create({
@@ -246,8 +248,8 @@ export const ScoopViewer: React.FC<ScoopViewerProps> = ({
       onPanResponderRelease: (_, gestureState) => {
         onPauseChange(false);
         // If swiped up enough, show viewers
-        if (gestureState.dy < -100 && onViewViewers) {
-          onViewViewers();
+        if (gestureState.dy < -100 && onViewViewersRef.current) {
+          onViewViewersRef.current();
         }
         // Reset animation
         Animated.spring(swipeAnim, {
