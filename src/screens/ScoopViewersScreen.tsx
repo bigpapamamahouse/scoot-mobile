@@ -43,18 +43,6 @@ export default function ScoopViewersScreen({ navigation, route }: any) {
     loadViewers();
   }, [loadViewers]);
 
-  const formatTimeAgo = (timestamp: number) => {
-    const now = Date.now();
-    const diff = now - timestamp;
-    const minutes = Math.floor(diff / (1000 * 60));
-    const hours = Math.floor(diff / (1000 * 60 * 60));
-
-    if (minutes < 1) return 'Just now';
-    if (minutes < 60) return `${minutes}m ago`;
-    if (hours < 24) return `${hours}h ago`;
-    return `${Math.floor(hours / 24)}d ago`;
-  };
-
   const handlePressViewer = useCallback(
     (viewer: ScoopViewer) => {
       navigation.navigate('Profile', {
@@ -76,9 +64,6 @@ export default function ScoopViewersScreen({ navigation, route }: any) {
         <View style={styles.viewerInfo}>
           <Text style={[styles.handle, { color: colors.text.primary }]}>
             {item.handle || 'User'}
-          </Text>
-          <Text style={[styles.time, { color: colors.text.tertiary }]}>
-            {formatTimeAgo(item.viewedAt)}
           </Text>
         </View>
       </TouchableOpacity>
@@ -142,10 +127,6 @@ const createStyles = (colors: any) =>
     handle: {
       fontSize: typography.fontSize.base,
       fontWeight: '600',
-    },
-    time: {
-      fontSize: typography.fontSize.sm,
-      marginTop: 2,
     },
     emptyContainer: {
       flex: 1,
