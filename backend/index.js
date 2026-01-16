@@ -1543,8 +1543,13 @@ module.exports.handler = async (event) => {
 
       } catch (err) {
         console.error('[GET /me/inviter] Error:', err);
-        // Return null inviter on error rather than failing the request
-        return ok({ inviter: null, message: 'Failed to look up inviter' });
+        // Return more details to help diagnose the issue
+        return ok({
+          inviter: null,
+          message: 'Failed to look up inviter',
+          error: err.message || String(err),
+          errorName: err.name || 'Unknown',
+        });
       }
     }
 
