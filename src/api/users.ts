@@ -1108,12 +1108,15 @@ export async function getInviter(): Promise<User | null> {
     for (const path of attempts) {
       try {
         const result = await api(path);
+        console.log(`[getInviter] ${path} returned:`, JSON.stringify(result, null, 2));
         const user = extractUserFromPayload(result);
+        console.log(`[getInviter] extractUserFromPayload result:`, user);
         if (user) {
           return user;
         }
       } catch (err: any) {
         const message = String(err?.message || '');
+        console.log(`[getInviter] ${path} error:`, message);
         if (message.includes('404') || message.includes('405')) {
           continue;
         }
@@ -1150,6 +1153,7 @@ export async function getInviter(): Promise<User | null> {
  * This helps new users start following relevant accounts.
  */
 export async function getWelcomeSuggestions(maxCount: number = 5): Promise<User[]> {
+  console.log('[getWelcomeSuggestions] Starting...');
   try {
     const suggestions: User[] = [];
     const seenHandles = new Set<string>();
@@ -1157,12 +1161,14 @@ export async function getWelcomeSuggestions(maxCount: number = 5): Promise<User[
     // Get current user to avoid suggesting self
     const currentUser = await me();
     const currentUserHandle = currentUser?.handle;
+    console.log('[getWelcomeSuggestions] Current user handle:', currentUserHandle);
     if (currentUserHandle) {
       seenHandles.add(currentUserHandle);
     }
 
     // First, try to get the inviter
     const inviter = await getInviter();
+    console.log('[getWelcomeSuggestions] Inviter result:', inviter);
 
     if (inviter && inviter.handle) {
       // Add inviter as first suggestion
@@ -1244,6 +1250,7 @@ export async function getWelcomeSuggestions(maxCount: number = 5): Promise<User[
       }
     }
 
+    console.log('[getWelcomeSuggestions] Final suggestions count:', suggestions.length, suggestions);
     return suggestions;
   } catch (error) {
     console.error('Error fetching welcome suggestions:', error);

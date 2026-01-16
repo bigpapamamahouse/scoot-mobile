@@ -84,7 +84,9 @@ export default function WelcomeScreen({ navigation }: any) {
   // Load suggested users
   const loadSuggestedUsers = React.useCallback(async () => {
     try {
+      console.log('[WelcomeScreen] Calling getWelcomeSuggestions...');
       const suggestions = await UsersAPI.getWelcomeSuggestions(5);
+      console.log('[WelcomeScreen] Got suggestions:', suggestions);
       setSuggestedUsers(suggestions as SuggestedUser[]);
 
       // Initialize following state to 'none' for all
