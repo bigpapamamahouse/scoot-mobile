@@ -1095,3 +1095,158 @@ export async function updateNotificationPreferences(preferences: Partial<Notific
     reactions: result?.reactions ?? true,
   };
 }
+
+/**
+ * Get the user who invited the current user (via invite code used during signup).
+ * Returns null if the inviter cannot be determined.
+ */
+export async function getInviter(): Promise<User | null> {
+  try {
+    // Try multiple endpoint patterns for getting inviter info
+    const attempts = ['/me/inviter', '/me/invited-by', '/me/referrer'];
+
+    for (const path of attempts) {
+      try {
+        const result = await api(path);
+        const user = extractUserFromPayload(result);
+        if (user) {
+          return user;
+        }
+      } catch (err: any) {
+        const message = String(err?.message || '');
+        if (message.includes('404') || message.includes('405')) {
+          continue;
+        }
+        // For other errors, try the next endpoint
+        console.warn(`Inviter lookup ${path} failed:`, message);
+        continue;
+      }
+    }
+
+    // Fallback: Check if /me response includes inviter info
+    try {
+      const meData = await me();
+      const inviterData = (meData as any)?.inviter || (meData as any)?.invitedBy || (meData as any)?.referrer;
+      if (inviterData) {
+        const user = extractUserFromPayload(inviterData);
+        if (user) {
+          return user;
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to get inviter from /me:', err);
+    }
+
+    return null;
+  } catch (error) {
+    console.error('Error fetching inviter:', error);
+    return null;
+  }
+}
+
+/**
+ * Get suggested users for the welcome screen.
+ * Returns the inviter (if available) plus some users that the inviter follows.
+ * This helps new users start following relevant accounts.
+ */
+export async function getWelcomeSuggestions(maxCount: number = 5): Promise<User[]> {
+  try {
+    const suggestions: User[] = [];
+    const seenHandles = new Set<string>();
+
+    // Get current user to avoid suggesting self
+    const currentUser = await me();
+    const currentUserHandle = currentUser?.handle;
+    if (currentUserHandle) {
+      seenHandles.add(currentUserHandle);
+    }
+
+    // First, try to get the inviter
+    const inviter = await getInviter();
+
+    if (inviter && inviter.handle) {
+      // Add inviter as first suggestion
+      seenHandles.add(inviter.handle);
+
+      // Enrich inviter data if needed
+      let enrichedInviter = inviter;
+      if (!inviter.fullName || !inviter.avatarKey) {
+        try {
+          const fullData = await getUser(inviter.handle);
+          enrichedInviter = {
+            ...inviter,
+            fullName: fullData?.fullName || inviter.fullName,
+            avatarKey: fullData?.avatarKey || inviter.avatarKey,
+          };
+        } catch (err) {
+          console.warn('Failed to enrich inviter data:', err);
+        }
+      }
+
+      suggestions.push({
+        ...enrichedInviter,
+        isInviter: true, // Mark as the inviter for special treatment in UI
+      } as User & { isInviter: boolean });
+
+      // Get people the inviter follows
+      try {
+        const inviterFollowingResponse = await listFollowing(inviter.handle);
+        const inviterFollowing = Array.isArray(inviterFollowingResponse)
+          ? inviterFollowingResponse
+          : inviterFollowingResponse?.items || inviterFollowingResponse?.users || [];
+
+        // Add some of the inviter's following to suggestions
+        for (const user of inviterFollowing) {
+          if (suggestions.length >= maxCount) break;
+
+          const userHandle = user?.handle;
+          if (!userHandle || seenHandles.has(userHandle)) continue;
+
+          seenHandles.add(userHandle);
+
+          // Enrich user data if needed
+          let enrichedUser = user;
+          if (!user.fullName || !user.avatarKey) {
+            try {
+              const fullData = await getUser(userHandle);
+              enrichedUser = {
+                ...user,
+                fullName: fullData?.fullName || user.fullName,
+                avatarKey: fullData?.avatarKey || user.avatarKey,
+              };
+            } catch (err) {
+              // Use original data if enrichment fails
+            }
+          }
+
+          suggestions.push(enrichedUser);
+        }
+      } catch (err) {
+        console.warn('Failed to fetch inviter following:', err);
+      }
+    }
+
+    // If we don't have enough suggestions, fall back to general suggested users
+    if (suggestions.length < maxCount) {
+      try {
+        const generalSuggestions = await getSuggestedUsers();
+        for (const user of generalSuggestions) {
+          if (suggestions.length >= maxCount) break;
+
+          const userHandle = user?.handle;
+          if (!userHandle || seenHandles.has(userHandle)) continue;
+
+          seenHandles.add(userHandle);
+          suggestions.push(user);
+        }
+      } catch (err) {
+        console.warn('Failed to fetch general suggestions:', err);
+      }
+    }
+
+    return suggestions;
+  } catch (error) {
+    console.error('Error fetching welcome suggestions:', error);
+    return [];
+  }
+}

@@ -162,10 +162,12 @@ export default function ClaimUsernameScreen({ route, navigation }: any) {
       const userData = await UsersAPI.me();
       if (!(userData as any)?.termsAccepted) {
         console.log('[ClaimUsername] User has not accepted TOS, navigating to TermsOfService');
-        navigation.reset({ index: 0, routes: [{ name: 'TermsOfService' }] });
+        // Pass isNewUser flag so TOS screen knows to show Welcome screen after
+        navigation.reset({ index: 0, routes: [{ name: 'TermsOfService', params: { isNewUser: true } }] });
       } else {
-        console.log('[ClaimUsername] User authenticated and TOS accepted, navigating to Feed');
-        navigation.reset({ index: 0, routes: [{ name: 'Feed' }] });
+        // TOS already accepted, still show Welcome for new users
+        console.log('[ClaimUsername] User authenticated and TOS accepted, navigating to Welcome');
+        navigation.reset({ index: 0, routes: [{ name: 'Welcome' }] });
       }
     } catch (e: any) {
       Alert.alert('Error', e?.message || String(e));

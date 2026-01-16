@@ -11,10 +11,11 @@ import {
 import { useCurrentUser } from '../contexts/CurrentUserContext';
 import { api } from '../api/client';
 
-export default function TermsOfServiceScreen({ navigation }: any) {
+export default function TermsOfServiceScreen({ navigation, route }: any) {
   const [agreed, setAgreed] = useState(false);
   const [loading, setLoading] = useState(false);
   const { refreshUser } = useCurrentUser();
+  const isNewUser = route?.params?.isNewUser === true;
 
   const handleAccept = async () => {
     setLoading(true);
@@ -23,7 +24,8 @@ export default function TermsOfServiceScreen({ navigation }: any) {
         method: 'POST',
       });
       await refreshUser();
-      navigation.replace('Feed');
+      // Navigate to Welcome for new users, Feed for existing users
+      navigation.replace(isNewUser ? 'Welcome' : 'Feed');
     } catch (error) {
       console.error('Error accepting terms:', error);
       alert('Failed to accept terms. Please try again.');
