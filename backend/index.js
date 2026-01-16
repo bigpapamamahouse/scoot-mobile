@@ -21,7 +21,7 @@ const {
 const { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 
-const { CognitoIdentityProviderClient, AdminDeleteUserCommand } = require('@aws-sdk/client-cognito-identity-provider');
+const { CognitoIdentityProviderClient, AdminDeleteUserCommand, AdminGetUserCommand } = require('@aws-sdk/client-cognito-identity-provider');
 
 const { BedrockRuntimeClient, InvokeModelCommand } = require('@aws-sdk/client-bedrock-runtime');
 
@@ -1477,6 +1477,74 @@ module.exports.handler = async (event) => {
           });
         }
         return bad('Failed to retrieve invites', 500);
+      }
+    }
+
+    // NEW: GET /me/inviter - Get the user who invited the current user
+    if (route === 'GET /me/inviter') {
+      if (!userId) return bad('Unauthorized', 401);
+      if (!INVITES_TABLE) return bad('Invites not enabled', 501);
+      if (!USER_POOL_ID) return bad('User pool not configured', 501);
+
+      try {
+        // Step 1: Get the user's Cognito attributes to find their invite code
+        const cognitoUser = await cognito.send(new AdminGetUserCommand({
+          UserPoolId: USER_POOL_ID,
+          Username: userId,
+        }));
+
+        // Find the custom:invite attribute (the invite code they used to sign up)
+        const inviteCodeAttr = cognitoUser.UserAttributes?.find(attr => attr.Name === 'custom:invite');
+        const usedInviteCode = inviteCodeAttr?.Value;
+
+        if (!usedInviteCode) {
+          // User didn't sign up with an invite code
+          return ok({ inviter: null, message: 'No invite code was used during signup' });
+        }
+
+        // Step 2: Look up who owns this invite code in INVITES_TABLE
+        const inviteRecord = await ddb.send(new GetCommand({
+          TableName: INVITES_TABLE,
+          Key: { code: usedInviteCode },
+        }));
+
+        if (!inviteRecord.Item || !inviteRecord.Item.userId) {
+          // Invite code not found or has no owner
+          return ok({ inviter: null, message: 'Invite code owner not found' });
+        }
+
+        const inviterId = inviteRecord.Item.userId;
+
+        // Don't return self as inviter (edge case)
+        if (inviterId === userId) {
+          return ok({ inviter: null, message: 'Self-invite' });
+        }
+
+        // Step 3: Get the inviter's profile from USERS_TABLE
+        const inviterRecord = await ddb.send(new GetCommand({
+          TableName: USERS_TABLE,
+          Key: { pk: `USER#${inviterId}` },
+        }));
+
+        if (!inviterRecord.Item) {
+          return ok({ inviter: null, message: 'Inviter profile not found' });
+        }
+
+        const inviter = inviterRecord.Item;
+
+        // Return inviter profile with consistent field names
+        return ok({
+          id: inviter.userId || inviterId,
+          userId: inviter.userId || inviterId,
+          handle: inviter.handle || null,
+          fullName: inviter.fullName || null,
+          avatarKey: inviter.avatarKey || null,
+        });
+
+      } catch (err) {
+        console.error('[GET /me/inviter] Error:', err);
+        // Return null inviter on error rather than failing the request
+        return ok({ inviter: null, message: 'Failed to look up inviter' });
       }
     }
 
