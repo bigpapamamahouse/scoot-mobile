@@ -152,32 +152,56 @@ async function processVideo(bucket, key, startTime, endTime) {
       return key;
     }
 
-    // Build FFmpeg command for trimming only (no re-encoding)
-    // Video is already compressed client-side, so we just need to trim
-    // Using stream copy (-c copy) is much faster and uses minimal memory
-    // -ss: seek to start time (before -i for fast seeking)
-    // -t: duration
-    // -c copy: copy streams without re-encoding
-    // -avoid_negative_ts make_zero: fix potential timestamp issues from trimming
-    const cmd = [
-      FFMPEG_PATH,
-      '-y', // Overwrite output file
-      '-ss', startTime.toString(), // Seek to start time
-      '-i', tmpInput,
-      '-t', duration.toString(), // Duration
-      '-c', 'copy', // Copy streams without re-encoding (fast, low memory)
-      '-avoid_negative_ts', 'make_zero', // Fix timestamp issues from trimming
-      tmpOutput,
-    ].join(' ');
+    // Check input size to determine processing mode
+    // If video is large (>1.5 MB/sec), it's likely uncompressed (old app or failed client compression)
+    // In that case, do full re-encoding. Otherwise, use fast stream copy.
+    const inputSize = fs.statSync(tmpInput).size;
+    const mbPerSecond = (inputSize / 1024 / 1024) / duration;
+    const COMPRESSION_THRESHOLD_MB_PER_SEC = 1.5; // ~15MB for 10 seconds
+    const needsCompression = mbPerSecond > COMPRESSION_THRESHOLD_MB_PER_SEC;
+
+    console.log(`[VideoProcess] Input: ${(inputSize / 1024 / 1024).toFixed(2)} MB, ${duration}s, ${mbPerSecond.toFixed(2)} MB/sec`);
+    console.log(`[VideoProcess] Mode: ${needsCompression ? 'FULL RE-ENCODE (large file detected)' : 'STREAM COPY (already compressed)'}`);
+
+    let cmd;
+    if (needsCompression) {
+      // Full re-encoding for uncompressed videos (fallback for old app or failed client compression)
+      cmd = [
+        FFMPEG_PATH,
+        '-y',
+        '-ss', startTime.toString(),
+        '-i', tmpInput,
+        '-t', duration.toString(),
+        '-c:v', 'libx264',
+        '-crf', '28',
+        '-preset', 'fast',
+        '-c:a', 'aac',
+        '-b:a', '128k',
+        '-movflags', '+faststart',
+        '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2',
+        tmpOutput,
+      ].join(' ');
+    } else {
+      // Fast stream copy for already-compressed videos
+      cmd = [
+        FFMPEG_PATH,
+        '-y',
+        '-ss', startTime.toString(),
+        '-i', tmpInput,
+        '-t', duration.toString(),
+        '-c', 'copy',
+        '-avoid_negative_ts', 'make_zero',
+        tmpOutput,
+      ].join(' ');
+    }
 
     console.log(`[VideoProcess] Running: ${cmd}`);
-    const inputSize = fs.statSync(tmpInput).size;
     const startProcessTime = Date.now();
 
     try {
       const result = execSync(cmd, {
-        maxBuffer: 10 * 1024 * 1024, // 10MB buffer (stream copy produces minimal output)
-        timeout: 30000, // 30 second timeout (stream copy is fast)
+        maxBuffer: needsCompression ? 50 * 1024 * 1024 : 10 * 1024 * 1024,
+        timeout: needsCompression ? 120000 : 30000, // 2 min for re-encode, 30s for stream copy
         encoding: 'utf8',
         stdio: ['pipe', 'pipe', 'pipe'],
       });
@@ -210,10 +234,10 @@ async function processVideo(bucket, key, startTime, endTime) {
     }
     const sizeChange = ((1 - outputSize / inputSize) * 100).toFixed(1);
 
-    console.log(`[VideoProcess] === Trim Results ===`);
+    console.log(`[VideoProcess] === ${needsCompression ? 'Compression' : 'Trim'} Results ===`);
     console.log(`[VideoProcess] Input size: ${(inputSize / 1024 / 1024).toFixed(2)} MB`);
     console.log(`[VideoProcess] Output size: ${(outputSize / 1024 / 1024).toFixed(2)} MB`);
-    console.log(`[VideoProcess] Size change: ${sizeChange}% (trimmed portion removed)`);
+    console.log(`[VideoProcess] Size reduction: ${sizeChange}%${needsCompression ? ' (re-encoded)' : ' (trimmed only)'}`);
     console.log(`[VideoProcess] Processing time: ${(processTime / 1000).toFixed(1)}s`);
 
     // Upload processed video back to S3
