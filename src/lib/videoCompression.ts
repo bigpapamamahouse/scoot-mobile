@@ -1,10 +1,17 @@
-import { Video } from 'react-native-compressor';
+// Dynamic import to handle Expo Go (where native module isn't available)
+let Video: any = null;
+try {
+  Video = require('react-native-compressor').Video;
+} catch (e) {
+  console.log('[VideoCompression] react-native-compressor not available (Expo Go)');
+}
 
 export interface CompressionResult {
   uri: string;
   originalSize?: number;
   compressedSize?: number;
   compressionRatio?: number;
+  skipped?: boolean;
 }
 
 export interface CompressionOptions {
@@ -15,8 +22,16 @@ export interface CompressionOptions {
 }
 
 /**
+ * Check if video compression is available (native module loaded)
+ */
+export function isCompressionAvailable(): boolean {
+  return Video !== null;
+}
+
+/**
  * Compress a video file for upload.
  * Uses react-native-compressor with settings optimized for 10-second scoops.
+ * Falls back to original video if compression is unavailable (Expo Go).
  *
  * Typical compression results for 10-second videos:
  * - 1080p 30fps: 50MB -> 5-8MB (85-90% reduction)
@@ -28,6 +43,15 @@ export async function compressVideo(
   options: CompressionOptions = {}
 ): Promise<CompressionResult> {
   const { quality = 'medium', logStats = true } = options;
+
+  // Check if compression is available (not in Expo Go)
+  if (!Video) {
+    if (logStats) {
+      console.log('[VideoCompression] Skipping compression (Expo Go - native module unavailable)');
+      console.log('[VideoCompression] Video will upload without compression');
+    }
+    return { uri, skipped: true };
+  }
 
   if (logStats) {
     console.log('[VideoCompression] Starting compression...');
@@ -58,12 +82,13 @@ export async function compressVideo(
 
     return {
       uri: compressedUri,
+      skipped: false,
     };
   } catch (error) {
     console.error('[VideoCompression] Compression failed:', error);
     // Return original URI if compression fails - upload will still work
     console.log('[VideoCompression] Falling back to original video');
-    return { uri };
+    return { uri, skipped: true };
   }
 }
 

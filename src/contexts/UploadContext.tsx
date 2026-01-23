@@ -6,7 +6,7 @@
 import React, { createContext, useContext, useState, useCallback, useRef } from 'react';
 import { ScoopsAPI } from '../api';
 import { uploadMedia } from '../lib/upload';
-import { compressVideo } from '../lib/videoCompression';
+import { compressVideo, isCompressionAvailable } from '../lib/videoCompression';
 import { ScoopMediaType, ScoopTextOverlay } from '../types';
 import { VideoTrimParams } from '../components/ScoopEditor';
 
@@ -58,7 +58,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
 
       try {
         // Step 1: Compress video before upload (client-side)
-        if (payload.mediaType === 'video') {
+        if (payload.mediaType === 'video' && isCompressionAvailable()) {
           setCurrentUpload({
             id: uploadId,
             status: 'compressing',
@@ -71,6 +71,9 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
           });
           mediaUri = compressionResult.uri;
           console.log('[UploadContext] Video compressed:', mediaUri);
+        } else if (payload.mediaType === 'video') {
+          // Compression not available (Expo Go) - skip but log it
+          console.log('[UploadContext] Skipping compression (Expo Go mode)');
         }
 
         // Step 2: Upload the media
