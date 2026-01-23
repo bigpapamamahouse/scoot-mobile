@@ -171,7 +171,7 @@ async function processVideo(bucket, key, startTime, endTime) {
       '-c:a', 'aac',
       '-b:a', '128k',
       '-movflags', '+faststart',
-      '-vf', '"scale=trunc(iw/2)*2:trunc(ih/2)*2"', // Ensure even dimensions
+      '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2', // Ensure even dimensions
       tmpOutput,
     ].join(' ');
 
@@ -201,8 +201,18 @@ async function processVideo(bucket, key, startTime, endTime) {
       console.log('[VideoProcess] FFmpeg completed (stderr had content but output file exists)');
     }
 
+    // Verify output file was created (even if execSync didn't throw)
+    if (!fs.existsSync(tmpOutput)) {
+      throw new Error('FFmpeg completed but output file was not created');
+    }
+
     const processTime = Date.now() - startProcessTime;
-    const outputSize = fs.statSync(tmpOutput).size;
+    const outputStats = fs.statSync(tmpOutput);
+    const outputSize = outputStats.size;
+
+    if (outputSize === 0) {
+      throw new Error('FFmpeg created empty output file');
+    }
     const compressionRatio = ((1 - outputSize / inputSize) * 100).toFixed(1);
 
     console.log(`[VideoProcess] === Processing Results ===`);
@@ -224,15 +234,32 @@ async function processVideo(bucket, key, startTime, endTime) {
     }
     console.log(`[VideoProcess] Uploading to s3://${bucket}/${processedKey}`);
 
+    // Verify file still exists before creating stream
+    if (!fs.existsSync(tmpOutput)) {
+      throw new Error('Output file disappeared before upload');
+    }
+
     // Upload using stream to avoid loading entire file into memory
-    const uploadStream = fs.createReadStream(tmpOutput);
-    await s3.send(new PutObjectCommand({
-      Bucket: bucket,
-      Key: processedKey,
-      Body: uploadStream,
-      ContentType: 'video/mp4',
-      ContentLength: outputSize, // Required when using stream
-    }));
+    // Wrap in promise to handle stream errors properly
+    await new Promise((resolve, reject) => {
+      const uploadStream = fs.createReadStream(tmpOutput);
+
+      // Handle stream errors before S3 SDK gets it
+      uploadStream.on('error', (err) => {
+        console.error('[VideoProcess] Read stream error:', err.message);
+        reject(err);
+      });
+
+      s3.send(new PutObjectCommand({
+        Bucket: bucket,
+        Key: processedKey,
+        Body: uploadStream,
+        ContentType: 'video/mp4',
+        ContentLength: outputSize,
+      }))
+        .then(resolve)
+        .catch(reject);
+    });
 
     console.log('[VideoProcess] Upload complete (streamed from disk)');
 
