@@ -5,6 +5,8 @@ import {
   confirmSignUp,
   fetchAuthSession,
   getCurrentUser,
+  resetPassword,
+  confirmResetPassword,
   type SignInOutput,
 } from 'aws-amplify/auth';
 import { writeIdToken, clearAuth } from '../lib/storage';
@@ -101,4 +103,47 @@ export async function confirmSignUpFn(username: string, code: string) {
 
 export async function signOutFn() {
   try { await signOut(); } finally { await clearAuth(); }
+}
+
+export type ResetPasswordResult =
+  | { status: 'CODE_SENT'; deliveryMedium: string; destination: string }
+  | { status: 'DONE' }
+  | { status: 'ERROR'; message: string };
+
+export async function resetPasswordFn(username: string): Promise<ResetPasswordResult> {
+  try {
+    const output = await resetPassword({ username });
+
+    if (output.nextStep.resetPasswordStep === 'CONFIRM_RESET_PASSWORD_WITH_CODE') {
+      const { deliveryMedium, destination } = output.nextStep.codeDeliveryDetails;
+      return {
+        status: 'CODE_SENT',
+        deliveryMedium: deliveryMedium || 'EMAIL',
+        destination: destination || '',
+      };
+    }
+
+    return { status: 'DONE' };
+  } catch (e: any) {
+    console.error('Reset password error:', e?.name || 'UnknownError', '-', e?.message || e?.toString());
+    return { status: 'ERROR', message: e?.message || 'Failed to initiate password reset' };
+  }
+}
+
+export type ConfirmResetPasswordResult =
+  | { status: 'SUCCESS' }
+  | { status: 'ERROR'; message: string };
+
+export async function confirmResetPasswordFn(
+  username: string,
+  confirmationCode: string,
+  newPassword: string
+): Promise<ConfirmResetPasswordResult> {
+  try {
+    await confirmResetPassword({ username, confirmationCode, newPassword });
+    return { status: 'SUCCESS' };
+  } catch (e: any) {
+    console.error('Confirm reset password error:', e?.name || 'UnknownError', '-', e?.message || e?.toString());
+    return { status: 'ERROR', message: e?.message || 'Failed to reset password' };
+  }
 }

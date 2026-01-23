@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TextInput, Button, Alert, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator, Image } from 'react-native';
+import { View, Text, TextInput, Button, Alert, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator, Image, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { signInFn, checkAuthStatus } from '../../api/auth';
 import { useTheme } from '../../theme/ThemeContext';
@@ -74,7 +74,8 @@ export default function LoginScreen({ navigation }: any) {
         navigation.navigate('ConfirmCode', { username: user.trim() });
         return;
       case 'RESET_PASSWORD':
-        Alert.alert('Password reset required', 'Please reset your password on the website for now.');
+        Alert.alert('Password reset required', 'You need to reset your password.');
+        navigation.navigate('ResetPassword', { username: user.trim() });
         return;
       case 'MFA_REQUIRED':
         Alert.alert('MFA required', `Sign-in requires ${r.type}. (Screen not implemented yet)`);
@@ -121,6 +122,11 @@ export default function LoginScreen({ navigation }: any) {
               onChangeText={setPass}
               style={inputStyle}
             />
+            <TouchableOpacity onPress={() => navigation.navigate('ForgotPassword')}>
+              <Text style={{ color: colors.text.link, textAlign: 'right', fontSize: 14 }}>
+                Forgot password?
+              </Text>
+            </TouchableOpacity>
             <Button title="Log in" onPress={onLogin} />
             <View style={{ height: 8 }} />
             <Button title="Need an account? Sign up" onPress={() => navigation.navigate('Signup')} />

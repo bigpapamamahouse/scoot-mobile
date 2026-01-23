@@ -12,6 +12,8 @@ import LoginScreen from '../screens/Auth/LoginScreen';
 import SignupScreen from '../screens/Auth/SignupScreen';
 import ConfirmCodeScreen from '../screens/Auth/ConfirmCodeScreen';
 import ClaimUsernameScreen from '../screens/Auth/ClaimUsernameScreen';
+import ForgotPasswordScreen from '../screens/Auth/ForgotPasswordScreen';
+import ResetPasswordScreen from '../screens/Auth/ResetPasswordScreen';
 import ComposePostScreen from '../screens/ComposePostScreen';
 import CreateScoopScreen from '../screens/CreateScoopScreen';
 import ScoopViewerScreen from '../screens/ScoopViewerScreen';
@@ -124,6 +126,8 @@ export default function RootNavigator(){
         <Stack.Screen name="Signup" component={SignupScreen} options={{ title: 'Sign up' }} />
         <Stack.Screen name="ConfirmCode" component={ConfirmCodeScreen} options={{ title: 'Confirm' }} />
         <Stack.Screen name="ClaimUsername" component={ClaimUsernameScreen} options={{ title: 'Choose username' }} />
+        <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} options={{ title: 'Forgot Password' }} />
+        <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} options={{ title: 'Reset Password' }} />
         <Stack.Screen name="TermsOfService" component={TermsOfServiceScreen} options={{ headerShown: false }} />
         <Stack.Screen
           name="Feed"
