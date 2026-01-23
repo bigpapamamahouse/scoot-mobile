@@ -5,6 +5,8 @@ const { randomUUID } = require('crypto');
 const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const { pipeline } = require('stream/promises');
+const { Readable } = require('stream');
 
 const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
 const {
@@ -72,12 +74,14 @@ const bedrock = new BedrockRuntimeClient({ region: 'us-east-1' });
 const FFMPEG_PATH = process.env.FFMPEG_PATH || '/opt/bin/ffmpeg';
 
 /**
- * Process video: trim to specified segment and compress
+ * Process video: trim to specified segment using stream copy (no re-encoding)
+ * Video compression is handled client-side before upload, so this function
+ * only needs to extract the selected time range.
  * @param {string} bucket - S3 bucket name
  * @param {string} key - S3 object key
  * @param {number} startTime - Start time in seconds
  * @param {number} endTime - End time in seconds
- * @returns {Promise<string>} - New S3 key for processed video
+ * @returns {Promise<string>} - New S3 key for trimmed video
  */
 async function processVideo(bucket, key, startTime, endTime) {
   const timestamp = Date.now();
@@ -117,19 +121,16 @@ async function processVideo(bucket, key, startTime, endTime) {
     console.log('[VideoProcess] === Starting Video Processing ===');
     console.log(`[VideoProcess] Downloading video from s3://${bucket}/${key}`);
 
-    // Download video from S3
+    // Download video from S3 using streaming to avoid loading into memory
     const getResult = await s3.send(new GetObjectCommand({
       Bucket: bucket,
       Key: key,
     }));
 
-    // Stream the body to a file
-    const chunks = [];
-    for await (const chunk of getResult.Body) {
-      chunks.push(chunk);
-    }
-    fs.writeFileSync(tmpInput, Buffer.concat(chunks));
-    console.log(`[VideoProcess] Downloaded ${fs.statSync(tmpInput).size} bytes`);
+    // Stream the S3 body directly to a file (memory efficient)
+    const writeStream = fs.createWriteStream(tmpInput);
+    await pipeline(getResult.Body, writeStream);
+    console.log(`[VideoProcess] Downloaded ${fs.statSync(tmpInput).size} bytes (streamed to disk)`);
 
     // Calculate duration
     const duration = endTime - startTime;
@@ -151,39 +152,56 @@ async function processVideo(bucket, key, startTime, endTime) {
       return key;
     }
 
-    // Build FFmpeg command:
-    // -ss: seek to start time (before -i for fast seeking)
-    // -t: duration
-    // -c:v libx264: H.264 video codec
-    // -crf 28: quality (lower = better, 23 is default, 28 is good for mobile)
-    // -preset fast: encoding speed vs compression ratio
-    // -c:a aac: AAC audio codec
-    // -b:a 128k: audio bitrate
-    // -movflags +faststart: optimize for web streaming
-    const cmd = [
-      FFMPEG_PATH,
-      '-y', // Overwrite output file
-      '-ss', startTime.toString(), // Seek to start time
-      '-i', tmpInput,
-      '-t', duration.toString(), // Duration
-      '-c:v', 'libx264',
-      '-crf', '28',
-      '-preset', 'fast',
-      '-c:a', 'aac',
-      '-b:a', '128k',
-      '-movflags', '+faststart',
-      '-vf', '"scale=trunc(iw/2)*2:trunc(ih/2)*2"', // Ensure even dimensions
-      tmpOutput,
-    ].join(' ');
+    // Check input size to determine processing mode
+    // If video is large (>1.5 MB/sec), it's likely uncompressed (old app or failed client compression)
+    // In that case, do full re-encoding. Otherwise, use fast stream copy.
+    const inputSize = fs.statSync(tmpInput).size;
+    const mbPerSecond = (inputSize / 1024 / 1024) / duration;
+    const COMPRESSION_THRESHOLD_MB_PER_SEC = 1.5; // ~15MB for 10 seconds
+    const needsCompression = mbPerSecond > COMPRESSION_THRESHOLD_MB_PER_SEC;
+
+    console.log(`[VideoProcess] Input: ${(inputSize / 1024 / 1024).toFixed(2)} MB, ${duration}s, ${mbPerSecond.toFixed(2)} MB/sec`);
+    console.log(`[VideoProcess] Mode: ${needsCompression ? 'FULL RE-ENCODE (large file detected)' : 'STREAM COPY (already compressed)'}`);
+
+    let cmd;
+    if (needsCompression) {
+      // Full re-encoding for uncompressed videos (fallback for old app or failed client compression)
+      cmd = [
+        FFMPEG_PATH,
+        '-y',
+        '-ss', startTime.toString(),
+        '-i', tmpInput,
+        '-t', duration.toString(),
+        '-c:v', 'libx264',
+        '-crf', '28',
+        '-preset', 'fast',
+        '-c:a', 'aac',
+        '-b:a', '128k',
+        '-movflags', '+faststart',
+        '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2',
+        tmpOutput,
+      ].join(' ');
+    } else {
+      // Fast stream copy for already-compressed videos
+      cmd = [
+        FFMPEG_PATH,
+        '-y',
+        '-ss', startTime.toString(),
+        '-i', tmpInput,
+        '-t', duration.toString(),
+        '-c', 'copy',
+        '-avoid_negative_ts', 'make_zero',
+        tmpOutput,
+      ].join(' ');
+    }
 
     console.log(`[VideoProcess] Running: ${cmd}`);
-    const inputSize = fs.statSync(tmpInput).size;
     const startProcessTime = Date.now();
 
     try {
       const result = execSync(cmd, {
-        maxBuffer: 50 * 1024 * 1024, // 50MB buffer
-        timeout: 120000, // 2 minute timeout
+        maxBuffer: needsCompression ? 50 * 1024 * 1024 : 10 * 1024 * 1024,
+        timeout: needsCompression ? 120000 : 30000, // 2 min for re-encode, 30s for stream copy
         encoding: 'utf8',
         stdio: ['pipe', 'pipe', 'pipe'],
       });
@@ -202,14 +220,24 @@ async function processVideo(bucket, key, startTime, endTime) {
       console.log('[VideoProcess] FFmpeg completed (stderr had content but output file exists)');
     }
 
-    const processTime = Date.now() - startProcessTime;
-    const outputSize = fs.statSync(tmpOutput).size;
-    const compressionRatio = ((1 - outputSize / inputSize) * 100).toFixed(1);
+    // Verify output file was created (even if execSync didn't throw)
+    if (!fs.existsSync(tmpOutput)) {
+      throw new Error('FFmpeg completed but output file was not created');
+    }
 
-    console.log(`[VideoProcess] === Processing Results ===`);
+    const processTime = Date.now() - startProcessTime;
+    const outputStats = fs.statSync(tmpOutput);
+    const outputSize = outputStats.size;
+
+    if (outputSize === 0) {
+      throw new Error('FFmpeg created empty output file');
+    }
+    const sizeChange = ((1 - outputSize / inputSize) * 100).toFixed(1);
+
+    console.log(`[VideoProcess] === ${needsCompression ? 'Compression' : 'Trim'} Results ===`);
     console.log(`[VideoProcess] Input size: ${(inputSize / 1024 / 1024).toFixed(2)} MB`);
     console.log(`[VideoProcess] Output size: ${(outputSize / 1024 / 1024).toFixed(2)} MB`);
-    console.log(`[VideoProcess] Compression: ${compressionRatio}% reduction`);
+    console.log(`[VideoProcess] Size reduction: ${sizeChange}%${needsCompression ? ' (re-encoded)' : ' (trimmed only)'}`);
     console.log(`[VideoProcess] Processing time: ${(processTime / 1000).toFixed(1)}s`);
 
     // Upload processed video back to S3
@@ -225,14 +253,34 @@ async function processVideo(bucket, key, startTime, endTime) {
     }
     console.log(`[VideoProcess] Uploading to s3://${bucket}/${processedKey}`);
 
-    await s3.send(new PutObjectCommand({
-      Bucket: bucket,
-      Key: processedKey,
-      Body: fs.readFileSync(tmpOutput),
-      ContentType: 'video/mp4',
-    }));
+    // Verify file still exists before creating stream
+    if (!fs.existsSync(tmpOutput)) {
+      throw new Error('Output file disappeared before upload');
+    }
 
-    console.log('[VideoProcess] Upload complete');
+    // Upload using stream to avoid loading entire file into memory
+    // Wrap in promise to handle stream errors properly
+    await new Promise((resolve, reject) => {
+      const uploadStream = fs.createReadStream(tmpOutput);
+
+      // Handle stream errors before S3 SDK gets it
+      uploadStream.on('error', (err) => {
+        console.error('[VideoProcess] Read stream error:', err.message);
+        reject(err);
+      });
+
+      s3.send(new PutObjectCommand({
+        Bucket: bucket,
+        Key: processedKey,
+        Body: uploadStream,
+        ContentType: 'video/mp4',
+        ContentLength: outputSize,
+      }))
+        .then(resolve)
+        .catch(reject);
+    });
+
+    console.log('[VideoProcess] Upload complete (streamed from disk)');
 
     // Clean up temp files
     fs.unlinkSync(tmpInput);
