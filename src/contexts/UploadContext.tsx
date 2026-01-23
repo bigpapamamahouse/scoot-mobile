@@ -6,12 +6,13 @@
 import React, { createContext, useContext, useState, useCallback, useRef } from 'react';
 import { ScoopsAPI } from '../api';
 import { uploadMedia } from '../lib/upload';
+import { compressVideo } from '../lib/videoCompression';
 import { ScoopMediaType, ScoopTextOverlay } from '../types';
 import { VideoTrimParams } from '../components/ScoopEditor';
 
 export interface UploadTask {
   id: string;
-  status: 'uploading' | 'processing' | 'success' | 'error';
+  status: 'compressing' | 'uploading' | 'processing' | 'success' | 'error';
   message: string;
   error?: string;
 }
@@ -53,19 +54,35 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
   const startUpload = useCallback(
     async (payload: UploadPayload) => {
       const uploadId = Date.now().toString();
-
-      // Set initial uploading state
-      setCurrentUpload({
-        id: uploadId,
-        status: 'uploading',
-        message: 'Uploading media...',
-      });
+      let mediaUri = payload.uri;
 
       try {
-        // Step 1: Upload the media
+        // Step 1: Compress video before upload (client-side)
+        if (payload.mediaType === 'video') {
+          setCurrentUpload({
+            id: uploadId,
+            status: 'compressing',
+            message: 'Compressing video...',
+          });
+
+          console.log('[UploadContext] Compressing video before upload');
+          const compressionResult = await compressVideo(mediaUri, {
+            quality: 'medium',
+          });
+          mediaUri = compressionResult.uri;
+          console.log('[UploadContext] Video compressed:', mediaUri);
+        }
+
+        // Step 2: Upload the media
+        setCurrentUpload({
+          id: uploadId,
+          status: 'uploading',
+          message: 'Uploading media...',
+        });
+
         console.log('[UploadContext] Starting media upload');
         const mediaKey = await uploadMedia({
-          uri: payload.uri,
+          uri: mediaUri,
           intent: 'scoop-media',
         });
 
@@ -75,11 +92,11 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
 
         console.log('[UploadContext] Media uploaded, key:', mediaKey);
 
-        // Step 2: Create the scoop (this includes video processing)
+        // Step 3: Create the scoop
         setCurrentUpload({
           id: uploadId,
           status: 'processing',
-          message: payload.mediaType === 'video' ? 'Processing video...' : 'Creating scoop...',
+          message: 'Creating scoop...',
         });
 
         const result = await ScoopsAPI.createScoop({
@@ -148,7 +165,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
     []
   );
 
-  const isUploading = currentUpload?.status === 'uploading' || currentUpload?.status === 'processing';
+  const isUploading = currentUpload?.status === 'compressing' || currentUpload?.status === 'uploading' || currentUpload?.status === 'processing';
 
   const contextValue = React.useMemo<UploadContextValue>(
     () => ({

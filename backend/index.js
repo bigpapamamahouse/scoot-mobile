@@ -74,12 +74,14 @@ const bedrock = new BedrockRuntimeClient({ region: 'us-east-1' });
 const FFMPEG_PATH = process.env.FFMPEG_PATH || '/opt/bin/ffmpeg';
 
 /**
- * Process video: trim to specified segment and compress
+ * Process video: trim to specified segment using stream copy (no re-encoding)
+ * Video compression is handled client-side before upload, so this function
+ * only needs to extract the selected time range.
  * @param {string} bucket - S3 bucket name
  * @param {string} key - S3 object key
  * @param {number} startTime - Start time in seconds
  * @param {number} endTime - End time in seconds
- * @returns {Promise<string>} - New S3 key for processed video
+ * @returns {Promise<string>} - New S3 key for trimmed video
  */
 async function processVideo(bucket, key, startTime, endTime) {
   const timestamp = Date.now();
@@ -150,28 +152,21 @@ async function processVideo(bucket, key, startTime, endTime) {
       return key;
     }
 
-    // Build FFmpeg command:
+    // Build FFmpeg command for trimming only (no re-encoding)
+    // Video is already compressed client-side, so we just need to trim
+    // Using stream copy (-c copy) is much faster and uses minimal memory
     // -ss: seek to start time (before -i for fast seeking)
     // -t: duration
-    // -c:v libx264: H.264 video codec
-    // -crf 28: quality (lower = better, 23 is default, 28 is good for mobile)
-    // -preset fast: encoding speed vs compression ratio
-    // -c:a aac: AAC audio codec
-    // -b:a 128k: audio bitrate
-    // -movflags +faststart: optimize for web streaming
+    // -c copy: copy streams without re-encoding
+    // -avoid_negative_ts make_zero: fix potential timestamp issues from trimming
     const cmd = [
       FFMPEG_PATH,
       '-y', // Overwrite output file
       '-ss', startTime.toString(), // Seek to start time
       '-i', tmpInput,
       '-t', duration.toString(), // Duration
-      '-c:v', 'libx264',
-      '-crf', '28',
-      '-preset', 'fast',
-      '-c:a', 'aac',
-      '-b:a', '128k',
-      '-movflags', '+faststart',
-      '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2', // Ensure even dimensions
+      '-c', 'copy', // Copy streams without re-encoding (fast, low memory)
+      '-avoid_negative_ts', 'make_zero', // Fix timestamp issues from trimming
       tmpOutput,
     ].join(' ');
 
@@ -181,8 +176,8 @@ async function processVideo(bucket, key, startTime, endTime) {
 
     try {
       const result = execSync(cmd, {
-        maxBuffer: 50 * 1024 * 1024, // 50MB buffer
-        timeout: 120000, // 2 minute timeout
+        maxBuffer: 10 * 1024 * 1024, // 10MB buffer (stream copy produces minimal output)
+        timeout: 30000, // 30 second timeout (stream copy is fast)
         encoding: 'utf8',
         stdio: ['pipe', 'pipe', 'pipe'],
       });
@@ -213,12 +208,12 @@ async function processVideo(bucket, key, startTime, endTime) {
     if (outputSize === 0) {
       throw new Error('FFmpeg created empty output file');
     }
-    const compressionRatio = ((1 - outputSize / inputSize) * 100).toFixed(1);
+    const sizeChange = ((1 - outputSize / inputSize) * 100).toFixed(1);
 
-    console.log(`[VideoProcess] === Processing Results ===`);
+    console.log(`[VideoProcess] === Trim Results ===`);
     console.log(`[VideoProcess] Input size: ${(inputSize / 1024 / 1024).toFixed(2)} MB`);
     console.log(`[VideoProcess] Output size: ${(outputSize / 1024 / 1024).toFixed(2)} MB`);
-    console.log(`[VideoProcess] Compression: ${compressionRatio}% reduction`);
+    console.log(`[VideoProcess] Size change: ${sizeChange}% (trimmed portion removed)`);
     console.log(`[VideoProcess] Processing time: ${(processTime / 1000).toFixed(1)}s`);
 
     // Upload processed video back to S3

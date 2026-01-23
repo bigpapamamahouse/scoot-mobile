@@ -39,7 +39,8 @@ module.exports = {
             useFrameworks: "static"
           }
         }
-      ]
+      ],
+      "react-native-compressor"
     ],
     extra: {
       eas: {
