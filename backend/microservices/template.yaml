@@ -1,0 +1,872 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  ScooterBooter Microservices Architecture
+
+  Optimized Lambda functions split by domain for improved performance,
+  cost efficiency, and independent scaling.
+
+Globals:
+  Function:
+    Runtime: nodejs20.x
+    Architectures:
+      - arm64  # Graviton2 - 34% better price/performance
+    Tracing: Active  # X-Ray tracing enabled
+    Environment:
+      Variables:
+        # DynamoDB Tables
+        POSTS_TABLE: !Ref PostsTable
+        USERS_TABLE: !Ref UsersTable
+        INVITES_TABLE: !Ref InvitesTable
+        FOLLOWS_TABLE: !Ref FollowsTable
+        COMMENTS_TABLE: !Ref CommentsTable
+        REACTIONS_TABLE: !Ref ReactionsTable
+        NOTIFICATIONS_TABLE: !Ref NotificationsTable
+        PUSH_TOKENS_TABLE: !Ref PushTokensTable
+        REPORTS_TABLE: !Ref ReportsTable
+        BLOCKS_TABLE: !Ref BlocksTable
+        SCOOPS_TABLE: !Ref ScoopsTable
+        # Other config
+        MEDIA_BUCKET: !Ref MediaBucket
+        USER_POOL_ID: !Ref CognitoUserPoolId
+        ADMIN_EMAILS: !Ref AdminEmails
+
+Parameters:
+  Environment:
+    Type: String
+    Default: prod
+    AllowedValues:
+      - dev
+      - staging
+      - prod
+    Description: Deployment environment
+
+  CognitoUserPoolId:
+    Type: String
+    Description: Cognito User Pool ID for authentication
+
+  CognitoUserPoolArn:
+    Type: String
+    Description: Cognito User Pool ARN for API Gateway authorizer
+
+  AdminEmails:
+    Type: String
+    Default: ""
+    Description: Comma-separated list of admin emails
+
+  # Existing table names (for migration - reuse existing tables)
+  ExistingPostsTable:
+    Type: String
+    Default: ""
+  ExistingUsersTable:
+    Type: String
+    Default: ""
+  ExistingFollowsTable:
+    Type: String
+    Default: ""
+  ExistingCommentsTable:
+    Type: String
+    Default: ""
+  ExistingReactionsTable:
+    Type: String
+    Default: ""
+  ExistingNotificationsTable:
+    Type: String
+    Default: ""
+  ExistingPushTokensTable:
+    Type: String
+    Default: ""
+  ExistingReportsTable:
+    Type: String
+    Default: ""
+  ExistingBlocksTable:
+    Type: String
+    Default: ""
+  ExistingScoopsTable:
+    Type: String
+    Default: ""
+  ExistingInvitesTable:
+    Type: String
+    Default: ""
+  ExistingMediaBucket:
+    Type: String
+    Default: ""
+
+Conditions:
+  CreatePostsTable: !Equals [!Ref ExistingPostsTable, ""]
+  CreateUsersTable: !Equals [!Ref ExistingUsersTable, ""]
+  CreateFollowsTable: !Equals [!Ref ExistingFollowsTable, ""]
+  CreateCommentsTable: !Equals [!Ref ExistingCommentsTable, ""]
+  CreateReactionsTable: !Equals [!Ref ExistingReactionsTable, ""]
+  CreateNotificationsTable: !Equals [!Ref ExistingNotificationsTable, ""]
+  CreatePushTokensTable: !Equals [!Ref ExistingPushTokensTable, ""]
+  CreateReportsTable: !Equals [!Ref ExistingReportsTable, ""]
+  CreateBlocksTable: !Equals [!Ref ExistingBlocksTable, ""]
+  CreateScoopsTable: !Equals [!Ref ExistingScoopsTable, ""]
+  CreateInvitesTable: !Equals [!Ref ExistingInvitesTable, ""]
+  CreateMediaBucket: !Equals [!Ref ExistingMediaBucket, ""]
+
+Resources:
+  # ============================================
+  # SHARED LAYER
+  # ============================================
+  SharedLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: !Sub scooterbooter-shared-${Environment}
+      Description: Shared utilities for ScooterBooter microservices
+      ContentUri: layers/shared/
+      CompatibleRuntimes:
+        - nodejs20.x
+      CompatibleArchitectures:
+        - arm64
+        - x86_64
+    Metadata:
+      BuildMethod: nodejs20.x
+
+  # FFmpeg Layer (for video processing)
+  # Use an existing public layer or build your own
+  # FFmpegLayer:
+  #   Type: AWS::Lambda::LayerVersion
+  #   Properties:
+  #     LayerName: ffmpeg
+  #     Content: ... # Your FFmpeg binary
+
+  # ============================================
+  # API GATEWAY
+  # ============================================
+  ApiGateway:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: !Ref Environment
+      CorsConfiguration:
+        AllowOrigins:
+          - "https://app.scooterbooter.com"
+          - "http://localhost:5173"
+        AllowHeaders:
+          - Content-Type
+          - Authorization
+          - X-Requested-With
+          - X-Ignore-Auth-Redirect
+        AllowMethods:
+          - GET
+          - POST
+          - PATCH
+          - DELETE
+          - OPTIONS
+        AllowCredentials: true
+        MaxAge: 86400
+      Auth:
+        DefaultAuthorizer: CognitoAuthorizer
+        Authorizers:
+          CognitoAuthorizer:
+            AuthorizationScopes:
+              - aws.cognito.signin.user.admin
+            IdentitySource: $request.header.Authorization
+            JwtConfiguration:
+              issuer: !Sub https://cognito-idp.${AWS::Region}.amazonaws.com/${CognitoUserPoolId}
+              audience:
+                - !Ref CognitoUserPoolId
+
+  # ============================================
+  # LAMBDA FUNCTIONS
+  # ============================================
+
+  # Users Service - 128 MB (lightweight profile operations)
+  UsersFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub scooterbooter-users-${Environment}
+      Handler: handler.handler
+      CodeUri: services/users/
+      Description: User profile and account management
+      MemorySize: 128
+      Timeout: 10
+      Layers:
+        - !Ref SharedLayer
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref UsersTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref InvitesTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref FollowsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref PostsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref NotificationsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref PushTokensTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref BlocksTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - cognito-idp:AdminDeleteUser
+              Resource: !Ref CognitoUserPoolArn
+      Events:
+        GetMe:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ApiGateway
+            Path: /me
+            Method: GET
+        PatchMe:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ApiGateway
+            Path: /me
+            Method: PATCH
+        PostMe:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ApiGateway
+            Path: /me
+            Method: POST
+        DeleteMe:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ApiGateway
+            Path: /me
+            Method: DELETE
+        PostAvatar:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ApiGateway
+            Path: /me/avatar
+            Method: POST
+        GetNotifPrefs:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ApiGateway
+            Path: /me/notification-preferences
+            Method: GET
+        PatchNotifPrefs:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ApiGateway
+            Path: /me/notification-preferences
+            Method: PATCH
+        AcceptTerms:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ApiGateway
+            Path: /me/accept-terms
+            Method: POST
+        GetInvite:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ApiGateway
+            Path: /me/invite
+            Method: GET
+        PostInvite:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ApiGateway
+            Path: /me/invite
+            Method: POST
+        GetInvites:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ApiGateway
+            Path: /me/invites
+            Method: GET
+        PostUsername:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ApiGateway
+            Path: /username
+            Method: POST
+        GetSearch:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ApiGateway
+            Path: /search
+            Method: GET
+
+  # Posts Service - 256 MB (feed aggregation requires more memory)
+  PostsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub scooterbooter-posts-${Environment}
+      Handler: handler.handler
+      CodeUri: services/posts/
+      Description: Posts, feed, comments, and reactions
+      MemorySize: 256
+      Timeout: 15
+      Layers:
+        - !Ref SharedLayer
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref PostsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref UsersTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref FollowsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref CommentsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ReactionsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref NotificationsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref BlocksTable
+      Events:
+        GetFeed:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ApiGateway
+            Path: /feed
+            Method: GET
+        CreatePost:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ApiGateway
+            Path: /posts
+            Method: POST
+        GetPost:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ApiGateway
+            Path: /posts/{id}
+            Method: GET
+        DeletePost:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ApiGateway
+            Path: /posts/{id}
+            Method: DELETE
+        GetComments:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ApiGateway
+            Path: /comments/{postId}
+            Method: GET
+        PostComment:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ApiGateway
+            Path: /comments/{postId}
+            Method: POST
+        GetReactions:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ApiGateway
+            Path: /reactions/{postId}
+            Method: GET
+        PostReaction:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ApiGateway
+            Path: /reactions/{postId}
+            Method: POST
+
+  # Social Service - 128 MB (follow/block operations are lightweight)
+  SocialFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub scooterbooter-social-${Environment}
+      Handler: handler.handler
+      CodeUri: services/social/
+      Description: Follows, blocks, reports, and user profiles
+      MemorySize: 128
+      Timeout: 10
+      Layers:
+        - !Ref SharedLayer
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref UsersTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref FollowsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref BlocksTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ReportsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref PostsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref NotificationsTable
+      Events:
+        Follow:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ApiGateway
+            Path: /follow
+            Method: POST
+        Unfollow:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ApiGateway
+            Path: /unfollow
+            Method: POST
+        Block:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ApiGateway
+            Path: /block
+            Method: POST
+        Unblock:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ApiGateway
+            Path: /unblock
+            Method: POST
+        GetBlocked:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ApiGateway
+            Path: /blocked
+            Method: GET
+        IsBlocked:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ApiGateway
+            Path: /is-blocked
+            Method: GET
+        Report:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ApiGateway
+            Path: /report
+            Method: POST
+        GetReports:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ApiGateway
+            Path: /reports
+            Method: GET
+        GetUserProfile:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ApiGateway
+            Path: /u/{handle}
+            Method: GET
+        GetFollowers:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ApiGateway
+            Path: /u/{handle}/followers
+            Method: GET
+        GetFollowing:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ApiGateway
+            Path: /u/{handle}/following
+            Method: GET
+        GetUserPosts:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ApiGateway
+            Path: /u/{handle}/posts
+            Method: GET
+
+  # Media Service - 1024 MB (video processing with FFmpeg)
+  MediaFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub scooterbooter-media-${Environment}
+      Handler: handler.handler
+      CodeUri: services/media/
+      Description: Media uploads and video processing
+      MemorySize: 1024
+      Timeout: 60
+      Layers:
+        - !Ref SharedLayer
+        # - !Ref FFmpegLayer  # Add your FFmpeg layer ARN here
+      Environment:
+        Variables:
+          FFMPEG_PATH: /opt/bin/ffmpeg
+      Policies:
+        - S3CrudPolicy:
+            BucketName: !Ref MediaBucket
+      Events:
+        UploadUrl:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ApiGateway
+            Path: /upload-url
+            Method: POST
+        AvatarUrl:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ApiGateway
+            Path: /avatar-url
+            Method: POST
+        ProcessVideo:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ApiGateway
+            Path: /process-video
+            Method: POST
+        DeleteMedia:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ApiGateway
+            Path: /media/{key+}
+            Method: DELETE
+
+  # Notifications Service - 128 MB (lightweight operations)
+  NotificationsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub scooterbooter-notifications-${Environment}
+      Handler: handler.handler
+      CodeUri: services/notifications/
+      Description: Notifications and push tokens
+      MemorySize: 128
+      Timeout: 10
+      Layers:
+        - !Ref SharedLayer
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref NotificationsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref PushTokensTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref UsersTable
+      Events:
+        GetNotifications:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ApiGateway
+            Path: /notifications
+            Method: GET
+        RegisterPush:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ApiGateway
+            Path: /push/register
+            Method: POST
+        UnregisterPush:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ApiGateway
+            Path: /push/unregister
+            Method: DELETE
+
+  # Scoops Service - 512 MB (ephemeral stories with video)
+  ScoopsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub scooterbooter-scoops-${Environment}
+      Handler: handler.handler
+      CodeUri: services/scoops/
+      Description: Ephemeral stories/scoops
+      MemorySize: 512
+      Timeout: 30
+      Layers:
+        - !Ref SharedLayer
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ScoopsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref FollowsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref BlocksTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref UsersTable
+      Events:
+        GetScoopsFeed:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ApiGateway
+            Path: /scoops/feed
+            Method: GET
+        GetMyScoops:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ApiGateway
+            Path: /scoops/me
+            Method: GET
+        CreateScoop:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ApiGateway
+            Path: /scoops
+            Method: POST
+        GetUserScoops:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ApiGateway
+            Path: /scoops/user/{userId}
+            Method: GET
+        GetScoop:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ApiGateway
+            Path: /scoops/{id}
+            Method: GET
+        DeleteScoop:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ApiGateway
+            Path: /scoops/{id}
+            Method: DELETE
+        ViewScoop:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ApiGateway
+            Path: /scoops/{id}/view
+            Method: POST
+        GetViewers:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ApiGateway
+            Path: /scoops/{id}/viewers
+            Method: GET
+
+  # ============================================
+  # DYNAMODB TABLES (conditional - use existing or create new)
+  # ============================================
+
+  PostsTable:
+    Type: AWS::DynamoDB::Table
+    Condition: CreatePostsTable
+    Properties:
+      TableName: !Sub scooterbooter-posts-${Environment}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+        - AttributeName: sk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+        - AttributeName: sk
+          KeyType: RANGE
+
+  UsersTable:
+    Type: AWS::DynamoDB::Table
+    Condition: CreateUsersTable
+    Properties:
+      TableName: !Sub scooterbooter-users-${Environment}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+        - AttributeName: type
+          AttributeType: S
+        - AttributeName: handle
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: byHandle
+          KeySchema:
+            - AttributeName: type
+              KeyType: HASH
+            - AttributeName: handle
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+
+  FollowsTable:
+    Type: AWS::DynamoDB::Table
+    Condition: CreateFollowsTable
+    Properties:
+      TableName: !Sub scooterbooter-follows-${Environment}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+        - AttributeName: sk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+        - AttributeName: sk
+          KeyType: RANGE
+
+  CommentsTable:
+    Type: AWS::DynamoDB::Table
+    Condition: CreateCommentsTable
+    Properties:
+      TableName: !Sub scooterbooter-comments-${Environment}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+        - AttributeName: sk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+        - AttributeName: sk
+          KeyType: RANGE
+
+  ReactionsTable:
+    Type: AWS::DynamoDB::Table
+    Condition: CreateReactionsTable
+    Properties:
+      TableName: !Sub scooterbooter-reactions-${Environment}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+        - AttributeName: sk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+        - AttributeName: sk
+          KeyType: RANGE
+
+  NotificationsTable:
+    Type: AWS::DynamoDB::Table
+    Condition: CreateNotificationsTable
+    Properties:
+      TableName: !Sub scooterbooter-notifications-${Environment}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+        - AttributeName: sk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+        - AttributeName: sk
+          KeyType: RANGE
+
+  PushTokensTable:
+    Type: AWS::DynamoDB::Table
+    Condition: CreatePushTokensTable
+    Properties:
+      TableName: !Sub scooterbooter-push-tokens-${Environment}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+        - AttributeName: sk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+        - AttributeName: sk
+          KeyType: RANGE
+
+  ReportsTable:
+    Type: AWS::DynamoDB::Table
+    Condition: CreateReportsTable
+    Properties:
+      TableName: !Sub scooterbooter-reports-${Environment}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+        - AttributeName: sk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+        - AttributeName: sk
+          KeyType: RANGE
+
+  BlocksTable:
+    Type: AWS::DynamoDB::Table
+    Condition: CreateBlocksTable
+    Properties:
+      TableName: !Sub scooterbooter-blocks-${Environment}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+        - AttributeName: sk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+        - AttributeName: sk
+          KeyType: RANGE
+
+  ScoopsTable:
+    Type: AWS::DynamoDB::Table
+    Condition: CreateScoopsTable
+    Properties:
+      TableName: !Sub scooterbooter-scoops-${Environment}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+        - AttributeName: sk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+        - AttributeName: sk
+          KeyType: RANGE
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+
+  InvitesTable:
+    Type: AWS::DynamoDB::Table
+    Condition: CreateInvitesTable
+    Properties:
+      TableName: !Sub scooterbooter-invites-${Environment}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: code
+          AttributeType: S
+        - AttributeName: userId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: code
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: byUserId
+          KeySchema:
+            - AttributeName: userId
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+
+  # S3 Bucket for media
+  MediaBucket:
+    Type: AWS::S3::Bucket
+    Condition: CreateMediaBucket
+    Properties:
+      BucketName: !Sub scooterbooter-media-${Environment}-${AWS::AccountId}
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders:
+              - "*"
+            AllowedMethods:
+              - GET
+              - PUT
+              - POST
+            AllowedOrigins:
+              - "https://app.scooterbooter.com"
+              - "http://localhost:5173"
+            MaxAge: 3600
+
+Outputs:
+  ApiEndpoint:
+    Description: API Gateway endpoint URL
+    Value: !Sub "https://${ApiGateway}.execute-api.${AWS::Region}.amazonaws.com/${Environment}"
+
+  UsersFunction:
+    Description: Users Lambda Function ARN
+    Value: !GetAtt UsersFunction.Arn
+
+  PostsFunction:
+    Description: Posts Lambda Function ARN
+    Value: !GetAtt PostsFunction.Arn
+
+  SocialFunction:
+    Description: Social Lambda Function ARN
+    Value: !GetAtt SocialFunction.Arn
+
+  MediaFunction:
+    Description: Media Lambda Function ARN
+    Value: !GetAtt MediaFunction.Arn
+
+  NotificationsFunction:
+    Description: Notifications Lambda Function ARN
+    Value: !GetAtt NotificationsFunction.Arn
+
+  ScoopsFunction:
+    Description: Scoops Lambda Function ARN
+    Value: !GetAtt ScoopsFunction.Arn

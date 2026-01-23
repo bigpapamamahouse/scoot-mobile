@@ -1,0 +1,29 @@
+{
+  "version": "2.0",
+  "routeKey": "GET /me",
+  "rawPath": "/me",
+  "rawQueryString": "",
+  "headers": {
+    "content-type": "application/json",
+    "authorization": "Bearer eyJraWQiOiJ..."
+  },
+  "requestContext": {
+    "accountId": "123456789012",
+    "apiId": "api-id",
+    "authorizer": {
+      "jwt": {
+        "claims": {
+          "sub": "user-123-uuid",
+          "email": "test@example.com",
+          "cognito:username": "testuser"
+        }
+      }
+    },
+    "http": {
+      "method": "GET",
+      "path": "/me"
+    },
+    "stage": "prod"
+  },
+  "isBase64Encoded": false
+}
