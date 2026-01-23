@@ -5,6 +5,8 @@ const { randomUUID } = require('crypto');
 const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const { pipeline } = require('stream/promises');
+const { Readable } = require('stream');
 
 const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
 const {
@@ -117,19 +119,16 @@ async function processVideo(bucket, key, startTime, endTime) {
     console.log('[VideoProcess] === Starting Video Processing ===');
     console.log(`[VideoProcess] Downloading video from s3://${bucket}/${key}`);
 
-    // Download video from S3
+    // Download video from S3 using streaming to avoid loading into memory
     const getResult = await s3.send(new GetObjectCommand({
       Bucket: bucket,
       Key: key,
     }));
 
-    // Stream the body to a file
-    const chunks = [];
-    for await (const chunk of getResult.Body) {
-      chunks.push(chunk);
-    }
-    fs.writeFileSync(tmpInput, Buffer.concat(chunks));
-    console.log(`[VideoProcess] Downloaded ${fs.statSync(tmpInput).size} bytes`);
+    // Stream the S3 body directly to a file (memory efficient)
+    const writeStream = fs.createWriteStream(tmpInput);
+    await pipeline(getResult.Body, writeStream);
+    console.log(`[VideoProcess] Downloaded ${fs.statSync(tmpInput).size} bytes (streamed to disk)`);
 
     // Calculate duration
     const duration = endTime - startTime;
@@ -225,14 +224,17 @@ async function processVideo(bucket, key, startTime, endTime) {
     }
     console.log(`[VideoProcess] Uploading to s3://${bucket}/${processedKey}`);
 
+    // Upload using stream to avoid loading entire file into memory
+    const uploadStream = fs.createReadStream(tmpOutput);
     await s3.send(new PutObjectCommand({
       Bucket: bucket,
       Key: processedKey,
-      Body: fs.readFileSync(tmpOutput),
+      Body: uploadStream,
       ContentType: 'video/mp4',
+      ContentLength: outputSize, // Required when using stream
     }));
 
-    console.log('[VideoProcess] Upload complete');
+    console.log('[VideoProcess] Upload complete (streamed from disk)');
 
     // Clean up temp files
     fs.unlinkSync(tmpInput);
