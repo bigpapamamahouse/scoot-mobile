@@ -168,7 +168,10 @@ export default function FeedScreen({ navigation }: any){
 
   // Scoop handlers
   const handlePressScoops = React.useCallback((userScoops: UserScoops) => {
-    navigation.navigate('ScoopViewer', { userScoops });
+    // Find the first unviewed scoop index, or start from beginning if all viewed
+    const firstUnviewedIndex = userScoops.scoops.findIndex(scoop => !scoop.viewed);
+    const initialIndex = firstUnviewedIndex >= 0 ? firstUnviewedIndex : 0;
+    navigation.navigate('ScoopViewer', { userScoops, initialIndex });
   }, [navigation]);
 
   const handlePressCreateScoop = React.useCallback(() => {
