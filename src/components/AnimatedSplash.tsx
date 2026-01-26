@@ -82,44 +82,42 @@ export default function AnimatedSplash({ children, isReady }: AnimatedSplashProp
     }
   }, [isReady, splashOpacity, logoScale]);
 
-  if (!showSplash) {
-    return <>{children}</>;
-  }
-
   return (
     <View style={styles.container}>
       {/* Render children behind the splash */}
-      <View style={StyleSheet.absoluteFill}>
+      <View style={styles.container}>
         {children}
       </View>
 
-      {/* Animated splash overlay */}
-      <Animated.View
-        style={[
-          styles.splashContainer,
-          { opacity: splashOpacity, backgroundColor },
-        ]}
-        pointerEvents="none"
-      >
+      {/* Animated splash overlay - keep in tree to prevent remount */}
+      {showSplash && (
         <Animated.View
           style={[
-            styles.logoContainer,
-            {
-              opacity: logoOpacity,
-              transform: [{ scale: logoScale }],
-            },
+            styles.splashContainer,
+            { opacity: splashOpacity, backgroundColor },
           ]}
+          pointerEvents="none"
         >
-          <Image
-            source={isDark
-              ? require('../../assets/scoot_lite.png')
-              : require('../../assets/scoot.png')
-            }
-            style={styles.logo}
-            resizeMode="contain"
-          />
+          <Animated.View
+            style={[
+              styles.logoContainer,
+              {
+                opacity: logoOpacity,
+                transform: [{ scale: logoScale }],
+              },
+            ]}
+          >
+            <Image
+              source={isDark
+                ? require('../../assets/scoot_lite.png')
+                : require('../../assets/scoot.png')
+              }
+              style={styles.logo}
+              resizeMode="contain"
+            />
+          </Animated.View>
         </Animated.View>
-      </Animated.View>
+      )}
     </View>
   );
 }
