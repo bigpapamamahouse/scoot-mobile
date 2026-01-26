@@ -8,8 +8,13 @@ interface AuthState {
   needsTermsAcceptance: boolean;
 }
 
+interface AuthResult {
+  isAuthenticated: boolean;
+  needsTermsAcceptance: boolean;
+}
+
 interface AuthContextType extends AuthState {
-  recheckAuth: () => Promise<void>;
+  recheckAuth: () => Promise<AuthResult>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -25,7 +30,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     needsTermsAcceptance: false,
   });
 
-  const checkAuth = useCallback(async () => {
+  const checkAuth = useCallback(async (): Promise<AuthResult> => {
     setState(prev => ({ ...prev, isChecking: true }));
 
     try {
@@ -35,24 +40,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const user = await UsersAPI.me();
         const needsTerms = !(user as any)?.termsAccepted;
 
-        setState({
-          isChecking: false,
+        const result = {
           isAuthenticated: true,
           needsTermsAcceptance: needsTerms,
-        });
+        };
+        setState({ ...result, isChecking: false });
+        return result;
       } else {
-        setState({
-          isChecking: false,
+        const result = {
           isAuthenticated: false,
           needsTermsAcceptance: false,
-        });
+        };
+        setState({ ...result, isChecking: false });
+        return result;
       }
     } catch (error) {
-      setState({
-        isChecking: false,
+      const result = {
         isAuthenticated: false,
         needsTermsAcceptance: false,
-      });
+      };
+      setState({ ...result, isChecking: false });
+      return result;
     }
   }, []);
 

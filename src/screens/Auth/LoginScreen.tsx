@@ -9,28 +9,22 @@ import { useAuth } from '../../contexts/AuthContext';
 export default function LoginScreen({ navigation }: any) {
   const { colors } = useTheme();
   const { refreshUser } = useCurrentUser();
-  const { isAuthenticated, needsTermsAcceptance, recheckAuth } = useAuth();
+  const { recheckAuth } = useAuth();
   const [user, setUser] = React.useState('');
   const [pass, setPass] = React.useState('');
-
-  // Navigate based on auth state (auth check already done by AuthContext during splash)
-  React.useEffect(() => {
-    if (isAuthenticated) {
-      if (needsTermsAcceptance) {
-        navigation.reset({ index: 0, routes: [{ name: 'TermsOfService' }] });
-      } else {
-        navigation.reset({ index: 0, routes: [{ name: 'Feed' }] });
-      }
-    }
-  }, [isAuthenticated, needsTermsAcceptance, navigation]);
 
   const onLogin = async () => {
     const r = await signInFn(user.trim(), pass);
     switch (r.status) {
       case 'SIGNED_IN':
-        // Refresh user context and recheck auth - navigation will happen via useEffect
+        // Refresh user context and recheck auth, then navigate
         await refreshUser();
-        await recheckAuth();
+        const authState = await recheckAuth();
+        if (authState.needsTermsAcceptance) {
+          navigation.reset({ index: 0, routes: [{ name: 'TermsOfService' }] });
+        } else {
+          navigation.reset({ index: 0, routes: [{ name: 'Feed' }] });
+        }
         return;
       case 'NEEDS_CONFIRMATION':
         Alert.alert('Confirm your account', 'We sent you a code by email.');
