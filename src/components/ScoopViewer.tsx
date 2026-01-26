@@ -314,8 +314,8 @@ export const ScoopViewer: React.FC<ScoopViewerProps> = ({
             </View>
           )}
 
-          {/* Text overlays */}
-          {scoop.textOverlays?.map((overlay) => (
+          {/* Text overlays - only show after media loads */}
+          {mediaLoaded && scoop.textOverlays?.map((overlay) => (
             <View
               key={overlay.id}
               style={[
