@@ -93,6 +93,7 @@ export const ScoopViewer: React.FC<ScoopViewerProps> = ({
   const progressAnim = useRef(new Animated.Value(0)).current;
   const animationRef = useRef<Animated.CompositeAnimation | null>(null);
   const [mediaLoaded, setMediaLoaded] = React.useState(false);
+  const [videoPlaying, setVideoPlaying] = React.useState(false);
   const [videoDuration, setVideoDuration] = React.useState<number | null>(null);
   const [showMenu, setShowMenu] = React.useState(false);
 
@@ -152,6 +153,7 @@ export const ScoopViewer: React.FC<ScoopViewerProps> = ({
   useEffect(() => {
     progressAnim.setValue(0);
     setMediaLoaded(false);
+    setVideoPlaying(false);
     setVideoDuration(null);
   }, [scoop.id, progressAnim]);
 
@@ -177,9 +179,14 @@ export const ScoopViewer: React.FC<ScoopViewerProps> = ({
       onComplete();
     });
 
+    const playingSubscription = player.addListener('playingChange', (event) => {
+      setVideoPlaying(event.isPlaying);
+    });
+
     return () => {
       statusSubscription.remove();
       endSubscription.remove();
+      playingSubscription.remove();
     };
   }, [isVideo, player, videoDuration, onComplete, mediaUrl]);
 
@@ -314,8 +321,8 @@ export const ScoopViewer: React.FC<ScoopViewerProps> = ({
             </View>
           )}
 
-          {/* Text overlays - only show after media loads */}
-          {mediaLoaded && scoop.textOverlays?.map((overlay) => (
+          {/* Text overlays - only show after media loads (and video is playing for videos) */}
+          {mediaLoaded && (!isVideo || videoPlaying) && scoop.textOverlays?.map((overlay) => (
             <View
               key={overlay.id}
               style={[
