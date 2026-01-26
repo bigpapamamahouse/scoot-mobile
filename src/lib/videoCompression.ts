@@ -15,7 +15,7 @@ export interface CompressionResult {
 }
 
 export interface CompressionOptions {
-  /** Quality preset: 'low' | 'medium' | 'high'. Default: 'medium' */
+  /** Quality preset: 'low' | 'medium' | 'high'. Default: 'high' */
   quality?: 'low' | 'medium' | 'high';
   /** Whether to log compression stats. Default: true */
   logStats?: boolean;
@@ -42,7 +42,7 @@ export async function compressVideo(
   uri: string,
   options: CompressionOptions = {}
 ): Promise<CompressionResult> {
-  const { quality = 'medium', logStats = true } = options;
+  const { quality = 'high', logStats = true } = options;
 
   // Check if compression is available (not in Expo Go)
   if (!Video) {
@@ -68,8 +68,8 @@ export async function compressVideo(
       compressionMethod: 'auto',
       // Quality maps to internal presets:
       // - 'low': aggressive compression, smaller files
-      // - 'medium': balanced quality/size (recommended for mobile)
-      // - 'high': less compression, larger files
+      // - 'medium': balanced quality/size
+      // - 'high': less compression, better quality (recommended for scoops)
       quality,
     });
 

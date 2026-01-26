@@ -67,7 +67,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
 
           console.log('[UploadContext] Compressing video before upload');
           const compressionResult = await compressVideo(mediaUri, {
-            quality: 'medium',
+            quality: 'high',
           });
           mediaUri = compressionResult.uri;
           console.log('[UploadContext] Video compressed:', mediaUri);
