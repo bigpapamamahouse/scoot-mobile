@@ -7,7 +7,7 @@ import {
   Dimensions,
 } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
-import { LinearGradient } from 'expo-linear-gradient';
+import { useTheme } from '../theme';
 
 // Keep the splash screen visible while we prepare our animated version
 SplashScreen.preventAutoHideAsync();
@@ -17,15 +17,20 @@ interface AnimatedSplashProps {
   isReady: boolean;
 }
 
-const { width, height } = Dimensions.get('window');
+const { width } = Dimensions.get('window');
 
 export default function AnimatedSplash({ children, isReady }: AnimatedSplashProps) {
   const [showSplash, setShowSplash] = useState(true);
+  const { effectiveMode } = useTheme();
 
   // Animation values
   const logoScale = useRef(new Animated.Value(0.3)).current;
   const logoOpacity = useRef(new Animated.Value(0)).current;
   const splashOpacity = useRef(new Animated.Value(1)).current;
+
+  // Theme-aware colors
+  const isDark = effectiveMode === 'dark';
+  const backgroundColor = isDark ? '#1a1a2e' : '#ffffff';
 
   useEffect(() => {
     // Start the logo entrance animation
@@ -92,32 +97,28 @@ export default function AnimatedSplash({ children, isReady }: AnimatedSplashProp
       <Animated.View
         style={[
           styles.splashContainer,
-          { opacity: splashOpacity },
+          { opacity: splashOpacity, backgroundColor },
         ]}
         pointerEvents="none"
       >
-        <LinearGradient
-          colors={['#e879f9', '#818cf8', '#60a5fa']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.gradient}
+        <Animated.View
+          style={[
+            styles.logoContainer,
+            {
+              opacity: logoOpacity,
+              transform: [{ scale: logoScale }],
+            },
+          ]}
         >
-          <Animated.View
-            style={[
-              styles.logoContainer,
-              {
-                opacity: logoOpacity,
-                transform: [{ scale: logoScale }],
-              },
-            ]}
-          >
-            <Image
-              source={require('../../assets/icon.png')}
-              style={styles.logo}
-              resizeMode="contain"
-            />
-          </Animated.View>
-        </LinearGradient>
+          <Image
+            source={isDark
+              ? require('../../assets/scoot_lite.png')
+              : require('../../assets/scoot.png')
+            }
+            style={styles.logo}
+            resizeMode="contain"
+          />
+        </Animated.View>
       </Animated.View>
     </View>
   );
@@ -130,9 +131,6 @@ const styles = StyleSheet.create({
   splashContainer: {
     ...StyleSheet.absoluteFillObject,
     zIndex: 999,
-  },
-  gradient: {
-    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -141,8 +139,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   logo: {
-    width: width * 0.5,
-    height: width * 0.5,
-    borderRadius: 40,
+    width: width * 0.6,
+    height: width * 0.25,
   },
 });
