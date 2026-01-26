@@ -5,17 +5,20 @@ import RootNavigator from './navigation';
 import { NotificationsProvider } from './lib/notifications';
 import { ThemeProvider } from './theme';
 import { CurrentUserProvider, useCurrentUser } from './contexts/CurrentUserContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { UploadProvider } from './contexts/UploadContext';
 import AnimatedSplash from './components/AnimatedSplash';
 
 function AppContent({ onReady }: { onReady: () => void }) {
-  const { loading } = useCurrentUser();
+  const { loading: userLoading } = useCurrentUser();
+  const { isChecking: authChecking } = useAuth();
 
   useEffect(() => {
-    if (!loading) {
+    // Only signal ready when both user data and auth check are complete
+    if (!userLoading && !authChecking) {
       onReady();
     }
-  }, [loading, onReady]);
+  }, [userLoading, authChecking, onReady]);
 
   return (
     <NotificationsProvider>
@@ -34,7 +37,9 @@ export default function App() {
       <ThemeProvider>
         <AnimatedSplash isReady={isReady}>
           <CurrentUserProvider>
-            <AppContent onReady={() => setIsReady(true)} />
+            <AuthProvider>
+              <AppContent onReady={() => setIsReady(true)} />
+            </AuthProvider>
           </CurrentUserProvider>
         </AnimatedSplash>
       </ThemeProvider>
