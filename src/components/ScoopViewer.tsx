@@ -163,6 +163,8 @@ export const ScoopViewer: React.FC<ScoopViewerProps> = ({
 
     console.log('[ScoopViewer] Setting up video player for:', mediaUrl);
 
+    let frameCheckInterval: ReturnType<typeof setInterval> | null = null;
+
     const statusSubscription = player.addListener('statusChange', (event) => {
       console.log('[ScoopViewer] Video status:', event.status);
       if (event.status === 'readyToPlay') {
@@ -170,15 +172,22 @@ export const ScoopViewer: React.FC<ScoopViewerProps> = ({
         if (player.duration && !videoDuration) {
           setVideoDuration(player.duration * 1000); // Convert to ms
         }
-        // Wait a bit after readyToPlay for the video frame to actually render
-        setTimeout(() => {
-          console.log('[ScoopViewer] Setting videoFrameRendered after delay');
-          setVideoFrameRendered(true);
-        }, 150);
       } else if (event.status === 'error') {
         console.error('[ScoopViewer] Video error:', event.error);
       }
     });
+
+    // Poll for currentTime > 0 to know when video has actually started rendering frames
+    frameCheckInterval = setInterval(() => {
+      if (player.currentTime > 0) {
+        console.log('[ScoopViewer] Video currentTime > 0, frame rendered');
+        setVideoFrameRendered(true);
+        if (frameCheckInterval) {
+          clearInterval(frameCheckInterval);
+          frameCheckInterval = null;
+        }
+      }
+    }, 16); // Check every frame (~60fps)
 
     const endSubscription = player.addListener('playToEnd', () => {
       onComplete();
@@ -187,6 +196,9 @@ export const ScoopViewer: React.FC<ScoopViewerProps> = ({
     return () => {
       statusSubscription.remove();
       endSubscription.remove();
+      if (frameCheckInterval) {
+        clearInterval(frameCheckInterval);
+      }
     };
   }, [isVideo, player, videoDuration, onComplete, mediaUrl]);
 
@@ -205,15 +217,6 @@ export const ScoopViewer: React.FC<ScoopViewerProps> = ({
     setMediaLoaded(true);
   }, []);
 
-  const handleVideoFirstFrame = useCallback(() => {
-    console.log('[ScoopViewer] onFirstFrameRender fired');
-    // Wait an extra frame to ensure the video frame is composited to screen
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        setVideoFrameRendered(true);
-      });
-    });
-  }, []);
 
   const handlePress = useCallback(
     (event: { nativeEvent: { locationX: number } }) => {
@@ -314,7 +317,6 @@ export const ScoopViewer: React.FC<ScoopViewerProps> = ({
               style={styles.media}
               contentFit="cover"
               nativeControls={false}
-              onFirstFrameRender={handleVideoFirstFrame}
             />
           ) : (
             <Image
