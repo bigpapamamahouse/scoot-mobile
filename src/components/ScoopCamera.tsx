@@ -172,7 +172,7 @@ export const ScoopCamera: React.FC<ScoopCameraProps> = ({
 
     try {
       const photo = await cameraRef.current.takePictureAsync({
-        quality: 0.8,
+        quality: 0.9,
         skipProcessing: false,
       });
 

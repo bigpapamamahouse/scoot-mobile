@@ -40,19 +40,20 @@ export default function CreateScoopScreen({ navigation }: any) {
   }, [navigation]);
 
   const handlePublish = useCallback(
-    (textOverlays: ScoopTextOverlay[], trimParams?: VideoTrimParams) => {
+    (processedUri: string, textOverlays: ScoopTextOverlay[], trimParams?: VideoTrimParams) => {
       if (!editorState) return;
 
       console.log('[CreateScoopScreen] Starting background upload:', {
-        uri: editorState.uri,
+        uri: processedUri,
         type: editorState.type,
         aspectRatio: editorState.aspectRatio,
         trimParams,
       });
 
       // Start background upload and navigate back immediately
+      // Use processedUri which includes cropped/compressed gallery images
       startUpload({
-        uri: editorState.uri,
+        uri: processedUri,
         mediaType: editorState.type,
         aspectRatio: editorState.aspectRatio,
         textOverlays,
