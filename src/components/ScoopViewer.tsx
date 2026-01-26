@@ -319,8 +319,8 @@ export const ScoopViewer: React.FC<ScoopViewerProps> = ({
             />
           )}
 
-          {/* Loading indicator */}
-          {!mediaLoaded && (
+          {/* Loading indicator - for videos, keep showing until first frame renders */}
+          {(!mediaLoaded || (isVideo && !videoFrameRendered)) && (
             <View style={styles.loadingOverlay}>
               <ActivityIndicator size="large" color="#fff" />
             </View>
