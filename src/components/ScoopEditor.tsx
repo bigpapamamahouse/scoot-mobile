@@ -406,7 +406,7 @@ export const ScoopEditor: React.FC<ScoopEditorProps> = ({
             },
           },
         ],
-        { compress: 0.85, format: ImageManipulator.SaveFormat.JPEG }
+        { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG }
       );
 
       console.log('[ScoopEditor] Crop result:', result);
