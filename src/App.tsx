@@ -13,12 +13,19 @@ function AppContent({ onReady }: { onReady: () => void }) {
   const { loading: userLoading } = useCurrentUser();
   const { isChecking: authChecking } = useAuth();
 
+  const isReady = !userLoading && !authChecking;
+
   useEffect(() => {
-    // Only signal ready when both user data and auth check are complete
-    if (!userLoading && !authChecking) {
+    if (isReady) {
       onReady();
     }
-  }, [userLoading, authChecking, onReady]);
+  }, [isReady, onReady]);
+
+  // Don't render navigator until auth is determined
+  // This ensures initialRouteName uses the correct auth state
+  if (!isReady) {
+    return null;
+  }
 
   return (
     <NotificationsProvider>
