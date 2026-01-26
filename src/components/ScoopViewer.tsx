@@ -201,7 +201,12 @@ export const ScoopViewer: React.FC<ScoopViewerProps> = ({
   }, []);
 
   const handleVideoFirstFrame = useCallback(() => {
-    setVideoFrameRendered(true);
+    // Wait an extra frame to ensure the video frame is composited to screen
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setVideoFrameRendered(true);
+      });
+    });
   }, []);
 
   const handlePress = useCallback(
