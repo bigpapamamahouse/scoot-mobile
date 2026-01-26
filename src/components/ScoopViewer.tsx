@@ -93,6 +93,7 @@ export const ScoopViewer: React.FC<ScoopViewerProps> = ({
   const progressAnim = useRef(new Animated.Value(0)).current;
   const animationRef = useRef<Animated.CompositeAnimation | null>(null);
   const [mediaLoaded, setMediaLoaded] = React.useState(false);
+  const [videoFrameRendered, setVideoFrameRendered] = React.useState(false);
   const [videoDuration, setVideoDuration] = React.useState<number | null>(null);
   const [showMenu, setShowMenu] = React.useState(false);
 
@@ -152,6 +153,7 @@ export const ScoopViewer: React.FC<ScoopViewerProps> = ({
   useEffect(() => {
     progressAnim.setValue(0);
     setMediaLoaded(false);
+    setVideoFrameRendered(false);
     setVideoDuration(null);
   }, [scoop.id, progressAnim]);
 
@@ -160,6 +162,8 @@ export const ScoopViewer: React.FC<ScoopViewerProps> = ({
     if (!isVideo || !player) return;
 
     console.log('[ScoopViewer] Setting up video player for:', mediaUrl);
+
+    let frameCheckInterval: ReturnType<typeof setInterval> | null = null;
 
     const statusSubscription = player.addListener('statusChange', (event) => {
       console.log('[ScoopViewer] Video status:', event.status);
@@ -173,6 +177,18 @@ export const ScoopViewer: React.FC<ScoopViewerProps> = ({
       }
     });
 
+    // Poll for currentTime > 0 to know when video has actually started rendering frames
+    frameCheckInterval = setInterval(() => {
+      if (player.currentTime > 0) {
+        console.log('[ScoopViewer] Video currentTime > 0, frame rendered');
+        setVideoFrameRendered(true);
+        if (frameCheckInterval) {
+          clearInterval(frameCheckInterval);
+          frameCheckInterval = null;
+        }
+      }
+    }, 16); // Check every frame (~60fps)
+
     const endSubscription = player.addListener('playToEnd', () => {
       onComplete();
     });
@@ -180,6 +196,9 @@ export const ScoopViewer: React.FC<ScoopViewerProps> = ({
     return () => {
       statusSubscription.remove();
       endSubscription.remove();
+      if (frameCheckInterval) {
+        clearInterval(frameCheckInterval);
+      }
     };
   }, [isVideo, player, videoDuration, onComplete, mediaUrl]);
 
@@ -197,6 +216,7 @@ export const ScoopViewer: React.FC<ScoopViewerProps> = ({
   const handleMediaLoad = useCallback(() => {
     setMediaLoaded(true);
   }, []);
+
 
   const handlePress = useCallback(
     (event: { nativeEvent: { locationX: number } }) => {
@@ -307,15 +327,15 @@ export const ScoopViewer: React.FC<ScoopViewerProps> = ({
             />
           )}
 
-          {/* Loading indicator */}
-          {!mediaLoaded && (
+          {/* Loading indicator - for videos, keep showing until first frame renders */}
+          {(!mediaLoaded || (isVideo && !videoFrameRendered)) && (
             <View style={styles.loadingOverlay}>
               <ActivityIndicator size="large" color="#fff" />
             </View>
           )}
 
-          {/* Text overlays */}
-          {scoop.textOverlays?.map((overlay) => (
+          {/* Text overlays - only show after media loads (and first frame renders for videos) */}
+          {mediaLoaded && (!isVideo || videoFrameRendered) && scoop.textOverlays?.map((overlay) => (
             <View
               key={overlay.id}
               style={[
