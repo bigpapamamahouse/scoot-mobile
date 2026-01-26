@@ -1,71 +1,28 @@
 import React from 'react';
-import { View, Text, TextInput, Button, Alert, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator, Image, TouchableOpacity } from 'react-native';
+import { View, Text, TextInput, Button, Alert, KeyboardAvoidingView, Platform, ScrollView, Image, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { signInFn, checkAuthStatus } from '../../api/auth';
+import { signInFn } from '../../api/auth';
 import { useTheme } from '../../theme/ThemeContext';
-import { UsersAPI } from '../../api';
 import { useCurrentUser } from '../../contexts/CurrentUserContext';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function LoginScreen({ navigation }: any) {
   const { colors } = useTheme();
   const { refreshUser } = useCurrentUser();
+  const { recheckAuth } = useAuth();
   const [user, setUser] = React.useState('');
   const [pass, setPass] = React.useState('');
-  const [checking, setChecking] = React.useState(true);
-
-  // Check if user is already authenticated when component mounts
-  React.useEffect(() => {
-    checkAuthStatus().then(async (isAuthenticated) => {
-      if (isAuthenticated) {
-        console.log('User already authenticated, checking TOS acceptance');
-        try {
-          // Refresh user context to ensure we have latest data
-          await refreshUser();
-          const user = await UsersAPI.me();
-          if (!(user as any)?.termsAccepted) {
-            console.log('User has not accepted TOS, navigating to TermsOfService');
-            navigation.reset({ index: 0, routes: [{ name: 'TermsOfService' }] });
-          } else {
-            console.log('User authenticated and TOS accepted, navigating to Feed');
-            navigation.reset({ index: 0, routes: [{ name: 'Feed' }] });
-          }
-        } catch (error) {
-          console.error('Error checking user TOS status:', error);
-          setChecking(false);
-        }
-      } else {
-        setChecking(false);
-      }
-    }).catch(() => {
-      setChecking(false);
-    });
-  }, [navigation, refreshUser]);
-
-  if (checking) {
-    return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background.primary, justifyContent: 'center', alignItems: 'center' }} edges={['bottom']}>
-        <ActivityIndicator size="large" color={colors.primary[500]} />
-        <Text style={{ marginTop: 16, color: colors.text.secondary }}>Checking authentication...</Text>
-      </SafeAreaView>
-    );
-  }
 
   const onLogin = async () => {
     const r = await signInFn(user.trim(), pass);
     switch (r.status) {
       case 'SIGNED_IN':
-        // Check if user has accepted terms of service
-        try {
-          // Refresh user context to ensure we have latest data
-          await refreshUser();
-          const userData = await UsersAPI.me();
-          if (!(userData as any)?.termsAccepted) {
-            navigation.reset({ index: 0, routes: [{ name: 'TermsOfService' }] });
-          } else {
-            navigation.reset({ index: 0, routes: [{ name: 'Feed' }] });
-          }
-        } catch (error) {
-          console.error('Error checking user TOS status:', error);
+        // Refresh user context and recheck auth, then navigate
+        await refreshUser();
+        const authState = await recheckAuth();
+        if (authState.needsTermsAcceptance) {
+          navigation.reset({ index: 0, routes: [{ name: 'TermsOfService' }] });
+        } else {
           navigation.reset({ index: 0, routes: [{ name: 'Feed' }] });
         }
         return;

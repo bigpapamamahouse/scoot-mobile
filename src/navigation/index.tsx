@@ -27,6 +27,7 @@ import TermsOfServiceScreen from '../screens/TermsOfServiceScreen';
 import { IconButton, Badge } from '../components/ui';
 import { useTheme, spacing } from '../theme';
 import { navigationRef } from './navigationRef';
+import { useAuth } from '../contexts/AuthContext';
 
 const Stack = createNativeStackNavigator();
 
@@ -106,6 +107,14 @@ function HeaderActions({ navigation }: { navigation: any }) {
 
 export default function RootNavigator(){
   const { colors, effectiveMode } = useTheme();
+  const { isAuthenticated, needsTermsAcceptance } = useAuth();
+
+  // Determine initial route based on auth state
+  const getInitialRouteName = () => {
+    if (!isAuthenticated) return 'Login';
+    if (needsTermsAcceptance) return 'TermsOfService';
+    return 'Feed';
+  };
 
   const navigationTheme = {
     dark: effectiveMode === 'dark',
@@ -121,7 +130,7 @@ export default function RootNavigator(){
 
   return (
     <NavigationContainer ref={navigationRef} theme={navigationTheme}>
-      <Stack.Navigator>
+      <Stack.Navigator initialRouteName={getInitialRouteName()}>
         <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
         <Stack.Screen name="Signup" component={SignupScreen} options={{ title: 'Sign up' }} />
         <Stack.Screen name="ConfirmCode" component={ConfirmCodeScreen} options={{ title: 'Confirm' }} />
