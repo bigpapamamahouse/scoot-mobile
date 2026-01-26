@@ -170,6 +170,11 @@ export const ScoopViewer: React.FC<ScoopViewerProps> = ({
         if (player.duration && !videoDuration) {
           setVideoDuration(player.duration * 1000); // Convert to ms
         }
+        // Wait a bit after readyToPlay for the video frame to actually render
+        setTimeout(() => {
+          console.log('[ScoopViewer] Setting videoFrameRendered after delay');
+          setVideoFrameRendered(true);
+        }, 150);
       } else if (event.status === 'error') {
         console.error('[ScoopViewer] Video error:', event.error);
       }
