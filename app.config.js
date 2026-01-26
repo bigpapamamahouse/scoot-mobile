@@ -8,9 +8,9 @@ module.exports = {
     userInterfaceStyle: "automatic",
     icon: "./assets/icon.png",
     splash: {
-      image: "./assets/icon.png",
+      image: "./assets/scoot.png",
       resizeMode: "contain",
-      backgroundColor: "#a78bfa"
+      backgroundColor: "#ffffff"
     },
     ios: {
       supportsTablet: true,

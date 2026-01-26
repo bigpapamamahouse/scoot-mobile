@@ -7,7 +7,6 @@ import {
   Dimensions,
 } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
-import { useTheme } from '../theme';
 
 // Keep the splash screen visible while we prepare our animated version
 SplashScreen.preventAutoHideAsync();
@@ -21,28 +20,27 @@ const { width } = Dimensions.get('window');
 
 export default function AnimatedSplash({ children, isReady }: AnimatedSplashProps) {
   const [showSplash, setShowSplash] = useState(true);
-  const { effectiveMode } = useTheme();
 
-  // Animation values
-  const logoScale = useRef(new Animated.Value(0.3)).current;
-  const logoOpacity = useRef(new Animated.Value(0)).current;
+  // Animation values - start visible to match native splash
+  const logoScale = useRef(new Animated.Value(1)).current;
+  const logoOpacity = useRef(new Animated.Value(1)).current;
   const splashOpacity = useRef(new Animated.Value(1)).current;
 
-  // Theme-aware colors
-  const isDark = effectiveMode === 'dark';
-  const backgroundColor = isDark ? '#1a1a2e' : '#ffffff';
+  // Use white background to match native splash (which can't be theme-aware)
+  const backgroundColor = '#ffffff';
 
   useEffect(() => {
     // Start the logo entrance animation
     const startAnimation = async () => {
-      // Hide the native splash screen
+      // Hide the native splash screen - logo is already visible so no flash
       await SplashScreen.hideAsync();
 
-      // Run the logo entrance animation (fade in + scale with bounce)
-      Animated.parallel([
-        Animated.timing(logoOpacity, {
-          toValue: 1,
-          duration: 400,
+      // Run a subtle pulse animation to bring the logo to life
+      Animated.sequence([
+        Animated.spring(logoScale, {
+          toValue: 1.1,
+          friction: 3,
+          tension: 100,
           useNativeDriver: true,
         }),
         Animated.spring(logoScale, {
@@ -55,7 +53,7 @@ export default function AnimatedSplash({ children, isReady }: AnimatedSplashProp
     };
 
     startAnimation();
-  }, [logoOpacity, logoScale]);
+  }, [logoScale]);
 
   useEffect(() => {
     if (isReady) {
@@ -108,10 +106,7 @@ export default function AnimatedSplash({ children, isReady }: AnimatedSplashProp
             ]}
           >
             <Image
-              source={isDark
-                ? require('../../assets/scoot_lite.png')
-                : require('../../assets/scoot.png')
-              }
+              source={require('../../assets/scoot.png')}
               style={styles.logo}
               resizeMode="contain"
             />
