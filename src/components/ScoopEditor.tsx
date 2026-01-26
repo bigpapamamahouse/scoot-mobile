@@ -41,7 +41,7 @@ interface ScoopEditorProps {
   mediaType: ScoopMediaType;
   aspectRatio: number;
   videoDuration?: number; // Duration in seconds for videos from gallery
-  onPublish: (textOverlays: ScoopTextOverlay[], trimParams?: VideoTrimParams) => void;
+  onPublish: (processedUri: string, textOverlays: ScoopTextOverlay[], trimParams?: VideoTrimParams) => void;
   onDiscard: () => void;
   isFromGallery?: boolean; // New prop to determine if cropping is needed
 }
@@ -509,8 +509,8 @@ export const ScoopEditor: React.FC<ScoopEditorProps> = ({
       };
     });
 
-    onPublish(finalOverlays, trimParams ?? undefined);
-  }, [textOverlays, onPublish, trimParams]);
+    onPublish(croppedUri || mediaUri, finalOverlays, trimParams ?? undefined);
+  }, [textOverlays, onPublish, trimParams, croppedUri, mediaUri]);
 
   // Handle video trim confirmation
   const handleTrimConfirm = useCallback((startTime: number, endTime: number) => {
