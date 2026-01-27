@@ -19,6 +19,7 @@ interface ScoopViewerScreenParams {
   scoops?: Scoop[];
   initialIndex?: number;
   isOwner?: boolean;
+  allUserScoops?: UserScoops[]; // Full feed for autoplay between users
 }
 
 export default function ScoopViewerScreen({ navigation, route }: any) {
@@ -27,15 +28,27 @@ export default function ScoopViewerScreen({ navigation, route }: any) {
 
   // Get scoops from either userScoops or direct scoops array
   const initialScoops = params.userScoops?.scoops || params.scoops || [];
-  const isOwner = params.isOwner ?? (params.userScoops?.userId === currentUser?.id);
+  const allUserScoops = params.allUserScoops || [];
 
   const [scoops, setScoops] = useState<Scoop[]>(initialScoops);
   const [currentIndex, setCurrentIndex] = useState(params.initialIndex || 0);
   const [isPaused, setIsPaused] = useState(false);
   const [viewedScoops, setViewedScoops] = useState<Set<string>>(new Set());
   const [currentProgress, setCurrentProgress] = useState(0);
+  // Track which users we've visited during this session for autoplay
+  const [visitedUsers, setVisitedUsers] = useState<Set<string>>(() => {
+    const initial = new Set<string>();
+    if (params.userScoops?.userId) {
+      initial.add(params.userScoops.userId);
+    }
+    return initial;
+  });
+  // Track current user for display purposes
+  const [currentUserScoops, setCurrentUserScoops] = useState<UserScoops | undefined>(params.userScoops);
 
   const currentScoop = scoops[currentIndex];
+  // Compute isOwner dynamically based on current user being viewed
+  const isOwner = params.isOwner ?? (currentUserScoops?.userId === currentUser?.id);
 
   // Pause when screen loses focus (e.g., navigating to viewers), resume when focused
   useEffect(() => {
@@ -72,11 +85,29 @@ export default function ScoopViewerScreen({ navigation, route }: any) {
 
   const handleComplete = useCallback(() => {
     if (currentIndex < scoops.length - 1) {
+      // More scoops from current user
       setCurrentIndex((prev) => prev + 1);
     } else {
-      navigation.goBack();
+      // Find next user with unviewed scoops that we haven't visited yet
+      const nextUserScoops = allUserScoops.find(
+        (us) => us.hasUnviewed && !visitedUsers.has(us.userId)
+      );
+
+      if (nextUserScoops) {
+        // Switch to next user's scoops
+        setVisitedUsers((prev) => new Set(prev).add(nextUserScoops.userId));
+        setCurrentUserScoops(nextUserScoops);
+        setScoops(nextUserScoops.scoops);
+        // Start from first unviewed scoop
+        const firstUnviewedIndex = nextUserScoops.scoops.findIndex(s => !s.viewed);
+        setCurrentIndex(firstUnviewedIndex >= 0 ? firstUnviewedIndex : 0);
+        setCurrentProgress(0);
+      } else {
+        // No more unviewed scoops from other users
+        navigation.goBack();
+      }
     }
-  }, [currentIndex, scoops.length, navigation]);
+  }, [currentIndex, scoops.length, navigation, allUserScoops, visitedUsers]);
 
   const handlePrevious = useCallback(() => {
     if (currentIndex > 0) {

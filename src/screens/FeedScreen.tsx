@@ -171,7 +171,9 @@ export default function FeedScreen({ navigation }: any){
     // Find the first unviewed scoop index, or start from beginning if all viewed
     const firstUnviewedIndex = userScoops.scoops.findIndex(scoop => !scoop.viewed);
     const initialIndex = firstUnviewedIndex >= 0 ? firstUnviewedIndex : 0;
-    navigation.navigate('ScoopViewer', { userScoops, initialIndex });
+    // Pass the full scoops feed for autoplay across users
+    const allUserScoops = scoopsBarRef.current?.getScoopsFeed() || [];
+    navigation.navigate('ScoopViewer', { userScoops, initialIndex, allUserScoops });
   }, [navigation]);
 
   const handlePressCreateScoop = React.useCallback(() => {
