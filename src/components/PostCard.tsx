@@ -17,6 +17,9 @@ import { useTheme, spacing, typography, borderRadius, shadows } from '../theme';
 import { ReactionDetailsModal } from './ReactionDetailsModal';
 import { imageDimensionCache } from '../lib/imageCache';
 
+// Regex to match Spotify URLs (same pattern as in lib/spotify.ts)
+const SPOTIFY_URL_REGEX = /https?:\/\/open\.spotify\.com\/(track|album|playlist)\/[a-zA-Z0-9]+(\?[^\s]*)?\s*/g;
+
 function PostCard({
   post,
   onPress,
@@ -496,14 +499,23 @@ function PostCard({
         </View>
       </View>
 
-      {/* Content */}
-      <MentionText
-        text={localPost.text}
-        style={styles.text}
-        onPressMention={(handle) => {
-          onPressUser?.(handle, handle);
-        }}
-      />
+      {/* Content - hide Spotify URL if we have an embed */}
+      {(() => {
+        const displayText = localPost.spotifyEmbed
+          ? localPost.text.replace(SPOTIFY_URL_REGEX, '').trim()
+          : localPost.text;
+
+        // Only show text if there's something to display after removing the URL
+        return displayText ? (
+          <MentionText
+            text={displayText}
+            style={styles.text}
+            onPressMention={(handle) => {
+              onPressUser?.(handle, handle);
+            }}
+          />
+        ) : null;
+      })()}
 
       {/* Spotify Embed */}
       {localPost.spotifyEmbed && (

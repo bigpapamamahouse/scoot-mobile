@@ -8,7 +8,7 @@ import {
   Linking,
   ActivityIndicator,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SpotifyEmbed, getSpotifyDeepLink, getSpotifyTypeLabel } from '../lib/spotify';
 import { useTheme, spacing, typography, borderRadius, shadows } from '../theme';
 
@@ -53,22 +53,67 @@ export function SpotifyCard({ embed, compact = false }: SpotifyCardProps) {
   const typeLabel = getSpotifyTypeLabel(embed.type);
   const styles = React.useMemo(() => createStyles(colors, compact), [colors, compact]);
 
+  if (compact) {
+    // Compact horizontal layout for compose preview
+    return (
+      <TouchableOpacity
+        style={styles.compactContainer}
+        onPress={handlePress}
+        activeOpacity={0.8}
+      >
+        <View style={styles.compactImageContainer}>
+          {!imageLoaded && !imageError && (
+            <View style={styles.imagePlaceholder}>
+              <ActivityIndicator size="small" color={SPOTIFY_GREEN} />
+            </View>
+          )}
+          {imageError ? (
+            <View style={styles.imagePlaceholder}>
+              <MaterialCommunityIcons name="music" size={24} color={colors.text.tertiary} />
+            </View>
+          ) : (
+            <Image
+              source={{ uri: embed.thumbnailUrl }}
+              style={[styles.compactImage, !imageLoaded && styles.imageHidden]}
+              onLoad={() => setImageLoaded(true)}
+              onError={() => setImageError(true)}
+              resizeMode="cover"
+            />
+          )}
+        </View>
+        <View style={styles.compactContent}>
+          <Text style={styles.compactTitle} numberOfLines={1}>
+            {embed.title}
+          </Text>
+          <View style={styles.spotifyBadge}>
+            <MaterialCommunityIcons name="spotify" size={14} color={SPOTIFY_GREEN} />
+            <Text style={styles.compactTypeLabel}>{typeLabel}</Text>
+          </View>
+        </View>
+        <View style={styles.compactPlayButton}>
+          <MaterialCommunityIcons name="play" size={16} color={SPOTIFY_BLACK} />
+        </View>
+      </TouchableOpacity>
+    );
+  }
+
+  // Full card layout for feed display
   return (
     <TouchableOpacity
       style={styles.container}
       onPress={handlePress}
       activeOpacity={0.8}
     >
-      {/* Album Art */}
+      {/* Large Album Art */}
       <View style={styles.imageContainer}>
         {!imageLoaded && !imageError && (
           <View style={styles.imagePlaceholder}>
-            <ActivityIndicator size="small" color={SPOTIFY_GREEN} />
+            <ActivityIndicator size="large" color={SPOTIFY_GREEN} />
           </View>
         )}
         {imageError ? (
           <View style={styles.imagePlaceholder}>
-            <Ionicons name="musical-notes" size={compact ? 24 : 32} color={colors.text.tertiary} />
+            <MaterialCommunityIcons name="music" size={48} color={colors.text.tertiary} />
           </View>
         ) : (
           <Image
@@ -79,25 +124,25 @@ export function SpotifyCard({ embed, compact = false }: SpotifyCardProps) {
             resizeMode="cover"
           />
         )}
-      </View>
 
-      {/* Content */}
-      <View style={styles.content}>
-        <View style={styles.textContainer}>
-          <Text style={styles.title} numberOfLines={2}>
-            {embed.title}
-          </Text>
-          <View style={styles.subtitleRow}>
-            <View style={styles.spotifyBadge}>
-              <Ionicons name="logo-spotify" size={12} color={SPOTIFY_GREEN} />
-              <Text style={styles.typeLabel}>{typeLabel}</Text>
-            </View>
+        {/* Play button overlay */}
+        <View style={styles.playButtonOverlay}>
+          <View style={styles.playButton}>
+            <MaterialCommunityIcons name="play" size={28} color={SPOTIFY_BLACK} />
           </View>
         </View>
+      </View>
 
-        {/* Play indicator */}
-        <View style={styles.playButton}>
-          <Ionicons name="play" size={compact ? 16 : 20} color={SPOTIFY_BLACK} />
+      {/* Info bar at bottom */}
+      <View style={styles.infoBar}>
+        <View style={styles.textContainer}>
+          <Text style={styles.title} numberOfLines={1}>
+            {embed.title}
+          </Text>
+          <View style={styles.spotifyBadge}>
+            <MaterialCommunityIcons name="spotify" size={16} color={SPOTIFY_GREEN} />
+            <Text style={styles.typeLabel}>{typeLabel}</Text>
+          </View>
         </View>
       </View>
     </TouchableOpacity>
@@ -106,9 +151,8 @@ export function SpotifyCard({ embed, compact = false }: SpotifyCardProps) {
 
 const createStyles = (colors: any, compact: boolean) =>
   StyleSheet.create({
+    // Full card styles
     container: {
-      flexDirection: 'row',
-      alignItems: 'center',
       backgroundColor: colors.background.tertiary,
       borderRadius: borderRadius.lg,
       overflow: 'hidden',
@@ -116,9 +160,10 @@ const createStyles = (colors: any, compact: boolean) =>
       ...shadows.sm,
     },
     imageContainer: {
-      width: compact ? 56 : 80,
-      height: compact ? 56 : 80,
+      width: '100%',
+      aspectRatio: 1,
       backgroundColor: colors.neutral[200],
+      position: 'relative',
     },
     imagePlaceholder: {
       position: 'absolute',
@@ -137,26 +182,33 @@ const createStyles = (colors: any, compact: boolean) =>
     imageHidden: {
       opacity: 0,
     },
-    content: {
-      flex: 1,
+    playButtonOverlay: {
+      position: 'absolute',
+      bottom: spacing[3],
+      right: spacing[3],
+    },
+    playButton: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      backgroundColor: SPOTIFY_GREEN,
+      justifyContent: 'center',
+      alignItems: 'center',
+      ...shadows.md,
+    },
+    infoBar: {
       flexDirection: 'row',
       alignItems: 'center',
-      paddingHorizontal: spacing[3],
-      paddingVertical: spacing[2],
+      padding: spacing[3],
     },
     textContainer: {
       flex: 1,
-      marginRight: spacing[2],
     },
     title: {
       ...typography.styles.label,
-      fontSize: compact ? typography.fontSize.sm : typography.fontSize.base,
+      fontSize: typography.fontSize.base,
       color: colors.text.primary,
       marginBottom: spacing[1],
-    },
-    subtitleRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
     },
     spotifyBadge: {
       flexDirection: 'row',
@@ -169,14 +221,52 @@ const createStyles = (colors: any, compact: boolean) =>
       textTransform: 'uppercase',
       letterSpacing: 0.5,
     },
-    playButton: {
-      width: compact ? 32 : 40,
-      height: compact ? 32 : 40,
-      borderRadius: compact ? 16 : 20,
+
+    // Compact styles (for compose preview)
+    compactContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.background.tertiary,
+      borderRadius: borderRadius.lg,
+      overflow: 'hidden',
+      marginVertical: spacing[2],
+      ...shadows.sm,
+    },
+    compactImageContainer: {
+      width: 56,
+      height: 56,
+      backgroundColor: colors.neutral[200],
+    },
+    compactImage: {
+      width: '100%',
+      height: '100%',
+    },
+    compactContent: {
+      flex: 1,
+      paddingHorizontal: spacing[3],
+      paddingVertical: spacing[2],
+    },
+    compactTitle: {
+      ...typography.styles.label,
+      fontSize: typography.fontSize.sm,
+      color: colors.text.primary,
+      marginBottom: spacing[1],
+    },
+    compactTypeLabel: {
+      ...typography.styles.caption,
+      color: colors.text.secondary,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+      fontSize: typography.fontSize.xs,
+    },
+    compactPlayButton: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
       backgroundColor: SPOTIFY_GREEN,
       justifyContent: 'center',
       alignItems: 'center',
-      ...shadows.sm,
+      marginRight: spacing[3],
     },
   });
 
