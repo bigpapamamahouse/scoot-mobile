@@ -40,7 +40,16 @@ module.exports = {
           }
         }
       ],
-      "react-native-compressor"
+      "react-native-compressor",
+      [
+        "expo-share-intent",
+        {
+          iosActivationRules: {
+            NSExtensionActivationSupportsWebURLWithMaxCount: 1,
+            NSExtensionActivationSupportsText: true
+          }
+        }
+      ]
     ],
     extra: {
       eas: {

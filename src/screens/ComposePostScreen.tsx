@@ -22,13 +22,15 @@ import { SpotifyCard } from '../components/SpotifyCard';
 import { useTheme, spacing, typography, borderRadius } from '../theme';
 import { imageDimensionCache } from '../lib/imageCache';
 import { mediaUrlFromKey, deleteMedia } from '../lib/media';
-import { hasSpotifyUrl, fetchSpotifyEmbedFromText, SpotifyEmbed } from '../lib/spotify';
+import { hasSpotifyUrl, fetchSpotifyEmbedFromText, detectSpotifyUrls, SpotifyEmbed } from '../lib/spotify';
 
 const MAX_IMAGES = 10;
 
-export default function ComposePostScreen({ navigation }: any) {
+export default function ComposePostScreen({ navigation, route }: any) {
   const { colors } = useTheme();
-  const [text, setText] = React.useState('');
+  // Get initial text from route params (e.g., from share intent)
+  const initialText = route?.params?.initialText || '';
+  const [text, setText] = React.useState(initialText);
   const [images, setImages] = React.useState<UploadingImage[]>([]);
   const [loading, setLoading] = React.useState(false);
   const [spotifyEmbed, setSpotifyEmbed] = React.useState<SpotifyEmbed | null>(null);
@@ -66,32 +68,34 @@ export default function ComposePostScreen({ navigation }: any) {
 
   // Detect Spotify URLs and fetch metadata
   React.useEffect(() => {
+    // Skip if we already have an embed (URL was already processed)
+    if (spotifyEmbed) {
+      return;
+    }
+
     // Check if text contains a Spotify URL
     if (!hasSpotifyUrl(text)) {
-      // Clear any existing embed if URL was removed
-      if (spotifyEmbed) {
-        setSpotifyEmbed(null);
-        lastFetchedUrlRef.current = null;
-      }
       return;
     }
 
     // Debounce the fetch to avoid too many API calls while typing
     const timeoutId = setTimeout(async () => {
-      // If we already have an embed for this text, skip
-      if (spotifyEmbed && text.includes(spotifyEmbed.spotifyUrl)) {
-        return;
-      }
-
       setLoadingSpotify(true);
       try {
         const embed = await fetchSpotifyEmbedFromText(text);
         if (embed) {
-          // Only update if the URL is different from what we last fetched
-          if (lastFetchedUrlRef.current !== embed.spotifyUrl) {
-            setSpotifyEmbed(embed);
-            lastFetchedUrlRef.current = embed.spotifyUrl;
+          setSpotifyEmbed(embed);
+          lastFetchedUrlRef.current = embed.spotifyUrl;
+
+          // Strip the Spotify URL from the text input
+          const detectedUrls = detectSpotifyUrls(text);
+          let cleanedText = text;
+          for (const url of detectedUrls) {
+            cleanedText = cleanedText.replace(url, '');
           }
+          // Clean up extra whitespace
+          cleanedText = cleanedText.replace(/\s+/g, ' ').trim();
+          setText(cleanedText);
         }
       } catch (error) {
         console.warn('Failed to fetch Spotify embed:', error);
