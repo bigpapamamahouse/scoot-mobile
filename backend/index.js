@@ -1021,6 +1021,7 @@ async function listPostsByUserId(targetId, limit = 1000) {
     imageAspectRatio: i.imageAspectRatio || null,
     images: i.images || null,
     avatarKey: i.avatarKey || null,
+    spotifyEmbed: i.spotifyEmbed || null,
     createdAt: i.createdAt,
   }));
 }
@@ -2535,6 +2536,7 @@ module.exports.handler = async (event) => {
               imageAspectRatio: i.imageAspectRatio || null,
               images: i.images || null,
               avatarKey: i.avatarKey || null,
+              spotifyEmbed: i.spotifyEmbed || null,
               createdAt: i.createdAt,
             }));
 
@@ -2661,6 +2663,7 @@ module.exports.handler = async (event) => {
           imageAspectRatio: i.imageAspectRatio || null,
           images: i.images || null,
           avatarKey: i.avatarKey || null,
+          spotifyEmbed: i.spotifyEmbed || null,
           createdAt: i.createdAt,
         }));
 
@@ -2827,6 +2830,19 @@ module.exports.handler = async (event) => {
         if (body.imageAspectRatio) item.imageAspectRatio = body.imageAspectRatio;
       }
 
+      // Support Spotify embeds
+      if (body.spotifyEmbed && typeof body.spotifyEmbed === 'object') {
+        item.spotifyEmbed = {
+          type: body.spotifyEmbed.type,
+          spotifyId: body.spotifyEmbed.spotifyId,
+          spotifyUrl: body.spotifyEmbed.spotifyUrl,
+          title: body.spotifyEmbed.title,
+          thumbnailUrl: body.spotifyEmbed.thumbnailUrl,
+          thumbnailWidth: body.spotifyEmbed.thumbnailWidth || null,
+          thumbnailHeight: body.spotifyEmbed.thumbnailHeight || null,
+        };
+      }
+
       await ddb.send(new PutCommand({ TableName: POSTS_TABLE, Item: item }));
 
       // NEW: detect mentions in post text
@@ -2853,6 +2869,7 @@ module.exports.handler = async (event) => {
         imageAspectRatio: item.imageAspectRatio || null,
         images: item.images || null,
         avatarKey: item.avatarKey,
+        spotifyEmbed: item.spotifyEmbed || null,
         createdAt: item.createdAt,
       });
     }
@@ -3064,6 +3081,7 @@ module.exports.handler = async (event) => {
         imageAspectRatio: post.imageAspectRatio || null,
         images: post.images || null,
         avatarKey: post.avatarKey || null,
+        spotifyEmbed: post.spotifyEmbed || null,
         createdAt: post.createdAt,
       });
     }
