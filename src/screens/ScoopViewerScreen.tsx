@@ -105,41 +105,44 @@ export default function ScoopViewerScreen({ navigation, route }: any) {
         setIsTransitioning(true);
         setIsPaused(true);
 
-        // Animate: slide current content left, show overlay with next user info
+        // Phase 1: Slide content left and fade in overlay
         Animated.parallel([
           Animated.timing(slideAnim, {
             toValue: -SCREEN_WIDTH,
             duration: 300,
             useNativeDriver: true,
           }),
+          Animated.timing(overlayOpacity, {
+            toValue: 1,
+            duration: 200,
+            useNativeDriver: true,
+          }),
+        ]).start(() => {
+          // Content is now off-screen and overlay is fully visible
+          // Switch to next user's scoops while overlay hides the transition
+          setVisitedUsers((prev) => new Set(prev).add(nextUserScoops.userId));
+          setCurrentUserScoops(nextUserScoops);
+          setScoops(nextUserScoops.scoops);
+          const firstUnviewedIndex = nextUserScoops.scoops.findIndex(s => !s.viewed);
+          setCurrentIndex(firstUnviewedIndex >= 0 ? firstUnviewedIndex : 0);
+          setCurrentProgress(0);
+
+          // Reset slide position (new content is behind overlay, invisible to user)
+          slideAnim.setValue(0);
+
+          // Phase 2: Brief pause then fade out overlay to reveal new content
           Animated.sequence([
-            Animated.timing(overlayOpacity, {
-              toValue: 1,
-              duration: 150,
-              useNativeDriver: true,
-            }),
-            Animated.delay(400),
+            Animated.delay(300),
             Animated.timing(overlayOpacity, {
               toValue: 0,
               duration: 200,
               useNativeDriver: true,
             }),
-          ]),
-        ]).start(() => {
-          // Switch to next user's scoops
-          setVisitedUsers((prev) => new Set(prev).add(nextUserScoops.userId));
-          setCurrentUserScoops(nextUserScoops);
-          setScoops(nextUserScoops.scoops);
-          // Start from first unviewed scoop
-          const firstUnviewedIndex = nextUserScoops.scoops.findIndex(s => !s.viewed);
-          setCurrentIndex(firstUnviewedIndex >= 0 ? firstUnviewedIndex : 0);
-          setCurrentProgress(0);
-
-          // Reset animation values and resume
-          slideAnim.setValue(0);
-          setIsTransitioning(false);
-          setNextUser(null);
-          setIsPaused(false);
+          ]).start(() => {
+            setIsTransitioning(false);
+            setNextUser(null);
+            setIsPaused(false);
+          });
         });
       } else {
         // No more unviewed scoops from other users
