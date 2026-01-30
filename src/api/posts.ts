@@ -1,6 +1,7 @@
 
 import { api } from './client';
 import { dedupedFetch } from '../lib/requestDeduplication';
+import { SpotifyEmbed } from '../types';
 
 export interface PaginationOptions {
   limit?: number;
@@ -160,7 +161,7 @@ export interface CreatePostImage {
 export async function createPost(
   text: string,
   imagesOrKey?: CreatePostImage[] | string,
-  aspectRatio?: number
+  spotifyEmbedOrAspectRatio?: SpotifyEmbed | number
 ) {
   // Support both new multi-image format and legacy single image format
   let body: any = { text };
@@ -174,17 +175,22 @@ export async function createPost(
     console.log('[PostsAPI] Creating post with images array:', {
       text,
       imageCount: body.images.length,
-      body,
     });
   } else if (typeof imagesOrKey === 'string') {
     // Legacy format: single image with imageKey
     body.imageKey = imagesOrKey;
-    if (aspectRatio !== undefined) {
-      body.imageAspectRatio = aspectRatio;
+    if (typeof spotifyEmbedOrAspectRatio === 'number') {
+      body.imageAspectRatio = spotifyEmbedOrAspectRatio;
     }
-    console.log('[PostsAPI] Creating post with single imageKey:', { text, body });
+    console.log('[PostsAPI] Creating post with single imageKey:', { text });
   } else {
     console.log('[PostsAPI] Creating text-only post:', { text });
+  }
+
+  // Add Spotify embed if provided (and not a legacy aspectRatio number)
+  if (spotifyEmbedOrAspectRatio && typeof spotifyEmbedOrAspectRatio === 'object') {
+    body.spotifyEmbed = spotifyEmbedOrAspectRatio;
+    console.log('[PostsAPI] Adding Spotify embed:', spotifyEmbedOrAspectRatio.title);
   }
 
   const response = await api('/posts', { method: 'POST', body: JSON.stringify(body) });

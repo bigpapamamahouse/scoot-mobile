@@ -7,6 +7,7 @@ import { ThemeProvider } from './theme';
 import { CurrentUserProvider, useCurrentUser } from './contexts/CurrentUserContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { UploadProvider } from './contexts/UploadContext';
+import { ShareIntentProvider } from './contexts/ShareIntentContext';
 import AnimatedSplash from './components/AnimatedSplash';
 
 function AppContent({ onReady }: { onReady: () => void }) {
@@ -30,7 +31,9 @@ function AppContent({ onReady }: { onReady: () => void }) {
   return (
     <NotificationsProvider>
       <UploadProvider>
-        <RootNavigator />
+        <ShareIntentProvider>
+          <RootNavigator />
+        </ShareIntentProvider>
       </UploadProvider>
     </NotificationsProvider>
   );

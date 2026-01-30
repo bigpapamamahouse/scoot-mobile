@@ -8,6 +8,7 @@ import { Avatar } from './Avatar';
 import { MentionText } from './MentionText';
 import { ImageGallery } from './ImageGallery';
 import { ImageGalleryViewer } from './ImageGalleryViewer';
+import { SpotifyCard } from './SpotifyCard';
 import { CommentsAPI, ReactionsAPI, PostsAPI, ModerationAPI } from '../api';
 import { resolveHandle } from '../lib/resolveHandle';
 import { useCurrentUser, isOwner } from '../hooks/useCurrentUser';
@@ -15,6 +16,9 @@ import { IconButton, Badge } from './ui';
 import { useTheme, spacing, typography, borderRadius, shadows } from '../theme';
 import { ReactionDetailsModal } from './ReactionDetailsModal';
 import { imageDimensionCache } from '../lib/imageCache';
+
+// Regex to match Spotify URLs (same pattern as in lib/spotify.ts)
+const SPOTIFY_URL_REGEX = /https?:\/\/open\.spotify\.com\/(track|album|playlist)\/[a-zA-Z0-9]+(\?[^\s]*)?\s*/g;
 
 function PostCard({
   post,
@@ -495,14 +499,28 @@ function PostCard({
         </View>
       </View>
 
-      {/* Content */}
-      <MentionText
-        text={localPost.text}
-        style={styles.text}
-        onPressMention={(handle) => {
-          onPressUser?.(handle, handle);
-        }}
-      />
+      {/* Content - hide Spotify URL if we have an embed */}
+      {(() => {
+        const displayText = localPost.spotifyEmbed
+          ? localPost.text.replace(SPOTIFY_URL_REGEX, '').trim()
+          : localPost.text;
+
+        // Only show text if there's something to display after removing the URL
+        return displayText ? (
+          <MentionText
+            text={displayText}
+            style={styles.text}
+            onPressMention={(handle) => {
+              onPressUser?.(handle, handle);
+            }}
+          />
+        ) : null;
+      })()}
+
+      {/* Spotify Embed */}
+      {localPost.spotifyEmbed && (
+        <SpotifyCard embed={localPost.spotifyEmbed} />
+      )}
 
       {/* Image Gallery */}
       {localPost.images && localPost.images.length > 0 ? (
@@ -852,6 +870,7 @@ export default React.memo(PostCard, (prevProps, nextProps) => {
     prevProps.post.id === nextProps.post.id &&
     prevProps.post.text === nextProps.post.text &&
     prevProps.post.imageKey === nextProps.post.imageKey &&
+    prevProps.post.spotifyEmbed?.spotifyId === nextProps.post.spotifyEmbed?.spotifyId &&
     prevProps.showCommentPreview === nextProps.showCommentPreview &&
     prevProps.initialReactions === nextProps.initialReactions
   );
