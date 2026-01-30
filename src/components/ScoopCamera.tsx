@@ -49,7 +49,7 @@ export const ScoopCamera: React.FC<ScoopCameraProps> = ({
   const [isCameraReady, setIsCameraReady] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [zoom, setZoom] = useState(0);
-  const [cameraMode, setCameraMode] = useState<'picture' | 'video'>('picture');
+  const [pictureSize, setPictureSize] = useState<string | undefined>(undefined);
   const recordingProgress = useRef(new Animated.Value(0)).current;
   const recordingTimer = useRef<NodeJS.Timeout | null>(null);
   const durationTimer = useRef<NodeJS.Timeout | null>(null);
@@ -58,8 +58,6 @@ export const ScoopCamera: React.FC<ScoopCameraProps> = ({
   const isRecordingRef = useRef(false);
   const shutterStartY = useRef(0);
   const isCameraReadyRef = useRef(false);
-  const cameraModeRef = useRef<'picture' | 'video'>('picture');
-  const pendingRecordingRef = useRef(false);
 
   // Pinch-to-zoom state
   const initialPinchDistance = useRef<number | null>(null);
@@ -69,7 +67,6 @@ export const ScoopCamera: React.FC<ScoopCameraProps> = ({
   const startRecordingRef = useRef<() => void>(() => {});
   const stopRecordingRef = useRef<() => void>(() => {});
   const takePhotoRef = useRef<() => void>(() => {});
-  const prepareForRecordingRef = useRef<() => void>(() => {});
 
   // Keep refs in sync with state
   useEffect(() => {
@@ -79,10 +76,6 @@ export const ScoopCamera: React.FC<ScoopCameraProps> = ({
   useEffect(() => {
     isCameraReadyRef.current = isCameraReady;
   }, [isCameraReady]);
-
-  useEffect(() => {
-    cameraModeRef.current = cameraMode;
-  }, [cameraMode]);
 
   // Shutter button pan responder - handles press, hold for video, and zoom gesture
   const shutterPanResponder = useRef(
@@ -96,9 +89,9 @@ export const ScoopCamera: React.FC<ScoopCameraProps> = ({
         // Start timer to detect long press for video recording
         pressTimer.current = setTimeout(() => {
           isLongPress.current = true;
-          // Prepare for recording (switch to video mode)
+          // Start recording via ref
           if (cameraRef.current && !isRecordingRef.current && isCameraReadyRef.current) {
-            prepareForRecordingRef.current();
+            startRecordingRef.current();
           }
         }, 200);
       },
@@ -124,9 +117,6 @@ export const ScoopCamera: React.FC<ScoopCameraProps> = ({
         } else if (!isLongPress.current) {
           // Was a short tap, take photo
           takePhotoRef.current();
-        } else if (pendingRecordingRef.current) {
-          // Was preparing to record but released before it started
-          pendingRecordingRef.current = false;
         }
 
         // Reset zoom when releasing
@@ -140,8 +130,6 @@ export const ScoopCamera: React.FC<ScoopCameraProps> = ({
         if (isRecordingRef.current) {
           stopRecordingRef.current();
         }
-        // Cancel pending recording
-        pendingRecordingRef.current = false;
         setZoom(0);
       },
     })
@@ -170,24 +158,46 @@ export const ScoopCamera: React.FC<ScoopCameraProps> = ({
 
   const toggleFacing = useCallback(() => {
     setIsCameraReady(false);
+    setPictureSize(undefined); // Reset picture size for new camera
     setFacing((prev) => (prev === 'back' ? 'front' : 'back'));
     // Increment key to force camera remount - fixes front camera recording issues
     setCameraKey((prev) => prev + 1);
   }, []);
 
-  const handleCameraReady = useCallback(() => {
-    console.log('[ScoopCamera] Camera is ready, mode:', cameraModeRef.current);
+  const handleCameraReady = useCallback(async () => {
+    console.log('[ScoopCamera] Camera is ready');
     setIsCameraReady(true);
 
-    // If we were waiting to record, start now that camera is ready in video mode
-    if (pendingRecordingRef.current && cameraModeRef.current === 'video') {
-      pendingRecordingRef.current = false;
-      // Small delay to ensure camera is fully ready
-      setTimeout(() => {
-        if (cameraRef.current && !isRecordingRef.current) {
-          startRecordingRef.current();
+    // Get available picture sizes and use the highest resolution for better photo quality
+    if (cameraRef.current) {
+      try {
+        const sizes = await cameraRef.current.getAvailablePictureSizesAsync();
+        console.log('[ScoopCamera] Available picture sizes:', sizes);
+
+        if (sizes && sizes.length > 0) {
+          // Parse sizes and find the highest resolution
+          // Sizes are typically in format "WIDTHxHEIGHT" or "WIDTH:HEIGHT"
+          const parsedSizes = sizes.map((size: string) => {
+            const [width, height] = size.split(/[x:]/);
+            return {
+              size,
+              width: parseInt(width, 10),
+              height: parseInt(height, 10),
+              pixels: parseInt(width, 10) * parseInt(height, 10),
+            };
+          }).filter((s: any) => !isNaN(s.pixels));
+
+          if (parsedSizes.length > 0) {
+            // Sort by total pixels (descending) and pick the highest
+            parsedSizes.sort((a: any, b: any) => b.pixels - a.pixels);
+            const bestSize = parsedSizes[0].size;
+            console.log('[ScoopCamera] Setting picture size to:', bestSize);
+            setPictureSize(bestSize);
+          }
         }
-      }, 50);
+      } catch (error) {
+        console.warn('[ScoopCamera] Failed to get picture sizes:', error);
+      }
     }
   }, []);
 
@@ -197,7 +207,7 @@ export const ScoopCamera: React.FC<ScoopCameraProps> = ({
     try {
       const photo = await cameraRef.current.takePictureAsync({
         quality: 1.0,
-        skipProcessing: false,
+        skipProcessing: Platform.OS === 'android', // Skip processing on Android for better quality
         exif: false,
       });
 
@@ -276,23 +286,7 @@ export const ScoopCamera: React.FC<ScoopCameraProps> = ({
     } catch (error) {
       console.warn('[ScoopCamera] Error stopping recording:', error);
     }
-
-    // Switch back to picture mode for better photo quality
-    setCameraMode('picture');
   }, [isRecording, recordingProgress]);
-
-  // Prepare for recording by switching to video mode
-  const prepareForRecording = useCallback(() => {
-    if (cameraMode === 'video') {
-      // Already in video mode, start recording immediately
-      startRecording();
-    } else {
-      // Switch to video mode and set pending flag
-      pendingRecordingRef.current = true;
-      setIsCameraReady(false); // Camera will need to reinitialize
-      setCameraMode('video');
-    }
-  }, [cameraMode, startRecording]);
 
   // Update function refs so pan responder can call them
   useEffect(() => {
@@ -306,10 +300,6 @@ export const ScoopCamera: React.FC<ScoopCameraProps> = ({
   useEffect(() => {
     stopRecordingRef.current = stopRecording;
   }, [stopRecording]);
-
-  useEffect(() => {
-    prepareForRecordingRef.current = prepareForRecording;
-  }, [prepareForRecording]);
 
   // Calculate distance between two touch points
   const getDistance = (touches: any[]) => {
@@ -446,8 +436,9 @@ export const ScoopCamera: React.FC<ScoopCameraProps> = ({
           ref={cameraRef}
           style={styles.camera}
           facing={facing}
-          mode={cameraMode}
+          mode="video"
           zoom={zoom}
+          pictureSize={pictureSize}
           onCameraReady={handleCameraReady}
         />
       </View>
