@@ -1,5 +1,19 @@
 // Common types used across the application
 
+// Spotify content types we support
+export type SpotifyContentType = 'track' | 'album' | 'playlist';
+
+// Data structure for Spotify embeds stored in posts
+export interface SpotifyEmbed {
+  type: SpotifyContentType;
+  spotifyId: string;
+  spotifyUrl: string;
+  title: string;
+  thumbnailUrl: string;
+  thumbnailWidth?: number;
+  thumbnailHeight?: number;
+}
+
 export interface PostImage {
   key: string;                    // S3 key
   aspectRatio: number;           // width/height for layout optimization
@@ -21,6 +35,9 @@ export interface Post {
   // Deprecated: Keep for backward compatibility with old posts
   imageKey?: string;
   imageAspectRatio?: number;
+
+  // Spotify embed (tracks, albums, playlists)
+  spotifyEmbed?: SpotifyEmbed;
 
   createdAt: string;
   updatedAt?: string;

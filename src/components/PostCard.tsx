@@ -8,6 +8,7 @@ import { Avatar } from './Avatar';
 import { MentionText } from './MentionText';
 import { ImageGallery } from './ImageGallery';
 import { ImageGalleryViewer } from './ImageGalleryViewer';
+import { SpotifyCard } from './SpotifyCard';
 import { CommentsAPI, ReactionsAPI, PostsAPI, ModerationAPI } from '../api';
 import { resolveHandle } from '../lib/resolveHandle';
 import { useCurrentUser, isOwner } from '../hooks/useCurrentUser';
@@ -504,6 +505,11 @@ function PostCard({
         }}
       />
 
+      {/* Spotify Embed */}
+      {localPost.spotifyEmbed && (
+        <SpotifyCard embed={localPost.spotifyEmbed} />
+      )}
+
       {/* Image Gallery */}
       {localPost.images && localPost.images.length > 0 ? (
         <ImageGallery
@@ -852,6 +858,7 @@ export default React.memo(PostCard, (prevProps, nextProps) => {
     prevProps.post.id === nextProps.post.id &&
     prevProps.post.text === nextProps.post.text &&
     prevProps.post.imageKey === nextProps.post.imageKey &&
+    prevProps.post.spotifyEmbed?.spotifyId === nextProps.post.spotifyEmbed?.spotifyId &&
     prevProps.showCommentPreview === nextProps.showCommentPreview &&
     prevProps.initialReactions === nextProps.initialReactions
   );

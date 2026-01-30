@@ -18,9 +18,11 @@ import { uploadMedia } from '../lib/upload';
 import { Button } from '../components/ui';
 import { MentionTextInput } from '../components/MentionTextInput';
 import { MultiImagePicker, UploadingImage } from '../components/MultiImagePicker';
+import { SpotifyCard } from '../components/SpotifyCard';
 import { useTheme, spacing, typography, borderRadius } from '../theme';
 import { imageDimensionCache } from '../lib/imageCache';
 import { mediaUrlFromKey, deleteMedia } from '../lib/media';
+import { hasSpotifyUrl, fetchSpotifyEmbedFromText, SpotifyEmbed } from '../lib/spotify';
 
 const MAX_IMAGES = 10;
 
@@ -29,9 +31,14 @@ export default function ComposePostScreen({ navigation }: any) {
   const [text, setText] = React.useState('');
   const [images, setImages] = React.useState<UploadingImage[]>([]);
   const [loading, setLoading] = React.useState(false);
+  const [spotifyEmbed, setSpotifyEmbed] = React.useState<SpotifyEmbed | null>(null);
+  const [loadingSpotify, setLoadingSpotify] = React.useState(false);
 
   // Use ref instead of state to avoid race condition on unmount
   const postedRef = React.useRef(false);
+
+  // Track the last fetched URL to avoid duplicate fetches
+  const lastFetchedUrlRef = React.useRef<string | null>(null);
 
   const styles = React.useMemo(() => createStyles(colors), [colors]);
 
@@ -56,6 +63,45 @@ export default function ComposePostScreen({ navigation }: any) {
       }
     };
   }, []); // Empty deps - only run cleanup on unmount
+
+  // Detect Spotify URLs and fetch metadata
+  React.useEffect(() => {
+    // Check if text contains a Spotify URL
+    if (!hasSpotifyUrl(text)) {
+      // Clear any existing embed if URL was removed
+      if (spotifyEmbed) {
+        setSpotifyEmbed(null);
+        lastFetchedUrlRef.current = null;
+      }
+      return;
+    }
+
+    // Debounce the fetch to avoid too many API calls while typing
+    const timeoutId = setTimeout(async () => {
+      // If we already have an embed for this text, skip
+      if (spotifyEmbed && text.includes(spotifyEmbed.spotifyUrl)) {
+        return;
+      }
+
+      setLoadingSpotify(true);
+      try {
+        const embed = await fetchSpotifyEmbedFromText(text);
+        if (embed) {
+          // Only update if the URL is different from what we last fetched
+          if (lastFetchedUrlRef.current !== embed.spotifyUrl) {
+            setSpotifyEmbed(embed);
+            lastFetchedUrlRef.current = embed.spotifyUrl;
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to fetch Spotify embed:', error);
+      } finally {
+        setLoadingSpotify(false);
+      }
+    }, 500); // 500ms debounce
+
+    return () => clearTimeout(timeoutId);
+  }, [text, spotifyEmbed]);
 
 
   const compressImage = async (uri: string, width: number, height: number) => {
@@ -261,7 +307,8 @@ export default function ComposePostScreen({ navigation }: any) {
 
       await PostsAPI.createPost(
         text.trim(),
-        postImages.length > 0 ? postImages : undefined
+        postImages.length > 0 ? postImages : undefined,
+        spotifyEmbed || undefined
       );
 
       postedRef.current = true; // Mark as posted so cleanup doesn't delete the images
@@ -332,6 +379,27 @@ export default function ComposePostScreen({ navigation }: any) {
             autocompleteMaxHeight={250}
             flex={false}
           />
+
+          {/* Spotify Preview */}
+          {(spotifyEmbed || loadingSpotify) && (
+            <View style={styles.spotifyPreviewContainer}>
+              {loadingSpotify ? (
+                <View style={styles.spotifyLoading}>
+                  <Text style={styles.spotifyLoadingText}>Loading Spotify preview...</Text>
+                </View>
+              ) : spotifyEmbed ? (
+                <View>
+                  <View style={styles.spotifyHeader}>
+                    <Text style={styles.spotifyHeaderText}>Spotify Link Detected</Text>
+                    <TouchableOpacity onPress={() => setSpotifyEmbed(null)}>
+                      <Ionicons name="close-circle" size={20} color={colors.text.tertiary} />
+                    </TouchableOpacity>
+                  </View>
+                  <SpotifyCard embed={spotifyEmbed} compact />
+                </View>
+              ) : null}
+            </View>
+          )}
 
           {/* Image picker - always visible */}
           {hasImages ? (
@@ -421,5 +489,28 @@ const createStyles = (colors: any) => StyleSheet.create({
     textAlign: 'center',
     marginTop: spacing[4],
     marginBottom: spacing[2],
+  },
+  spotifyPreviewContainer: {
+    marginHorizontal: spacing[4],
+    marginTop: spacing[2],
+  },
+  spotifyHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing[1],
+  },
+  spotifyHeaderText: {
+    color: colors.text.secondary,
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.medium,
+  },
+  spotifyLoading: {
+    padding: spacing[4],
+    alignItems: 'center',
+  },
+  spotifyLoadingText: {
+    color: colors.text.tertiary,
+    fontSize: typography.fontSize.sm,
   },
 });
