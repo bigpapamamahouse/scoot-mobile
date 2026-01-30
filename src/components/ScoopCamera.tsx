@@ -175,7 +175,14 @@ export const ScoopCamera: React.FC<ScoopCameraProps> = ({
         console.log('[ScoopCamera] Available picture sizes:', sizes);
 
         if (sizes && sizes.length > 0) {
-          // Parse sizes and find the highest resolution
+          // On iOS, "Photo" is the highest quality preset - use it if available
+          if (sizes.includes('Photo')) {
+            console.log('[ScoopCamera] Using "Photo" preset for highest quality');
+            setPictureSize('Photo');
+            return;
+          }
+
+          // Fallback: Parse sizes and find the highest resolution
           // Sizes are typically in format "WIDTHxHEIGHT" or "WIDTH:HEIGHT"
           const parsedSizes = sizes.map((size: string) => {
             const [width, height] = size.split(/[x:]/);
