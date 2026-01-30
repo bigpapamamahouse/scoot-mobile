@@ -26,6 +26,7 @@ interface ScoopsBarProps {
 
 export interface ScoopsBarRef {
   refresh: () => Promise<void>;
+  getScoopsFeed: () => UserScoops[];
 }
 
 export const ScoopsBar = forwardRef<ScoopsBarRef, ScoopsBarProps>(({
@@ -59,10 +60,11 @@ export const ScoopsBar = forwardRef<ScoopsBarRef, ScoopsBarProps>(({
     loadScoops();
   }, [loadScoops]);
 
-  // Expose refresh method via ref
+  // Expose refresh and getScoopsFeed methods via ref
   useImperativeHandle(ref, () => ({
     refresh: loadScoops,
-  }), [loadScoops]);
+    getScoopsFeed: () => scoopsFeed,
+  }), [loadScoops, scoopsFeed]);
 
   // Refresh scoops when upload succeeds
   React.useEffect(() => {
