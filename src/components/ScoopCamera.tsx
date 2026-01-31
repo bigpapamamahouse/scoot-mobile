@@ -286,6 +286,7 @@ export const ScoopCamera: React.FC<ScoopCameraProps> = ({
 
       // Switch back to picture mode for high quality photos
       setCameraMode('picture');
+      setCameraKey((prev) => prev + 1);
 
       if (video?.uri) {
         const aspectRatio = SCREEN_WIDTH / SCREEN_HEIGHT; // Assuming full-screen capture
@@ -296,6 +297,7 @@ export const ScoopCamera: React.FC<ScoopCameraProps> = ({
       setIsRecording(false);
       // Switch back to picture mode even on error
       setCameraMode('picture');
+      setCameraKey((prev) => prev + 1);
     }
   }, [isRecording, isCameraReady, recordingProgress, onCapture]);
 
@@ -323,18 +325,20 @@ export const ScoopCamera: React.FC<ScoopCameraProps> = ({
 
   // Prepare for recording by switching to video mode if needed
   const prepareForRecording = useCallback(() => {
-    console.log('[ScoopCamera] Preparing for recording, current mode:', cameraMode);
+    console.log('[ScoopCamera] Preparing for recording, current mode:', cameraMode, 'ready:', isCameraReady);
 
     if (cameraMode === 'video' && isCameraReady) {
       // Already in video mode and ready, start recording immediately
-      console.log('[ScoopCamera] Already in video mode, starting recording');
+      console.log('[ScoopCamera] Already in video mode and ready, starting recording');
       startRecording();
     } else {
-      // Need to switch to video mode first
+      // Need to switch to video mode (or camera not ready yet)
       console.log('[ScoopCamera] Switching to video mode');
       pendingRecordingRef.current = true;
       setIsCameraReady(false);
       setCameraMode('video');
+      // Force camera remount to ensure onCameraReady is called
+      setCameraKey((prev) => prev + 1);
     }
   }, [cameraMode, isCameraReady, startRecording]);
 
