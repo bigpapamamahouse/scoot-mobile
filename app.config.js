@@ -15,13 +15,15 @@ module.exports = {
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.scooterbooter.scoot",
+      appleTeamId: "Z4F43AS99A",
       buildNumber: "6",
       infoPlist: {
         NSCameraUsageDescription: "This app uses the camera to take photos for creating posts.",
         NSPhotoLibraryUsageDescription: "This app needs access to your photo library to select photos for posts."
       },
       entitlements: {
-        "aps-environment": "production"
+        "aps-environment": "production",
+        "com.apple.security.application-groups": ["group.com.scooterbooter.scoot"]
       },
       config: {
         usesNonExemptEncryption: false
@@ -44,6 +46,7 @@ module.exports = {
       [
         "expo-share-intent",
         {
+          iosAppGroupIdentifier: "group.com.scooterbooter.scoot",
           iosActivationRules: {
             NSExtensionActivationSupportsWebURLWithMaxCount: 1,
             NSExtensionActivationSupportsText: true
