@@ -15,6 +15,7 @@ module.exports = {
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.scooterbooter.scoot",
+      appleTeamId: "Z4F43AS99A",
       buildNumber: "6",
       infoPlist: {
         NSCameraUsageDescription: "This app uses the camera to take photos for creating posts.",
