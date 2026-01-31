@@ -280,17 +280,22 @@ export const ScoopCamera: React.FC<ScoopCameraProps> = ({
     }, MAX_VIDEO_DURATION);
 
     try {
+      console.log('[ScoopCamera] Starting recordAsync');
       const video = await cameraRef.current.recordAsync({
         maxDuration: MAX_VIDEO_DURATION / 1000,
       });
+      console.log('[ScoopCamera] recordAsync resolved, video:', video);
 
       // Switch back to picture mode for high quality photos
       setCameraMode('picture');
       setCameraKey((prev) => prev + 1);
 
       if (video?.uri) {
+        console.log('[ScoopCamera] Calling onCapture with video uri:', video.uri);
         const aspectRatio = SCREEN_WIDTH / SCREEN_HEIGHT; // Assuming full-screen capture
         onCapture(video.uri, 'video', aspectRatio, false);
+      } else {
+        console.warn('[ScoopCamera] No video uri returned from recordAsync');
       }
     } catch (error: any) {
       console.error('[ScoopCamera] Failed to record video:', error);
